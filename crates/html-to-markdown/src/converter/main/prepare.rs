@@ -8,8 +8,8 @@ use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, re
 use crate::converter::utility::preprocessing::strip_script_and_style_tags_for_second_pass;
 use crate::converter::utility::preprocessing::{
     KeptScripts, normalize_bogus_comment_endings, normalize_menu_elements, normalize_split_closing_tags,
-    normalize_unclosed_list_items, preprocess_html, strip_bogus_comments, strip_hidden_elements, strip_html_cdata,
-    strip_script_and_style_tags, strip_script_and_style_tags_with_kept_scripts,
+    normalize_unclosed_list_items, owner_mark_numbers, preprocess_html, strip_bogus_comments, strip_hidden_elements,
+    strip_html_cdata, strip_script_and_style_tags, strip_script_and_style_tags_with_kept_scripts,
 };
 use crate::error::Result;
 use crate::options::{ConversionOptions, HiddenContent};
@@ -48,6 +48,17 @@ pub(super) fn preprocess_initial_html(
     hidden_content: HiddenContent,
 ) -> Result<String> {
     Ok(preprocess_initial_html_with_kept_scripts(html, options, hidden_content)?.0)
+}
+
+/// Each number that the page of the conversion of `html` has after the name of an owner mark,
+/// as the cleanup leaves it.
+///
+/// ~keep The repair of a script with no end tag writes owner marks before the conversion reads
+/// ~keep the page. It asks for these numbers and writes its marks again with none of them, as
+/// ~keep the second pass of the kept scripts does: one reservation for the two writers of a mark.
+pub fn owner_mark_numbers_after_cleanup(html: &str, options: &ConversionOptions) -> Result<Vec<usize>> {
+    let page = preprocess_initial_html(html, options, options.hidden_content)?;
+    Ok(owner_mark_numbers(page.as_bytes()).into_iter().collect())
 }
 
 /// [`preprocess_initial_html`], with the kept scripts of `html`.

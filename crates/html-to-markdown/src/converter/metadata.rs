@@ -130,6 +130,8 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
 /// ~keep The tree holds the text of a kept script with the escape of the first pass.
 /// ~keep `KeptScripts` takes it back for the node that had the owner mark of the script; this
 /// ~keep function decodes nothing, so a character reference of the JSON stays as written.
+/// ~keep A script with no end tag whose bytes the repair kept has those bytes in the tree by now
+/// ~keep (`restore_inert_bodies`), and no owner mark of the first pass: it reads as the tree has it.
 #[cfg(feature = "metadata")]
 fn json_ld_from_tag(node: u32, tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scripts: &KeptScripts) -> Option<String> {
     let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;

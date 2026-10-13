@@ -485,7 +485,7 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
 /// ~keep DoS guard: hostile input can contain an unterminated element followed
 /// ~keep by hundreds of megabytes of text; the scan gives up rather than walking
 /// ~keep the whole document for every such tag.
-const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
+pub(super) const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
 
 /// The side of an element that a tag is on.
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -278,6 +278,9 @@ pub(super) fn finish_dom_parse(
     kept_scripts: KeptScripts,
 ) -> Result<KeptScripts> {
     if !inert_bodies.is_empty() {
+        // ~keep The restore runs first: it puts the bytes of a repaired script back in the tree
+        // ~keep and takes the owner mark of that script out. No reader asks for its node ids:
+        // ~keep nothing decodes the text of a script, so a restored body reads as the tree has it.
         crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
         *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
     }

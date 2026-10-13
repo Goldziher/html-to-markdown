@@ -544,6 +544,82 @@ fn the_plain_output_holds_no_owner_mark() {
     }
 }
 
+/// The repair of a script with no end tag (#875) writes its owner mark before the cleanup of
+/// the conversion. The cleanup joins the parts of a name, a value and a text of the author into
+/// that mark. The repair reserves the names of the cleaned page, so the script of the author
+/// does not get the JSON of the repaired script: it is written with its own text, and the
+/// repaired script with its JSON. A preserved script of the body gives no metadata, so the
+/// content is the proof.
+#[test]
+fn a_repaired_script_keeps_its_json_when_the_cleanup_joins_its_mark() {
+    const GAP: &str = "<span hidden>x</span>";
+    const JSON: &str = r#"{"a":"<b>"}"#;
+    let forged = script_with_a_mark_in_parts(GAP, GAP, GAP, &format!("h2m_script_body_{GAP}0_end"));
+    let html = format!("{forged}<p>m</p>{OPEN}{JSON}<p>tail</p>");
+    let text_of_the_author = ">h2m_script_body_0_end</script>\n\nm\n\n";
+    let repaired = format!("{}\n\ntail\n", script(JSON));
+    for (route, content) in ROUTES.into_iter().zip(preserved(&html, "script")) {
+        assert_eq!(content.matches(JSON).count(), 1, "{route:?}: {content:?}");
+        assert!(content.contains(text_of_the_author), "{route:?}: {content:?}");
+        assert!(content.ends_with(&repaired), "{route:?}: {content:?}");
+    }
+}
+
+/// The first pass marks a script with an end tag whose text holds `<`. The repair of a script
+/// with no end tag (#875) keeps the bytes of a preserved script under a mark of the same name.
+/// No two marks of a page have one number: each script gives its own JSON as written, with one
+/// script of each kind and with two, in the two orders. With `preserve_tags` a script of the
+/// body gives no metadata, and each script is written with its own text and no mark: the kept
+/// script as the tree has it, the repaired script as the page has it.
+#[test]
+fn a_marked_script_and_a_repaired_script_give_their_own_json() {
+    const WITH_END_TAG: [&str; 2] = [r#"{"closed":"<1>"}"#, r#"{"closed":"<2> &lt;"}"#];
+    const NO_END_TAG: [&str; 2] = [r#"{"unclosed":"<3> &amp;"}"#, r#"{"unclosed":"&lt;4>"}"#];
+    for count in [1, 2] {
+        let with_end_tag: String = WITH_END_TAG[..count].iter().map(|body| script(body)).collect();
+        let no_end_tag: String = NO_END_TAG[..count]
+            .iter()
+            .map(|body| format!("{OPEN}{body}<p>tail</p>"))
+            .collect();
+        let with_end_tag_first: Vec<&str> = WITH_END_TAG[..count]
+            .iter()
+            .chain(&NO_END_TAG[..count])
+            .copied()
+            .collect();
+        let no_end_tag_first: Vec<&str> = NO_END_TAG[..count]
+            .iter()
+            .chain(&WITH_END_TAG[..count])
+            .copied()
+            .collect();
+        let kept: Vec<String> = WITH_END_TAG[..count]
+            .iter()
+            .map(|body| script(&body.replace('<', "&lt;")))
+            .collect();
+        let repaired: Vec<String> = NO_END_TAG[..count]
+            .iter()
+            .flat_map(|body| [script(body), "tail".to_owned()])
+            .collect();
+        for (html, bodies, blocks) in [
+            (
+                format!("{with_end_tag}{no_end_tag}"),
+                with_end_tag_first,
+                [kept.clone(), repaired.clone()].concat(),
+            ),
+            (
+                format!("{no_end_tag}{with_end_tag}"),
+                no_end_tag_first,
+                [repaired, kept].concat(),
+            ),
+        ] {
+            assert_eq!(raw_json(&html), as_written(&bodies), "{html:?}");
+            let written = format!("{}\n", blocks.join("\n\n"));
+            for (route, content) in ROUTES.into_iter().zip(preserved(&html, "script")) {
+                assert_eq!(content, written, "{route:?}: {html:?}");
+            }
+        }
+    }
+}
+
 #[cfg(feature = "visitor")]
 mod with_a_visitor {
     use std::collections::BTreeMap;

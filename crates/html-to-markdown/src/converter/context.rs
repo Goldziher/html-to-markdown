@@ -51,7 +51,7 @@ pub struct ContextParameters {
 
 /// The kinds of metadata the collector asks for, read once when the context is made.
 #[cfg(feature = "metadata")]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct MetadataPreferences {
     pub(crate) document: bool,
     pub(crate) headers: bool,
@@ -126,7 +126,7 @@ pub struct MediaBoundaryState {
 ///
 /// This context is passed through the recursive tree walker and maintains information
 /// about the current position in the document tree, nesting levels, and enabled features.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Context {
     /// Are we inside a code-like element (pre, code, kbd, samp)?
     pub(crate) in_code: bool,
@@ -412,83 +412,31 @@ impl Context {
 
     /// Create a new conversion context from options and optional collectors.
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
-        Self {
-            in_code: false,
-            in_code_block: false,
-            inline_code_links: None,
-            media_boundary: None,
-            pre_cell_break_offsets: None,
-            list_counter: 0,
-            in_ordered_list: false,
-            blockquote_depth: 0,
-            in_table_cell: false,
-            allow_nested_table_markup: false,
-            in_cell_of_inputs: false,
-            in_option_list: false,
-            in_layout_cell: false,
+        #[cfg(feature = "metadata")]
+        let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
+        let mut context = Self {
             convert_as_inline: options.convert_as_inline,
-            inline_depth: 0,
-            in_list_item: false,
-            list_item_open: false,
-            text_in_markers: false,
-            in_marker_span: false,
-            inline_buffer_column: None,
-            inline_buffer_after_hard_break: false,
-            escapes_hyphens: false,
-            list_depth: 0,
-            list_indent_columns: 0,
-            real_item_columns: 0,
-            quote_starts_after_markers: false,
-            previous_marker: crate::converter::list::utils::PreviousMarker::default(),
-            last_list: crate::converter::list::utils::LastList::default(),
-            ordered_delimiter: None,
-            item_lines: crate::converter::list::utils::ItemLineScan::default(),
-            first_writer: None,
-            task_item_scope: None,
-            ul_depth: 0,
-            in_list: false,
-            loose_list: false,
-            prev_item_had_blocks: false,
-            in_heading: false,
-            heading_allow_inline_images: false,
-            cell_allow_inline_images: false,
-            link_allow_inline_images: false,
-            in_paragraph: false,
-            djot_rule_like_text: None,
-            block_content_start: 0,
-            block_output_ptr: 0,
-            at_fresh_block_start: Rc::new(Cell::new(true)),
-            in_ruby: false,
-            in_strong: false,
-            in_link: false,
-            strip_tags: Rc::new(options.strip_tags.iter().cloned().collect()),
-            preserve_tags: Rc::new(options.preserve_tags.iter().cloned().collect()),
-            keep_inline_images_in: Rc::new(options.keep_inline_images_in.iter().cloned().collect()),
-            excluded_node_ids: Rc::new(HashSet::new()),
-            depth_limit_reached: Rc::new(Cell::new(false)),
-            inline_data_replaced: Rc::new(Cell::new(false)),
             #[cfg(feature = "inline-images")]
             inline_collector: parameters.inline_collector,
-            // ~keep The preferences read the collector before the context takes it.
-            #[cfg(feature = "metadata")]
-            metadata_wants: metadata_preferences(parameters.metadata_collector.as_ref()),
             #[cfg(feature = "metadata")]
             metadata_collector: parameters.metadata_collector,
+            #[cfg(feature = "metadata")]
+            metadata_wants: metadata,
             #[cfg(feature = "visitor")]
             visitor: parameters.visitor,
-            #[cfg(feature = "visitor")]
-            visitor_error: Rc::new(RefCell::new(None)),
-            #[cfg(feature = "visitor")]
-            is_unobserved: false,
             structure_collector: parameters.structure_collector,
             reference_collector: parameters.reference_collector,
-            skip_visitor_hooks: false,
-            measure_width_only: false,
             base_url: parameters.base_url,
             own_page: Rc::new(parameters.own_page),
             #[cfg(feature = "metadata")]
             kept_scripts: Rc::new(parameters.kept_scripts),
-        }
+            ..Self::default()
+        };
+        context.at_fresh_block_start.set(true);
+        Rc::make_mut(&mut context.strip_tags).extend(options.strip_tags.iter().cloned());
+        Rc::make_mut(&mut context.preserve_tags).extend(options.preserve_tags.iter().cloned());
+        Rc::make_mut(&mut context.keep_inline_images_in).extend(options.keep_inline_images_in.iter().cloned());
+        context
     }
 
     /// Whether the current output buffer is written between inline markers: an inline wrapper's

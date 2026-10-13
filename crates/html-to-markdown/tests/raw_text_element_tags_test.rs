@@ -343,17 +343,17 @@ mod structured_data {
         }
     }
 
-    /// A structured data script with no end tag holds the rest of the page as its text. The
-    /// parser reads it as one script with one text: a start tag in that text opens no script
-    /// in the script. A page of such start tags nested one script for each of them, and a
-    /// large page ended the process with a stack overflow.
+    /// A structured data script with no end tag ends where its JSON ends, and the markup after
+    /// the JSON is written (#875). So each start tag of a page of such scripts opens a script
+    /// of its own, beside the one before it: no start tag opens a script in a script. A page
+    /// of such start tags nested one script for each of them, and a large page ended the
+    /// process with a stack overflow.
     #[test]
-    fn a_script_with_no_end_tag_is_one_script_with_the_rest_of_the_page_as_its_text() {
+    fn each_script_with_no_end_tag_is_a_script_of_its_own_with_its_json_as_its_text() {
         const START_TAGS: usize = 200;
         let unit = "<script type=\"application/ld+json\">{} ";
         let html = format!("<p>x</p>{}", unit.repeat(START_TAGS));
-        let rest = format!("{{}} {}", unit.repeat(START_TAGS - 1));
-        assert_eq!(raw_json(&html), vec![vec![rest.trim_end().to_string()]; 2]);
+        assert_eq!(raw_json(&html), vec![vec!["{}".to_string(); START_TAGS]; 2]);
     }
 
     /// A media type that only starts with the name of structured data is not structured data.
@@ -445,6 +445,20 @@ mod structured_data {
         for body in [r#"{"a":"&lt;b&gt;"}"#, r#"{"a":"a < b &lt; c"}"#] {
             let html = format!("<p>visible</p>{OPEN}{body}");
             assert_eq!(raw_json(&html), as_written(&[body]), "{html:?}");
+        }
+    }
+
+    /// The repair of a script with no end tag (#875) does not look in a `noembed` or in a
+    /// `noframes`. The first pass reads a script with no end tag there: the script holds the
+    /// rest of the page, and it has a record of its own, so its text is given as written.
+    #[test]
+    fn a_script_with_no_end_tag_that_the_repair_does_not_reach_gives_the_rest_of_the_page_as_written() {
+        for element in ["noembed", "noframes"] {
+            for body in [r#"{"a":"<b>"}"#, r#"{"a":"&lt;b>"}"#] {
+                let html = format!("<p>x</p><{element}>{OPEN}{body}<p>tail</p>");
+                let rest = format!("{body}<p>tail</p>");
+                assert_eq!(raw_json(&html), as_written(&[&rest]), "{html:?}");
+            }
         }
     }
 

@@ -153,19 +153,48 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     let has_visitor = false;
     let preserve_bodies = options.output_format != crate::options::OutputFormat::Plain
         && (has_visitor || !options.preserve_tags.is_empty());
-    let (inert_html, inert_bodies) = crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
-        &normalized_input,
-        preserve_bodies,
-        options.hidden_content,
-    );
-    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
-    // ~keep in kept content is no head of the page, and a browser ignores it there.
+    let (inert_html, mut inert_bodies) =
+        crate::converter::utility::preprocessing::normalize_inert_bodies_with_preservation(
+            &normalized_input,
+            preserve_bodies,
+            options.hidden_content,
+        );
     let normalized_input = match inert_html {
         Cow::Borrowed(_) => normalized_input,
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
-    let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
-        .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
+    // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
+    let preserves_script = preserve_bodies
+        && options
+            .preserve_tags
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case("script"));
+    let bodies_before_repair = preserves_script.then(|| inert_bodies.clone());
+    let mut repaired_page = written_page(
+        crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
+            normalized_input.as_ref(),
+            preserves_script.then_some(&mut inert_bodies),
+        ),
+    );
+    // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
+    // ~keep in kept content is no head of the page, and a browser ignores it there.
+    let mut head = repair_head(
+        repaired_page.as_deref().unwrap_or_else(|| normalized_input.as_ref()),
+        options.hidden_content,
+    );
+    // ~keep A page with no repaired script whose bytes are kept, which is most pages, is repaired once.
+    if let Some(bodies) = bodies_before_repair.filter(|bodies| bodies.len() < inert_bodies.len()) {
+        let first_repair = head
+            .as_ref()
+            .map(|(html, _)| html.as_str())
+            .or_else(|| repaired_page.as_deref());
+        inert_bodies = bodies;
+        (repaired_page, head) =
+            repair_with_reserved_owner_names(&normalized_input, first_repair, &mut inert_bodies, options)?;
+    }
+    let unrepaired_head = repaired_page.map_or(normalized_input, Cow::Owned);
+    let (normalized_html, head_repair_limit) =
+        head.map_or((unrepaired_head, None), |(html, limit)| (Cow::Owned(html), limit));
     let document_base_href = (options.base_url.is_some() || options.extract_metadata)
         .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
         .flatten();
@@ -188,6 +217,41 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
     })
 }
 
+/// The repair of the scripts of `input` with no end tag a second time, and the head repair of
+/// its page. `first_repair` is the page that the first repair and its head repair wrote, when
+/// they wrote one. `bodies` holds the kept bodies as they were before the first repair.
+///
+/// ~keep The first repair wrote an owner mark. The cleanup of the conversion removes bytes, and
+/// ~keep two parts of a name of the author can meet there and spell that mark. So the repair
+/// ~keep writes its marks a second time, with no number that the cleaned page has: the
+/// ~keep reservation of the kept scripts (`KeptScripts::reserving_owner_names_of`).
+fn repair_with_reserved_owner_names(
+    input: &str,
+    first_repair: Option<&str>,
+    bodies: &mut std::collections::HashMap<String, String>,
+    options: &ConversionOptions,
+) -> Result<(Option<String>, HeadRepair)> {
+    let reserved = crate::converter::owner_mark_numbers_after_cleanup(first_repair.unwrap_or(input), options)?;
+    let repaired_page = written_page(
+        crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts_reserving(
+            input, bodies, &reserved,
+        ),
+    );
+    let head = repair_head(repaired_page.as_deref().unwrap_or(input), options.hidden_content);
+    Ok((repaired_page, head))
+}
+
+/// The page of a head repair, with the limit that the repair reached.
+type HeadRepair = Option<(String, Option<crate::types::WarningKind>)>;
+
+/// The page that a pass wrote, when it wrote one.
+fn written_page(page: Cow<'_, str>) -> Option<String> {
+    match page {
+        Cow::Borrowed(_) => None,
+        Cow::Owned(page) => Some(page),
+    }
+}
+
 /// The head repair of `html`, the page after the inert-body pass of `hidden_content`.
 ///
 /// ~keep A choice that keeps hidden content takes the repair only where `drop` takes it too.
@@ -195,10 +259,7 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
 /// ~keep there. Read as the head, it sent only the wider choice to the repair, which then put a
 /// ~keep title of the body in the head. So a wider choice empties the kept elements again and
 /// ~keep asks that page first.
-fn repair_head(
-    html: &str,
-    hidden_content: crate::options::HiddenContent,
-) -> Option<(String, Option<crate::types::WarningKind>)> {
+fn repair_head(html: &str, hidden_content: crate::options::HiddenContent) -> HeadRepair {
     let drop = crate::options::HiddenContent::Drop;
     if hidden_content != drop {
         let emptied =

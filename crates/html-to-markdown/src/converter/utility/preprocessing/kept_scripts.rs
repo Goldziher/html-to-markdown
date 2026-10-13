@@ -3,8 +3,10 @@
 /// The `<` of a kept element, as the first pass writes it.
 pub(super) const ESCAPED_LT: &str = "&lt;";
 
-/// The start of the name of the owner mark of a kept script. A number ends the name.
-const OWNER_MARK_PREFIX: &str = "data-h2m-script-";
+/// The start of the name of the owner mark of a script. A number ends the name. The first pass
+/// writes the mark on a kept script, and the repair of a script with no end tag writes it on a
+/// script whose bytes it keeps (see `PreservedBodies`).
+pub(super) const OWNER_MARK_PREFIX: &str = "data-h2m-script-";
 
 /// The kept scripts of one page whose text the tree cannot give back as written.
 ///
@@ -18,7 +20,7 @@ const OWNER_MARK_PREFIX: &str = "data-h2m-script-";
 /// ~keep mark with it, so no script is found again by its place or by its text.
 /// ~keep `with_owner_marks_taken` takes each mark out of the final tree before a reader sees
 /// ~keep an attribute.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct KeptScripts {
     /// The number of each owner mark with the body of its script as written, with no white
     /// space at the two ends, in the order of the numbers.
@@ -276,9 +278,12 @@ fn owner_mark_value(mark: usize) -> String {
 ///
 /// ~keep The parser and the tree builder write the name of an attribute in lower case, so a
 /// ~keep name of the author in upper case is the name of a mark in the tree. The `2` of the
-/// ~keep prefix has no case and is not frequent in a page, so the read looks for it.
-#[cfg(feature = "metadata")]
-fn owner_mark_numbers(page: &[u8]) -> ahash::AHashSet<usize> {
+/// ~keep prefix has no case and is not frequent in a page, so the read looks for it. The
+/// ~keep repair of a script with no end tag writes the same name (see `PreservedBodies`), so
+/// ~keep the two writers of a mark read the names of a page with this one function, and a
+/// ~keep number that one of them wrote in the page is never the number of the other.
+#[must_use]
+pub fn owner_mark_numbers(page: &[u8]) -> ahash::AHashSet<usize> {
     let prefix = OWNER_MARK_PREFIX.as_bytes();
     let Some(two) = memchr::memchr(b'2', prefix) else {
         return ahash::AHashSet::new();

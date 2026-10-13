@@ -30,16 +30,19 @@ use crate::converter::block::container::HandlerContext;
 use crate::error::Result;
 use crate::options::ConversionOptions;
 
-use crate::converter::context::{Context, ContextParameters, InlineCollectorHandle};
+use crate::converter::context::{Context, InlineCollectorHandle};
 use crate::types::structure_collector::StructureCollectorHandle;
 
 mod block_boundary;
+mod context_setup;
 mod exclusions;
 mod parse;
 mod prepare;
 mod table_parts;
 use self::block_boundary::{separate_in_list_item, separate_words_at_block_boundary};
+use self::context_setup::create_conversion_context;
 use self::parse::{ParsedPage, finish_dom_parse, parse_for_conversion};
+pub use self::prepare::owner_mark_numbers_after_cleanup;
 use self::prepare::prepare_html;
 use self::table_parts::{is_table_part, walk_table_parts};
 
@@ -76,18 +79,9 @@ pub fn convert_html_impl(
     options: &ConversionOptions,
     parameters: ConversionParameters<'_>,
 ) -> Result<ConversionOutput> {
-    let ConversionParameters {
-        inert_bodies,
-        inline_collector,
-        #[cfg(feature = "metadata")]
-        metadata_collector,
-        #[cfg(feature = "visitor")]
-        visitor,
-        structure_collector,
-        base_url,
-        document_base_href,
-        head_repair_limit,
-    } = parameters;
+    let inert_bodies = parameters.inert_bodies;
+    let structure_collector = parameters.structure_collector.as_ref().map(std::rc::Rc::clone);
+    let document_base_href = parameters.document_base_href;
     let (preprocessed, prepare_limit, as_written, kept_scripts) = prepare_html(html, options)?;
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
@@ -96,7 +90,7 @@ pub fn convert_html_impl(
         len: preprocessed_len,
         repair_limit,
     } = parse_for_conversion(&preprocessed, &repaired_page, options, as_written)?;
-    let repair_warning = repair_limit.or(prepare_limit).or(head_repair_limit);
+    let repair_warning = repair_limit.or(prepare_limit).or(parameters.head_repair_limit);
     let kept_scripts = finish_dom_parse(&mut dom, &mut dom_ctx, inert_bodies, preprocessed_len, kept_scripts)?;
     let parser = dom.parser();
     let mut output = String::with_capacity(preprocessed_len.saturating_add(preprocessed_len / 4));
@@ -107,27 +101,13 @@ pub fn convert_html_impl(
         options,
         document_base_href,
         #[cfg(feature = "metadata")]
-        metadata_collector.as_ref(),
+        parameters.metadata_collector.as_ref(),
     );
     output.push_str(&frontmatter);
 
     let reference_collector = create_reference_collector(options);
 
-    let mut ctx = Context::new(
-        options,
-        ContextParameters {
-            inline_collector,
-            #[cfg(feature = "metadata")]
-            metadata_collector,
-            kept_scripts,
-            #[cfg(feature = "visitor")]
-            visitor,
-            structure_collector: structure_collector.as_ref().map(std::rc::Rc::clone),
-            reference_collector: reference_collector.as_ref().map(std::rc::Rc::clone),
-            base_url,
-            own_page: crate::converter::url_resolve::OwnPage::of(html, options.base_url.as_deref()),
-        },
-    );
+    let mut ctx = create_conversion_context(html, options, parameters, reference_collector.as_ref(), kept_scripts);
 
     apply_exclusions(&dom, options, &mut ctx);
     walk_document(&dom, parser, &mut output, options, &ctx, &dom_ctx);
