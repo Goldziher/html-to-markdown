@@ -286,6 +286,9 @@ fn visit_emphasis(tag: &tl::HTMLTag<'_>, kind: EmphasisKind, handler: &HandlerCo
             Some(custom)
         }
         VisitResult::Skip => {
+            if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
+                handler.dom_context.record_absent_breaks(node_id, true);
+            }
             crate::converter::structure_capture::replace_element(handler.context, None);
             Some(String::new())
         }
