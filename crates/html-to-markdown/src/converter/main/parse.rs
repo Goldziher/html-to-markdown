@@ -342,42 +342,73 @@ mod tests {
 
     #[test]
     fn should_build_one_context_for_repair_and_fallback_decisions() {
-        let cases = [
-            (
-                "<DIV><P>one</DIV>two</P>rest</DIV>tail".to_string(),
-                "one\n\ntwo\n\nresttail\n",
-                2,
-                0,
-            ),
-            (
-                "<table>a<tr><td>b</td></tr></table>".to_string(),
-                "a\n\n| b |\n| --- |\n",
-                2,
-                0,
-            ),
-            ("<HTML><BODY><p>a</p><p>b</p>".to_string(), "a\n\nb\n", 1, 0),
-            ("<frameset><frame></frameset><p>a<p>b".to_string(), "a\n\nb\n", 2, 0),
-            (
-                format!("<p>kept</p>{}deep", "<div>".repeat(600)),
-                "kept\n\ndeep\n",
-                1,
-                1,
-            ),
-            (format!("{}x", "<table><td>".repeat(300)), "", 2, 1),
-        ];
-        for (html, content, parses, warnings) in cases {
-            let options = ConversionOptions {
-                max_depth: Some(1024),
-                tier_strategy: TierStrategy::Tier2,
-                extract_metadata: false,
-                ..Default::default()
-            };
+        // ~keep Preserve deep decision coverage without depending on the default libtest stack.
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let cases = [
+                    (
+                        "<DIV><P>one</DIV>two</P>rest</DIV>tail".to_string(),
+                        "one\n\ntwo\n\nresttail\n",
+                        2,
+                        0,
+                    ),
+                    (
+                        "<table>a<tr><td>b</td></tr></table>".to_string(),
+                        "a\n\n| b |\n| --- |\n",
+                        2,
+                        0,
+                    ),
+                    ("<HTML><BODY><p>a</p><p>b</p>".to_string(), "a\n\nb\n", 1, 0),
+                    ("<frameset><frame></frameset><p>a<p>b".to_string(), "a\n\nb\n", 2, 0),
+                    (
+                        format!("<p>kept</p>{}deep", "<div>".repeat(600)),
+                        "kept\n\ndeep\n",
+                        1,
+                        1,
+                    ),
+                    (format!("{}x", "<table><td>".repeat(300)), "", 2, 1),
+                ];
+                for (html, content, parses, warnings) in cases {
+                    let options = ConversionOptions {
+                        max_depth: Some(1024),
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    PARSE_CALLS.with(|calls| calls.set(0));
+                    DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
+                    let result = convert(&html, options).expect("convert selected tree");
+                    assert_eq!(result.content.as_deref(), Some(content));
+                    assert_eq!(result.warnings.len(), warnings);
+                    assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), parses);
+                    assert_eq!(DOM_CONTEXT_BUILDS.with(std::cell::Cell::get), 1);
+                }
+            })
+            .expect("spawn deep selected-tree fixtures")
+            .join()
+            .expect("deep selected-tree fixtures complete");
+    }
+
+    #[test]
+    fn should_follow_the_last_root_and_child_for_omitted_end_tag_repair() {
+        for html in [
+            "<p>one</p><div>two",
+            "<html><head><title>T</title></head><body><p>one</p><div>two",
+        ] {
             PARSE_CALLS.with(|calls| calls.set(0));
             DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
-            let result = convert(&html, options).expect("convert selected tree");
-            assert_eq!(result.content.as_deref(), Some(content));
-            assert_eq!(result.warnings.len(), warnings);
-            assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), parses);
+            let result = convert(
+                html,
+                ConversionOptions {
+                    tier_strategy: TierStrategy::Tier2,
+                    extract_metadata: false,
+                    ..Default::default()
+                },
+            )
+            .expect("convert omitted final sibling");
+            assert_eq!(result.content.as_deref(), Some("one\n\ntwo\n"));
+            assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), 2);
             assert_eq!(DOM_CONTEXT_BUILDS.with(std::cell::Cell::get), 1);
         }
     }
