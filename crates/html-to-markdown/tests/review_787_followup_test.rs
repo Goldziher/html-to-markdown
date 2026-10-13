@@ -335,9 +335,9 @@ fn should_keep_a_no_break_space_after_a_span_whose_text_ends_with_a_space() {
 #[test]
 fn should_write_one_space_for_a_line_end_an_empty_span_and_a_no_break_space() {
     // ~keep An empty `span` writes nothing: the line end before it and the no-break space after
-    // ~keep it are one run of white space, as on `main`. A space before it is a written space,
-    // ~keep an element that is no `span` is an element with no text, a `span` of white space
-    // ~keep writes its space, and a table cell has no line end: each of these keeps both.
+    // ~keep it are one run of white space under the full-main policy, including a preceding
+    // ~keep ASCII space before the line end (#868). A span's own line ends, space-only bodies,
+    // ~keep marked siblings and table-cell boundaries retain their separate spaces.
     assert_rows(&[
         ("<p>a\n<span></span>&nbsp;b</p>", "a b\n"),
         ("<p>a\n<span></span>\u{a0}b</p>", "a b\n"),
@@ -350,7 +350,7 @@ fn should_write_one_space_for_a_line_end_an_empty_span_and_a_no_break_space() {
         ("<h2>a\n<span><br></span>&nbsp;b</h2>", "## a  b\n"),
         ("<ul><li>a\n<span></span>&nbsp;b</li></ul>", "- a b\n"),
         ("<p>a <span></span>&nbsp;b</p>", "a  b\n"),
-        ("<p>a \n<span></span>&nbsp;b</p>", "a  b\n"),
+        ("<p>a \n<span></span>&nbsp;b</p>", "a b\n"),
         ("<p>a\n<b></b>&nbsp;b</p>", "a  b\n"),
         ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n"),
         (

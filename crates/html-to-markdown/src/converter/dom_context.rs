@@ -4,9 +4,9 @@
 //! and provides O(1) access to node relationships via precomputed maps.
 
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::converter::main_helpers::{is_html5_void_element, is_inline_element};
+use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
 use crate::converter::utility::white_space::{TextClass, classify_text};
@@ -54,12 +54,20 @@ impl TableContentSummary {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LineEndOwner {
+    Code,
+    Del,
+}
+
 /// DOM context that provides efficient access to parent/child relationships and text content.
 ///
 /// This context is built once during conversion and provides O(1) access to node relationships
 /// via precomputed maps.
 pub struct DomContext {
     pub(crate) parent_map: Vec<Option<u32>>,
+    pub(crate) literal_pre_map: Vec<bool>,
+    pub(crate) line_end_owner_map: Vec<Option<LineEndOwner>>,
     pub(crate) children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     pub(crate) sibling_index_map: Vec<Option<usize>>,
     pub(crate) root_children: Vec<tl::NodeHandle>,
@@ -74,12 +82,22 @@ pub struct DomContext {
     pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
     /// For each element that [`DomContext::holds_text`] read: whether it holds text.
     pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
+    pub(crate) blank_passthrough_renders: RefCell<HashSet<u32>>,
+    pub(crate) authored_break_cache: RefCell<HashMap<u32, bool>>,
 }
 
 #[cfg(test)]
 thread_local! {
     /// The nodes that `DomContext::holds_text` and `DomContext::holds_content` read on this thread.
     pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static AUTHORED_BREAK_CACHE_STATS: std::cell::Cell<(usize,usize)> = const { std::cell::Cell::new((0,0)) };
+    /// Actual emitted bytes examined by observed passthrough registration. ~keep
+    pub(crate) static FONT_RENDER_BYTE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Number of actual observed font registration guards, including length rejections. ~keep
+    pub(crate) static FONT_RENDER_GUARD_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Maximum actual sparse observed-font entries and reserved capacity during this test. ~keep
+    pub(crate) static FONT_RENDER_SET_STATS: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
 }
 
 #[cfg(test)]
@@ -111,6 +129,8 @@ impl DomContext {
         if self.parent_map.len() <= idx {
             let new_len = idx + 1;
             self.parent_map.resize(new_len, None);
+            self.literal_pre_map.resize(new_len, false);
+            self.line_end_owner_map.resize(new_len, None);
             self.children_map.resize_with(new_len, || None);
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
@@ -364,8 +384,10 @@ impl DomContext {
         })
     }
 
-    /// Whether the element `id` holds content: a text of any kind or a void element
-    /// ([`is_html5_void_element`]), at any depth. A comment is no content, and an element with
+    /// Whether the element `id` holds content: text other than code/del-owned line ends, literal pre content,
+    /// or a void element
+    /// that can write Markdown outside a table cell (a break, a rule or an image), at any depth.
+    /// A comment is no content, and an element with
     /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
     /// hold none, and `<span><br></span>` holds content.
     ///
@@ -378,17 +400,148 @@ impl DomContext {
     pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
         let record = RefCell::new(HashMap::new());
         self.holds(id, parser, &record, |node, child| match node {
-            tl::Node::Raw(_) => Held::Yes,
-            tl::Node::Tag(_) if self.is_void(child, parser) => Held::Yes,
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                let parent = self.parent_tag_name(child, parser);
+                let owner = self.line_end_owner_map.get(child as usize).copied().flatten();
+                let line_ends_only = match owner {
+                    Some(LineEndOwner::Code) => decoded.trim_matches('\n').is_empty(),
+                    // ~keep Nested CR-only spans retain their existing boundary; only authored line ends collapse (#868).
+                    Some(LineEndOwner::Del) => {
+                        decoded.trim_matches(['\n', '\r']).is_empty()
+                            && (parent == Some("del") || decoded.contains('\n'))
+                    }
+                    None => false,
+                };
+                if line_ends_only && !self.literal_pre_map.get(child as usize).copied().unwrap_or(false) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) if self.writes_void_content(child, parser) => Held::Yes,
             tl::Node::Tag(_) => Held::Inside,
             tl::Node::Comment(_) => Held::No,
         })
     }
 
-    /// Whether the element `id` is an HTML void element ([`is_html5_void_element`]).
-    fn is_void(&self, id: u32, parser: &tl::Parser) -> bool {
-        self.tag_info(id, parser)
-            .is_some_and(|info| is_html5_void_element(info.name.as_bytes()))
+    pub(crate) fn begin_passthrough_render(
+        &self,
+        id: u32,
+        output_len: usize,
+        handler: crate::converter::block::container::HandlerContext<'_>,
+    ) -> Option<usize> {
+        let ctx = handler.ctx;
+        #[cfg(feature = "visitor")]
+        let observer_suppressed = ctx.skip_visitor_hooks && ctx.has_observer();
+        #[cfg(not(feature = "visitor"))]
+        let observer_suppressed = false;
+        (!observer_suppressed
+            && !ctx.code_element_is_transparent()
+            && !ctx.in_code_block
+            && handler.options.whitespace_mode != crate::WhitespaceMode::Strict)
+            .then(|| {
+                self.blank_passthrough_renders.borrow_mut().remove(&id);
+                output_len
+            })
+    }
+
+    pub(crate) fn record_blank_passthrough_render(&self, id: u32, written: &str) {
+        #[cfg(test)]
+        FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(calls.get() + 1));
+        let blank = written.is_empty()
+            || (written.len() == 1 && {
+                #[cfg(test)]
+                FONT_RENDER_BYTE_READS.with(|reads| reads.set(reads.get() + 1));
+                matches!(written.as_bytes()[0], b' ' | b'\t')
+            });
+        if blank {
+            let mut fonts = self.blank_passthrough_renders.borrow_mut();
+            fonts.insert(id);
+            #[cfg(test)]
+            FONT_RENDER_SET_STATS.with(|stats| {
+                let (entries, capacity) = stats.get();
+                stats.set((entries.max(fonts.len()), capacity.max(fonts.capacity())));
+            });
+        }
+    }
+
+    pub(crate) fn holds_authored_break(&self, id: u32, parser: &tl::Parser) -> bool {
+        let found = self.holds(id, parser, &self.authored_break_cache, |node, child| match node {
+            tl::Node::Tag(_) if self.tag_info(child, parser).is_some_and(|info| info.name == "br") => {
+                if recorded(&self.authored_break_cache, child) == Some(false) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Raw(_) | tl::Node::Comment(_) => Held::No,
+        });
+        #[cfg(test)]
+        AUTHORED_BREAK_CACHE_STATS.with(|stats| {
+            let cache = self.authored_break_cache.borrow();
+            let (entries, capacity) = stats.get();
+            stats.set((entries.max(cache.len()), capacity.max(cache.capacity())));
+        });
+        found
+    }
+
+    // ~keep Strict wrappers must not transport a source BR skipped by its callback. Later
+    // ~keep renders may continue that same BR; changing its status invalidates all ancestors.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn record_line_break_skip(&self, id: u32, skipped: bool) {
+        let mut cache = self.authored_break_cache.borrow_mut();
+        if (cache.get(&id) == Some(&false)) == skipped {
+            return;
+        }
+        if skipped {
+            cache.insert(id, false);
+        } else {
+            cache.remove(&id);
+        }
+        let mut parent = self.parent_of(id);
+        while let Some(id) = parent {
+            cache.remove(&id);
+            parent = self.parent_of(id);
+        }
+    }
+
+    /// ~keep Code/del can render an empty line end, and a break can render whitespace; neither is a blank passthrough element.
+    pub(crate) fn passthrough_boundary_has_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_)
+                if self.writes_void_content(child, parser)
+                    || self
+                        .tag_info(child, parser)
+                        .is_some_and(|info| matches!(info.name.as_str(), "code" | "del" | "pre")) =>
+            {
+                Held::Yes
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// ~keep Silent void descendants do not separate the line end from a following NBSP (#868).
+    /// ~keep That boundary rule skips table cells, whose checkboxes can write their state.
+    fn writes_void_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.tag_info(id, parser).is_some_and(|info| match info.name.as_str() {
+            "br" | "hr" => true,
+            "img" => !self.silent_heading_images.borrow().contains(&id),
+            _ => false,
+        })
     }
 
     /// Whether a node in the element `id` is held, as `held` answers for each node, with the
@@ -478,5 +631,354 @@ impl DomContext {
     /// Store a computed table content summary for reuse by ancestor/descendant table scans.
     pub(crate) fn cache_table_content_summary(&self, table_id: u32, summary: TableContentSummary) {
         self.table_content_summary_cache.borrow_mut().insert(table_id, summary);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn should_refresh_cached_break_ancestors_without_forgetting_siblings() {
+        let source = "<b><span><br></span><i><br></i></b>";
+        for order in [[0, 1], [1, 0]] {
+            let dom = tl::parse(source, tl::ParserOptions::default()).expect("break siblings");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            let root = dom.children()[0].get_inner();
+            let breaks = dom
+                .query_selector("br")
+                .expect("break selector")
+                .map(|handle| handle.get_inner())
+                .collect::<Vec<_>>();
+            assert_eq!(breaks.len(), 2);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], true);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[1]], true);
+            assert!(!context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], false);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_line_break_skip(breaks[order[0]], true);
+            assert!(!context.holds_authored_break(root, parser));
+        }
+    }
+
+    #[test]
+    fn should_bound_observed_font_registration_and_boundary_reads() {
+        let mut jobs = 0;
+        for overlapping in [false, true] {
+            for depth in [4, 16, 64, 256] {
+                let closing = if overlapping {
+                    "</font>&nbsp;".repeat(depth)
+                } else {
+                    "</font>".repeat(depth) + "&nbsp;"
+                };
+                let source = format!("<p>a{} {closing}b</p>", "<font>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("font nodes");
+                let nodes = dom.nodes().len();
+                super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+                super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+                let result = crate::convert(
+                    &source,
+                    crate::ConversionOptions {
+                        tier_strategy: crate::TierStrategy::Tier2,
+                        extract_metadata: false,
+                        max_depth: Some(1024),
+                        ..Default::default()
+                    },
+                )
+                .expect("font nesting");
+                let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+                let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+                assert_eq!(result.content.as_deref(), Some("a b\n"));
+                assert_eq!(byte_reads, depth);
+                assert_eq!(node_reads, if overlapping { depth + 1 } else { 2 * depth });
+                assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+                assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).0, depth);
+                assert!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).1 <= 2 * depth);
+                assert!(
+                    byte_reads > 0 && byte_reads <= 4 * nodes,
+                    "font registration {byte_reads}/{nodes}"
+                );
+                assert!(
+                    node_reads > 0 && node_reads <= 4 * nodes,
+                    "font boundary {node_reads}/{nodes}"
+                );
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 8);
+    }
+    #[cfg(feature = "visitor")]
+    #[test]
+    fn should_bound_font_registration_with_growing_custom_child_whitespace() {
+        use std::sync::{Arc, Mutex};
+        #[derive(Debug)]
+        struct BlankChild {
+            width: usize,
+            calls: usize,
+        }
+        impl crate::visitor::HtmlVisitor for BlankChild {
+            fn visit_element_start(&mut self, ctx: &crate::visitor::NodeContext) -> crate::visitor::VisitResult {
+                if ctx.tag_name == "span" {
+                    self.calls += 1;
+                    crate::visitor::VisitResult::Custom(" ".repeat(self.width))
+                } else {
+                    crate::visitor::VisitResult::Continue
+                }
+            }
+        }
+        let mut jobs = 0;
+        for depth in [4, 16, 64, 256] {
+            let source = format!(
+                "<p>a{}<span></span>{}&nbsp;b</p>",
+                "<font>".repeat(depth),
+                "</font>".repeat(depth)
+            );
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("custom font nodes");
+            let nodes = dom.nodes().len();
+            let visitor = Arc::new(Mutex::new(BlankChild { width: depth, calls: 0 }));
+            super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+            super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+            let result = crate::convert(
+                &source,
+                crate::ConversionOptions {
+                    visitor: Some(visitor.clone()),
+                    tier_strategy: crate::TierStrategy::Tier2,
+                    extract_metadata: false,
+                    max_depth: Some(1024),
+                    ..Default::default()
+                },
+            )
+            .expect("custom child whitespace");
+            let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+            let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+            assert_eq!(
+                result.content.as_deref(),
+                Some(format!("a{}b\n", " ".repeat(depth + 1)).as_str())
+            );
+            assert_eq!(visitor.lock().expect("visitor calls").calls, 1);
+            assert_eq!(byte_reads, 0);
+            assert_eq!(node_reads, depth);
+            assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get), (0, 0));
+            assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+            assert!(node_reads > 0 && node_reads <= 4 * nodes);
+            jobs += 1;
+        }
+        assert_eq!(jobs, 4);
+    }
+    #[test]
+    #[allow(clippy::print_stdout)]
+    fn should_bound_observed_unknown_registration_and_boundary_reads() {
+        let mut jobs = 0;
+        for overlapping in [false, true] {
+            for depth in [4, 16, 64, 256] {
+                let closing = if overlapping {
+                    "</x-y>&nbsp;".repeat(depth)
+                } else {
+                    "</x-y>".repeat(depth) + "&nbsp;"
+                };
+                let source = format!("<p>a{} {closing}b</p>", "<x-y>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("unknown nodes");
+                let nodes = dom.nodes().len();
+                assert_eq!(nodes, if overlapping { 2 * depth + 3 } else { depth + 4 });
+                super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+                super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+                super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+                let result = crate::convert(
+                    &source,
+                    crate::ConversionOptions {
+                        tier_strategy: crate::TierStrategy::Tier2,
+                        extract_metadata: false,
+                        max_depth: Some(1024),
+                        ..Default::default()
+                    },
+                )
+                .expect("unknown nesting");
+                let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+                let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+                assert_eq!(result.content.as_deref(), Some("a b\n"));
+                assert_eq!(byte_reads, depth);
+                assert_eq!(node_reads, if overlapping { depth + 1 } else { 2 * depth });
+                assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+                assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).0, depth);
+                assert!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).1 <= 2 * depth);
+                assert!(
+                    byte_reads > 0 && byte_reads <= 4 * nodes,
+                    "unknown registration {byte_reads}/{nodes}"
+                );
+                assert!(
+                    node_reads > 0 && node_reads <= 4 * nodes,
+                    "unknown boundary {node_reads}/{nodes}"
+                );
+                std::println!(
+                    "unknown-cost overlap={overlapping} depth={depth} nodes={nodes} bytes={byte_reads} reads={node_reads} calls={} entries={} capacity={}",
+                    super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get),
+                    super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).0,
+                    super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).1
+                );
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 8);
+    }
+    #[cfg(feature = "visitor")]
+    #[test]
+    #[allow(clippy::print_stdout)]
+    fn should_bound_unknown_registration_with_growing_custom_child_whitespace() {
+        use std::sync::{Arc, Mutex};
+        #[derive(Debug)]
+        struct BlankChild {
+            width: usize,
+            calls: usize,
+        }
+        impl crate::visitor::HtmlVisitor for BlankChild {
+            fn visit_element_start(&mut self, ctx: &crate::visitor::NodeContext) -> crate::visitor::VisitResult {
+                if ctx.tag_name == "span" {
+                    self.calls += 1;
+                    crate::visitor::VisitResult::Custom(" ".repeat(self.width))
+                } else {
+                    crate::visitor::VisitResult::Continue
+                }
+            }
+        }
+        let mut jobs = 0;
+        for depth in [4, 16, 64, 256] {
+            let source = format!(
+                "<p>a{}<span></span>{}&nbsp;b</p>",
+                "<x-y>".repeat(depth),
+                "</x-y>".repeat(depth)
+            );
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("custom unknown nodes");
+            let nodes = dom.nodes().len();
+            assert_eq!(nodes, depth + 4);
+            let visitor = Arc::new(Mutex::new(BlankChild { width: depth, calls: 0 }));
+            super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_BYTE_READS.with(|reads| reads.set(0));
+            super::FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(0));
+            super::FONT_RENDER_SET_STATS.with(|stats| stats.set((0, 0)));
+            let result = crate::convert(
+                &source,
+                crate::ConversionOptions {
+                    visitor: Some(visitor.clone()),
+                    tier_strategy: crate::TierStrategy::Tier2,
+                    extract_metadata: false,
+                    max_depth: Some(1024),
+                    ..Default::default()
+                },
+            )
+            .expect("custom child whitespace");
+            let node_reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+            let byte_reads = super::FONT_RENDER_BYTE_READS.with(std::cell::Cell::get);
+            assert_eq!(
+                result.content.as_deref(),
+                Some(format!("a{}b\n", " ".repeat(depth + 1)).as_str())
+            );
+            assert_eq!(visitor.lock().expect("visitor calls").calls, 1);
+            assert_eq!(byte_reads, 0);
+            assert_eq!(node_reads, depth);
+            assert_eq!(super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get), (0, 0));
+            assert_eq!(super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get), depth);
+            assert!(node_reads > 0 && node_reads <= 4 * nodes);
+            std::println!(
+                "unknown-cost custom depth={depth} nodes={nodes} bytes={byte_reads} reads={node_reads} calls={} entries={} capacity={}",
+                super::FONT_RENDER_GUARD_CALLS.with(std::cell::Cell::get),
+                super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).0,
+                super::FONT_RENDER_SET_STATS.with(std::cell::Cell::get).1
+            );
+            jobs += 1;
+        }
+        assert_eq!(jobs, 4);
+    }
+    #[test]
+    fn should_classify_visible_void_descendants_below_inline_wrappers() {
+        for (body, expected) in [
+            ("<em><wbr></em>", false),
+            ("<em><input></em>", false),
+            ("<b><br></b>", true),
+            ("<b><img alt='X' src='x'></b>", true),
+            ("<b><hr></b>", true),
+        ] {
+            let source = format!("<span>{body}</span>");
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse descendants");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            let root = dom.children()[0].get_inner();
+            assert_eq!(context.holds_content(root, parser), expected, "{source}");
+        }
+    }
+    #[test]
+    fn should_keep_literal_preformatted_content_when_inline_line_ends_are_empty() {
+        for (body, expected) in [
+            ("<code>\n</code>", false),
+            ("<del>\n</del>", false),
+            ("<code> </code>", true),
+            ("<pre>\n</pre>", true),
+            ("<pre><code>\n\n</code></pre>", true),
+            ("<pre><!-- x --></pre>", false),
+            ("<pre><i></i></pre>", false),
+            ("<pre><span><code>\n</code></span></pre>", true),
+            ("<code>&#13;&#10;</code>", true),
+            ("<code><span>\n</span></code>", false),
+            ("<del><span>\n</span></del>", false),
+            ("<code><del><span>&#13;</span></del></code>", true),
+            ("<code><del><span>&#13;&#10;</span></del></code>", true),
+            ("<del><code><span>&#13;</span></code></del>", true),
+            ("<del><span>&#13;</span></del>", true),
+            ("<pre><code><span>\n</span></code></pre>", true),
+        ] {
+            let source = format!("<span>{body}</span>");
+            let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse literal ownership");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            assert_eq!(
+                context.holds_content(dom.children()[0].get_inner(), parser),
+                expected,
+                "{source}"
+            );
+            for (index, node) in dom.nodes().iter().enumerate() {
+                if matches!(node, tl::Node::Tag(_)) {
+                    let id = u32::try_from(index).expect("small node arena");
+                    assert_eq!(context.holds_content(id, parser), expected, "rooted {source}");
+                }
+            }
+        }
+    }
+    #[test]
+    fn should_preserve_deep_pre_ownership_without_changing_text_cache() {
+        let depth = 2048;
+        let source = format!(
+            "<span><pre>{}<code>\n</code>{}</pre></span>",
+            "<span>".repeat(depth),
+            "</span>".repeat(depth)
+        );
+        let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse deep literal ownership");
+        let parser = dom.parser();
+        let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+        super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        let root = dom.children()[0].get_inner();
+        let pre = dom
+            .query_selector("pre")
+            .expect("pre selector")
+            .next()
+            .expect("pre exists")
+            .get_inner();
+        let code = dom
+            .query_selector("code")
+            .expect("code selector")
+            .next()
+            .expect("code exists")
+            .get_inner();
+        for id in [root, pre, code] {
+            assert!(context.holds_content(id, parser), "literal query at {id}");
+            assert!(!context.holds_text(id, parser), "text query at {id}");
+        }
+        let reads = super::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+        assert_eq!(reads, 3 * depth + 9);
     }
 }

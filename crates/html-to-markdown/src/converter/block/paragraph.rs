@@ -33,6 +33,7 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         in_paragraph: true,
         block_content_start: output.len(),
         block_output_ptr: std::ptr::from_ref::<String>(output) as usize,
+        inline_break_owner: None,
         ..ctx.clone()
     };
     walk_paragraph_children(

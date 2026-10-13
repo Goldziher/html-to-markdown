@@ -447,20 +447,65 @@ impl TextProcessor<'_, '_, '_> {
             || (!space_is_owed(self.output) && prefix == " " && !self.keeps_unicode_space(value))
     }
 
+    // ~keep A Unicode prefix after an empty block is content beside a list's structural indent (#868).
+    fn keeps_list_block_prefix(&self) -> bool {
+        if !self.handler.ctx.in_list_item || !self.output.trim_end_matches([' ', '\t']).ends_with('\n') {
+            return false;
+        }
+        let dom_ctx = self.handler.dom_ctx;
+        let previous = dom_ctx
+            .prev_tag_map
+            .get(self.node_handle.get_inner() as usize)
+            .and_then(std::cell::OnceCell::get)
+            .copied()
+            .flatten();
+        previous.is_some_and(|previous| {
+            dom_ctx
+                .tag_info(previous, self.parser)
+                .is_some_and(|info| info.name == "span")
+                && !dom_ctx.holds_text(previous, self.parser)
+                && matches!(
+                    crate::converter::utility::siblings::previous_content_block_through(
+                        self.node_handle,
+                        self.parser,
+                        dom_ctx,
+                        crate::converter::utility::white_space::writes_in_text_flow,
+                    ),
+                    Some(
+                        "p" | "div"
+                            | "table"
+                            | "h1"
+                            | "h2"
+                            | "h3"
+                            | "h4"
+                            | "h5"
+                            | "h6"
+                            | "blockquote"
+                            | "pre"
+                            | "section"
+                            | "article"
+                            | "figure"
+                            | "dl"
+                    )
+                )
+        })
+    }
+
     /// Whether `value` starts with a Unicode space that is written after the space the output
     /// ends with.
     fn keeps_unicode_space(&self, value: &str) -> bool {
         self.output.ends_with(' ')
             && starts_with_unicode_space(value)
-            && unicode_space_is_kept(
-                self.output,
-                text_place(
-                    *self.node_handle,
-                    self.parser,
-                    self.handler.dom_ctx,
-                    self.handler.ctx.in_table_cell,
-                ),
-            )
+            && (self.keeps_list_block_prefix()
+                || unicode_space_is_kept(
+                    self.output,
+                    text_place(
+                        *self.node_handle,
+                        self.parser,
+                        self.handler.dom_ctx,
+                        self.handler.ctx.in_table_cell,
+                    ),
+                ))
     }
 
     fn append_trailing_line_ending(&self, output: &mut String, has_double_newline: bool) {
@@ -813,5 +858,71 @@ mod tests {
 
         assert_eq!(result.content.as_deref(), Some("k x d\n"));
         DATALIST_NODE_READS.with(|reads| assert_eq!(reads.get(), 3));
+    }
+
+    #[test]
+    fn should_bound_empty_list_block_prefix_visits_through_nested_spans() {
+        let mut jobs = 0;
+        for overlapping in [false, true] {
+            for depth in [4, 16, 64] {
+                let ending = if overlapping {
+                    "</span>&nbsp;".repeat(depth) + "b"
+                } else {
+                    "</span>".repeat(depth) + "&nbsp;b"
+                };
+                let source = format!("<ul><li>a\n{}<p></p>{ending}</li></ul>", "<span>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("input nodes");
+                assert_cold_previous_span(&dom, source.len());
+                let nodes = dom.nodes().len();
+                crate::converter::utility::siblings::PREVIOUS_CONTENT_BLOCK_READS.with(|reads| reads.set(0));
+                crate::converter::utility::siblings::PREVIOUS_CONTENT_BLOCK_CALLS.with(|calls| calls.set(0));
+                let result = convert(
+                    &source,
+                    ConversionOptions {
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        max_depth: Some(512),
+                        ..Default::default()
+                    },
+                )
+                .expect("nested empty block");
+                let reads =
+                    crate::converter::utility::siblings::PREVIOUS_CONTENT_BLOCK_READS.with(std::cell::Cell::get);
+                let calls =
+                    crate::converter::utility::siblings::PREVIOUS_CONTENT_BLOCK_CALLS.with(std::cell::Cell::get);
+                if overlapping {
+                    assert_eq!(
+                        result.content.as_deref(),
+                        Some(format!("- a\n\n  {} b\n", "\u{a0}".repeat(depth - 1)).as_str())
+                    );
+                } else {
+                    assert_eq!(result.content.as_deref(), Some("- a\n\n   b\n"));
+                }
+                assert_eq!(calls, if overlapping { 1 } else { 2 });
+                assert_eq!(reads, if overlapping { 2 } else { 2 * (depth + 1) });
+                assert!(reads > 0 && reads <= 2 * nodes, "{reads} reads for {nodes} nodes");
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 6);
+    }
+
+    fn assert_cold_previous_span(dom: &tl::VDom<'_>, source_len: usize) {
+        let context = crate::converter::utility::caching::build_dom_context(dom, dom.parser(), source_len);
+        let span = dom
+            .query_selector("span")
+            .expect("span selector")
+            .next()
+            .expect("outer span")
+            .get_inner();
+        let tail = dom
+            .nodes()
+            .iter()
+            .enumerate()
+            .find(|(_, node)| matches!(node, tl::Node::Raw(raw) if raw.as_utf8_str().ends_with('b')))
+            .map(|(index, _)| u32::try_from(index).expect("small input"))
+            .expect("tail node");
+        assert_eq!(context.prev_tag_map[tail as usize].get().copied().flatten(), Some(span));
+        assert!(context.tag_info_map.iter().all(|cell| cell.get().is_none()));
     }
 }

@@ -62,6 +62,10 @@ thread_local! {
     pub(crate) static FOLLOWING_CONTENT_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The sibling entries that `text_place` read on this thread. ~keep
     pub(crate) static TEXT_PLACE_SIBLING_VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Actual sibling entries visited while looking through inline wrappers for a block. ~keep
+    pub(crate) static PREVIOUS_CONTENT_BLOCK_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Number of actual preceding-block queries on this thread. ~keep
+    pub(crate) static PREVIOUS_CONTENT_BLOCK_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -158,9 +162,8 @@ fn place_after_element(
     in_cell: bool,
 ) -> crate::converter::utility::white_space::TextPlace {
     use crate::converter::utility::white_space::{TextPlace, writes_in_text_flow};
-    let in_flow = dom_ctx
-        .tag_info(element, parser)
-        .is_some_and(|info| writes_in_text_flow(&info.name));
+    let info = dom_ctx.tag_info(element, parser);
+    let in_flow = info.is_some_and(|info| writes_in_text_flow(&info.name));
     if dom_ctx.holds_text(element, parser) {
         return if in_flow && ends_with_text_space(element, parser, dom_ctx) {
             TextPlace::AfterFlowElement
@@ -168,25 +171,32 @@ fn place_after_element(
             TextPlace::AfterText
         };
     }
-    if in_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
+    if dom_ctx.blank_passthrough_renders.borrow().contains(&element)
+        && !dom_ctx.passthrough_boundary_has_content(element, parser)
+    {
+        return TextPlace::AfterText;
+    }
+    let empty_flow = in_flow || info.is_some_and(|info| matches!(info.name.as_str(), "option" | "optgroup"));
+    if empty_flow && !in_cell && ends_with_line_end(before.last(), parser) && !dom_ctx.holds_content(element, parser) {
         TextPlace::AfterText
     } else {
         TextPlace::AfterEmptyElement
     }
 }
 
-/// Whether `node` is a text that ends with line ends right after a visible character.
+/// Whether `node` ends with a collapsible run containing a line end.
 ///
-/// ~keep A space before the line end is a written space of the text (`a \n<span></span>&nbsp;b`
-/// ~keep has two spaces on the fast converter of `main`): only the line end alone is joined.
+/// ~keep Empty inline boundaries share the full converter's main policy even where main's
+/// ~keep forced-fast route kept a second space. A preceding Unicode space remains a character (#868).
 fn ends_with_line_end(node: Option<&tl::NodeHandle>, parser: &tl::Parser) -> bool {
     let Some(tl::Node::Raw(raw)) = node.and_then(|node| node.get(parser)) else {
         return false;
     };
     let raw = raw.as_utf8_str();
     let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
-    let before_line_ends = decoded.trim_end_matches(['\n', '\r']);
-    before_line_ends.len() < decoded.len() && before_line_ends.ends_with(|character: char| !character.is_whitespace())
+    let before = decoded.trim_end_matches(crate::converter::utility::white_space::is_collapsible);
+    decoded[before.len()..].contains(['\n', '\r'])
+        && (before.is_empty() || before.ends_with(|character: char| !character.is_whitespace()))
 }
 
 /// Whether the content of the element `element` ends with a text that ends with collapsible
@@ -249,6 +259,8 @@ pub fn previous_content_block_through<'a>(
     dom_ctx: &'a DomContext,
     looks_into: fn(&str) -> bool,
 ) -> Option<&'a str> {
+    #[cfg(test)]
+    PREVIOUS_CONTENT_BLOCK_CALLS.with(|calls| calls.set(calls.get() + 1));
     let id = node_handle.get_inner();
     let siblings = match dom_ctx.parent_of(id) {
         Some(parent_id) => match dom_ctx.children_of(parent_id) {
@@ -264,6 +276,8 @@ pub fn previous_content_block_through<'a>(
     // ~keep A loop rather than recursion: nested inline wrappers are attacker-controlled depth.
     'outer: loop {
         for sibling in nodes.iter().rev() {
+            #[cfg(test)]
+            PREVIOUS_CONTENT_BLOCK_READS.with(|reads| reads.set(reads.get() + 1));
             if let Some(info) = dom_ctx.tag_info(sibling.get_inner(), parser) {
                 if crate::converter::utility::content::is_block_level_element(&info.name) {
                     return Some(info.name.as_str());

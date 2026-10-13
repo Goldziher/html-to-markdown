@@ -272,7 +272,7 @@ pub fn handle_figcaption(
         {
             let caption_ctx = super::Context {
                 text_in_markers: true,
-                ..handler.ctx.clone()
+                ..handler.ctx.with_inline_break_owner(&text)
             };
             for child_handle in children.top().iter() {
                 super::walk_node(

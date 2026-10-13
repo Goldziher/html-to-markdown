@@ -88,7 +88,9 @@ pub fn handle_dt(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
     };
 
     let mut rendered = String::with_capacity(64);
-    let child_context = crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx);
+    let child_ctx = ctx.with_inline_break_owner(&rendered);
+    let child_context =
+        crate::converter::block::container::HandlerContext::new(options, &child_ctx, depth + 1, dom_ctx);
     let children = tag.children();
     for child_handle in children.top().iter() {
         crate::converter::walk_node(child_handle, parser, &mut rendered, child_context);
@@ -226,6 +228,7 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
     };
 
     let mut rendered = String::with_capacity(128);
+    let child_ctx = ctx.with_inline_break_owner(&rendered);
     let children = tag.children();
     {
         for child_handle in children.top().iter() {
@@ -233,11 +236,12 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
                 child_handle,
                 parser,
                 &mut rendered,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
+                crate::converter::block::container::HandlerContext::new(options, &child_ctx, depth + 1, dom_ctx),
             );
         }
     }
 
+    trim_description_breaks(&mut rendered, ctx, options.newline_style);
     let trimmed =
         crate::converter::handlers::blockquote::container_content(tag, parser, &rendered, options.code_block_style)
             .to_owned();
@@ -278,6 +282,16 @@ pub fn handle_dd(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
         }
         output.push_str(&trimmed);
         output.push_str("\n\n");
+    }
+}
+
+fn trim_description_breaks(
+    rendered: &mut String,
+    ctx: &crate::converter::Context,
+    newline_style: crate::options::NewlineStyle,
+) {
+    if !ctx.convert_as_inline && !ctx.in_code && !ctx.in_code_block && !ctx.in_table_cell {
+        strip_trailing_backslash_breaks_from_fresh_buffer(rendered, newline_style);
     }
 }
 

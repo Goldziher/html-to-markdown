@@ -17,20 +17,20 @@ pub(super) fn dispatch_tag<'a>(
     parser: &'a tl::Parser<'a>,
     output: &mut String,
     handler: HandlerContext<'a>,
-) -> bool {
+) -> (bool, bool) {
     // ~keep In a table cell a code block is one code span, which has no lines.
     if handler.ctx.in_code_block
         && !handler.ctx.in_table_cell
         && crate::converter::handlers::code_block::is_line_element_in_pre(tag_name)
     {
         crate::converter::handlers::code_block::handle_line_element_in_pre(node_handle, parser, output, handler);
-        return false;
+        return (false, false);
     }
     // ~keep Inline-code link ranges belong to this buffer. Container handlers must not
     // ~keep collect children in detached buffers or insert block markup around those ranges (#813).
     if handler.ctx.inline_code_links.is_some() && !code_collection_handler(tag_name) {
         crate::converter::block::container::handle_passthrough(node_handle, parser, output, handler);
-        return false;
+        return (false, false);
     }
     let mut dispatcher = TagDispatcher {
         tag_name,
@@ -47,19 +47,18 @@ pub(super) fn dispatch_tag<'a>(
         )
     {
         dispatcher.dispatch_div_like();
-        return false;
+        return (false, false);
     }
     if dispatcher.dispatch_inline() || dispatcher.dispatch_blocks() {
-        return false;
+        return (false, false);
     }
     if let Some(stop) = dispatcher.dispatch_tables_and_lists() {
-        return stop;
+        return (stop, false);
     }
     if dispatcher.dispatch_categories() {
-        return false;
+        return (false, false);
     }
-    dispatcher.dispatch_fallback();
-    false
+    (false, dispatcher.dispatch_fallback())
 }
 
 fn code_collection_handler(tag_name: &str) -> bool {
@@ -337,7 +336,7 @@ impl TagDispatcher<'_, '_> {
         true
     }
 
-    fn dispatch_fallback(&mut self) {
+    fn dispatch_fallback(&mut self) -> bool {
         match self.tag_name {
             "head" | "script" | "style" => crate::converter::metadata::handle(
                 self.tag_name,
@@ -352,7 +351,15 @@ impl TagDispatcher<'_, '_> {
                 self.output,
                 self.handler,
             ),
-            _ => crate::converter::block::unknown::handle(self.node_handle, self.parser, self.output, self.handler),
+            _ => {
+                return crate::converter::block::unknown::handle(
+                    self.node_handle,
+                    self.parser,
+                    self.output,
+                    self.handler,
+                );
+            }
         }
+        false
     }
 }

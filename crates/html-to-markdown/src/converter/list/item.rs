@@ -375,6 +375,7 @@ fn collect_task_text(
     context: ListContext<'_>,
 ) -> String {
     let mut task_text = String::new();
+    let item_ctx = item_ctx.with_inline_break_owner(&task_text);
     for child_handle in tag.children().top().iter() {
         render_li_content(
             child_handle,
@@ -382,7 +383,7 @@ fn collect_task_text(
             &mut task_text,
             marker.task.checkbox,
             ListContext {
-                ctx: item_ctx,
+                ctx: &item_ctx,
                 depth: context.depth + 1,
                 ..context
             },
@@ -481,6 +482,7 @@ fn write_regular_children(
     render: &ItemRenderContext<'_, '_>,
 ) -> (usize, usize) {
     let item_start = output.len();
+    let item_ctx = render.item_ctx.with_inline_break_owner(output);
     let mut text_end = item_start;
     for child_handle in tag.children().top().iter() {
         let is_nested_list = child_handle.get(parser).is_some_and(|node| {
@@ -498,7 +500,7 @@ fn write_regular_children(
             output,
             crate::converter::block::container::HandlerContext::new(
                 render.list.options,
-                render.item_ctx,
+                &item_ctx,
                 render.list.depth + 1,
                 render.list.dom_ctx,
             ),

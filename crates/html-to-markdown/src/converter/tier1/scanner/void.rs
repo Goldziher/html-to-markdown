@@ -162,6 +162,25 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
 fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Result<(), BailReason> {
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
+    // ~keep A leading split marker is discarded by the DOM code renderer (#842), whereas
+    // ~keep the flat scanner would hoist it before the span. Ordinary interior breaks stay fast.
+    if in_code && !in_pre && !state.in_table_cell() && !state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let start = state
+            .stack
+            .iter()
+            .rev()
+            .find(|frame| matches!(frame.spec.kind, TagKind::Code))
+            .map(|frame| frame.content_start);
+        if start.is_some_and(|start| {
+            state.cell_or_output_mut().get(start..).is_some_and(|content| {
+                content
+                    .chars()
+                    .all(crate::converter::utility::white_space::is_collapsible)
+            })
+        }) {
+            return Err(BailReason::Classifier);
+        }
+    }
     let label_start = (!in_code)
         .then(|| {
             state
@@ -885,12 +904,17 @@ fn handle_empty_inline_body(
 ) -> Result<bool, BailReason> {
     let content_absent = buf.len() <= content_start;
     let is_marks = matches!(marker, "**" | "*" | "~~" | "==");
-    // ~keep In marks a body of white space of any kind goes to the full converter:
-    // ~keep `<p>a <em>&nbsp;</em> b</p>` is `a b` there. A body of form feeds goes too: no mark
-    // ~keep can stand beside a form feed. Code keeps its text.
+    // ~keep Whitespace-only marks use the full converter, including form feeds that must stay
+    // ~keep outside empty marks (#811). Break syntax at either edge is not visible body text.
     let whitespace_only = !content_absent
         && if is_marks {
-            buf[content_start..].chars().all(char::is_whitespace)
+            buf[content_start..]
+                .trim_start_matches([' ', '\t'])
+                .trim_start_matches("\\\n")
+                .trim_end_matches("  \n")
+                .trim_end_matches("\\\n")
+                .chars()
+                .all(char::is_whitespace)
         } else {
             buf[content_start..]
                 .bytes()

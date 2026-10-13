@@ -57,6 +57,18 @@ pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let rendered = render_image(tag, &data, inline_data, &handler);
     if !handler.options.skip_images {
         if let Some(image_text) = rendered {
+            // ~keep Heading images can emit no alt text; record actual output before the next boundary query (#868).
+            if image_text.is_empty()
+                && handler.context.in_heading
+                && !handler.context.code_element_is_transparent()
+                && !handler.context.in_code_block
+            {
+                handler
+                    .dom_context
+                    .silent_heading_images
+                    .borrow_mut()
+                    .insert(handler.node_handle.get_inner());
+            }
             if data.src.is_empty() && image_text.is_empty() {
                 collapse_empty_image_boundary(&mut handler);
             }

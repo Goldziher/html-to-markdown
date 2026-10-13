@@ -315,41 +315,52 @@ mod tests {
 
     #[test]
     fn should_build_only_the_selected_context_after_paragraph_repair() {
-        let cases = [0, 100, 500].into_iter().flat_map(|depth| {
-            [500, 2000]
-                .into_iter()
-                .flat_map(move |n| ["fully_closed", "legacy_open", "omitted"].map(|shape| (depth, n, shape)))
-        });
-        for (depth, n, shape) in cases {
-            let paragraph = if shape == "omitted" { "<p>x " } else { "<p>x </p>" };
-            let closes = if shape == "fully_closed" {
-                "</div>".repeat(depth)
-            } else {
-                String::new()
-            };
-            let html = format!("{}{}{closes}", "<div>".repeat(depth), paragraph.repeat(n));
-            let options = ConversionOptions {
-                max_depth: Some(1024),
-                tier_strategy: TierStrategy::Tier2,
-                extract_metadata: false,
-                ..Default::default()
-            };
-            PARSE_CALLS.with(|calls| calls.set(0));
-            DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
-            let result = convert(&html, options).expect("convert repaired paragraphs");
-            assert_eq!(
-                result.content.as_deref(),
-                Some(format!("{}x\n", "x\n\n".repeat(n - 1)).as_str())
-            );
-            assert!(result.warnings.is_empty());
-            let repairs = shape == "omitted" || (shape == "legacy_open" && depth != 0);
-            assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), if repairs { 2 } else { 1 });
-            assert_eq!(
-                DOM_CONTEXT_BUILDS.with(std::cell::Cell::get),
-                1,
-                "{depth}, {n}, {shape}"
-            );
-        }
+        // ~keep These raised-depth fixtures need a local stack independent of the libtest worker.
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                let cases = [0, 100, 500].into_iter().flat_map(|depth| {
+                    [500, 2000]
+                        .into_iter()
+                        .flat_map(move |n| ["fully_closed", "legacy_open", "omitted"].map(|shape| (depth, n, shape)))
+                });
+                let mut rows = 0;
+                for (depth, n, shape) in cases {
+                    let paragraph = if shape == "omitted" { "<p>x " } else { "<p>x </p>" };
+                    let closes = if shape == "fully_closed" {
+                        "</div>".repeat(depth)
+                    } else {
+                        String::new()
+                    };
+                    let html = format!("{}{}{closes}", "<div>".repeat(depth), paragraph.repeat(n));
+                    let options = ConversionOptions {
+                        max_depth: Some(1024),
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    PARSE_CALLS.with(|calls| calls.set(0));
+                    DOM_CONTEXT_BUILDS.with(|calls| calls.set(0));
+                    let result = convert(&html, options).expect("convert repaired paragraphs");
+                    assert_eq!(
+                        result.content.as_deref(),
+                        Some(format!("{}x\n", "x\n\n".repeat(n - 1)).as_str())
+                    );
+                    assert!(result.warnings.is_empty());
+                    let repairs = shape == "omitted" || (shape == "legacy_open" && depth != 0);
+                    assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), if repairs { 2 } else { 1 });
+                    assert_eq!(
+                        DOM_CONTEXT_BUILDS.with(std::cell::Cell::get),
+                        1,
+                        "{depth}, {n}, {shape}"
+                    );
+                    rows += 1;
+                }
+                assert_eq!(rows, 18);
+            })
+            .expect("spawn deep paragraph repair fixtures")
+            .join()
+            .expect("deep paragraph repair fixtures complete");
     }
 
     #[test]

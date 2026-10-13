@@ -159,6 +159,7 @@ fn collect_quote_content(tag: &tl::HTMLTag<'_>, handler: &HandlerContext<'_>) ->
         ..handler.context.clone()
     };
     let mut content = String::with_capacity(256);
+    let quote_context = quote_context.with_inline_break_owner(&content);
     walk_children(tag, &mut content, &quote_context, handler);
     // ~keep No later dispatch can close a trailing `<br>` run at the end of this buffer (#464).
     strip_trailing_backslash_breaks_from_fresh_buffer(&mut content, handler.options.newline_style);
