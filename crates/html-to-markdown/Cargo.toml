@@ -131,6 +131,10 @@ required-features = ["testkit"]
 name = "issue_868_omitted_break_boundary_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_868_nonflow_list_prefix_test"
+required-features = ["testkit"]
+
 [[example]]
 name = "test_deser"
 required-features = ["serde"]

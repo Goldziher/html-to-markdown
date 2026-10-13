@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
   break subtree into a hard break inside blank inline wrappers (#868).
 
+- Normalized Markdown and Djot retain the no-break-space prefix after empty
+  `aside`, `footer`, `main`, and `details` blocks in list continuations (#868).
+
 - The text inside a `textarea` is text: `<textarea><b>bold</b></textarea>` gave `**bold**` and now gives `<b>bold</b>` ([#828](https://github.com/xberg-io/html-to-markdown/issues/828)).
 - The fast converter keeps the text after a `</style>` end tag with a form feed after the name ([#826](https://github.com/xberg-io/html-to-markdown/issues/826)).
 - A page is not empty when a structured data script has a slash or a form feed after `script` in its start tag and `<script>` in its JSON ([#825](https://github.com/xberg-io/html-to-markdown/issues/825)).

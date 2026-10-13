@@ -486,6 +486,10 @@ impl TextProcessor<'_, '_, '_> {
                             | "article"
                             | "figure"
                             | "dl"
+                            | "aside"
+                            | "footer"
+                            | "main"
+                            | "details"
                     )
                 )
         })
