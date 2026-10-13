@@ -488,10 +488,9 @@ impl DomContext {
         found
     }
 
-    // ~keep Strict wrappers must not transport a source BR skipped by its callback. Later
-    // ~keep renders may continue that same BR; changing its status invalidates all ancestors.
-    #[cfg(feature = "visitor")]
-    pub(crate) fn record_line_break_skip(&self, id: u32, skipped: bool) {
+    // ~keep Strict wrappers must not transport BRs in omitted subtrees or empty callbacks.
+    // ~keep Later renders can retain them; status changes invalidate ancestors, preserving siblings.
+    pub(crate) fn record_absent_breaks(&self, id: u32, skipped: bool) {
         let mut cache = self.authored_break_cache.borrow_mut();
         if (cache.get(&id) == Some(&false)) == skipped {
             return;
@@ -652,14 +651,34 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(breaks.len(), 2);
             assert!(context.holds_authored_break(root, parser));
-            context.record_line_break_skip(breaks[order[0]], true);
+            context.record_absent_breaks(breaks[order[0]], true);
             assert!(context.holds_authored_break(root, parser));
-            context.record_line_break_skip(breaks[order[1]], true);
+            context.record_absent_breaks(breaks[order[1]], true);
             assert!(!context.holds_authored_break(root, parser));
-            context.record_line_break_skip(breaks[order[0]], false);
+            context.record_absent_breaks(breaks[order[0]], false);
             assert!(context.holds_authored_break(root, parser));
-            context.record_line_break_skip(breaks[order[0]], true);
+            context.record_absent_breaks(breaks[order[0]], true);
             assert!(!context.holds_authored_break(root, parser));
+        }
+    }
+
+    #[test]
+    fn should_invalidate_omitted_subtree_ancestors_and_keep_retained_siblings() {
+        let source = "<b><span><br></span><i><br></i></b>";
+        for order in [[0, 1], [1, 0]] {
+            let dom = tl::parse(source, tl::ParserOptions::default()).expect("break subtrees");
+            let parser = dom.parser();
+            let context = crate::converter::utility::caching::build_dom_context(&dom, parser, source.len());
+            let root = dom.children()[0].get_inner();
+            let children = context.children_of(root).expect("two subtrees");
+            assert_eq!(children.len(), 2);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_absent_breaks(children[order[0]].get_inner(), true);
+            assert!(context.holds_authored_break(root, parser));
+            context.record_absent_breaks(children[order[1]].get_inner(), true);
+            assert!(!context.holds_authored_break(root, parser));
+            context.record_absent_breaks(children[order[0]].get_inner(), false);
+            assert!(context.holds_authored_break(root, parser));
         }
     }
 

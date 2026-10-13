@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
+  break subtree into a hard break inside blank inline wrappers (#868).
+
 - Inline break-only wrappers retain a real break after text inside a div or after a nested
   no-break space, including through transparent nested strong wrappers and after earlier
   paragraphs (#863). A leading Backslash break followed only by blank
