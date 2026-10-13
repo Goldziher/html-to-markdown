@@ -624,6 +624,44 @@ mod line_state_cost_tests {
         }
     }
 
+    #[test]
+    fn numeric_text_tails_should_bound_suffix_and_column_reads() {
+        for text in ["x1. ", "x1) ", "雪1. ", "雪12) ", "x1234567890123456. ", "x1.\u{a0}"] {
+            for output_format in [OutputFormat::Markdown, OutputFormat::Plain, OutputFormat::Djot] {
+                for n in [100, 400] {
+                    INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
+                    crate::converter::context::INLINE_BUFFER_TAIL_CHAR_READS.with(|reads| reads.set(0));
+                    let options = ConversionOptions {
+                        output_format,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        extract_metadata: false,
+                        ..Default::default()
+                    };
+                    let content = convert(
+                        &format!("<div>{}</div>", format!("<mark>{text}</mark>").repeat(n)),
+                        options,
+                    )
+                    .expect("convert numeric tails")
+                    .content
+                    .expect("content");
+                    assert_eq!(
+                        content,
+                        format!("{}\n", text.replace('\u{a0}', " ").repeat(n).trim_end())
+                    );
+                    let columns = INLINE_BUFFER_COLUMN_CHAR_READS.with(std::cell::Cell::get);
+                    let suffix = crate::converter::context::INLINE_BUFFER_TAIL_CHAR_READS.with(std::cell::Cell::get);
+                    assert_eq!(columns, 0, "{text:?}, {output_format:?}, {n}");
+                    assert!(
+                        suffix <= n * text.chars().count(),
+                        "{text:?}, {output_format:?}, {n}: {suffix}"
+                    );
+                    assert_eq!(suffix, text.trim_end().chars().count() * (n - 1));
+                }
+            }
+        }
+    }
+
     fn column_reads(tag: &str, highlight_style: HighlightStyle, n: usize) -> usize {
         INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(0));
         let html = format!("<div>{}</div>", format!("<{tag}>x</{tag}>").repeat(n));

@@ -174,8 +174,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Avoid repeated depth ancestry walks during HTML5 repair and unused inline output-column scans (Refs #830, #862).
-  Marker-looking text tails such as `x.` also skip unused column scans; ambiguous markers and
-  all-blank tails keep the existing fallback.
+  Marker-looking text tails such as `x.` and `x12)` also skip unused column scans. Numeric suffixes
+  read only their trailing digit run before proving an adjacent text prefix cannot start a marker;
+  whitespace-separated markers and all-blank tails keep the existing fallback. Growing digit runs
+  still require suffix scanning, and growing blank tails still require trimming and indentation work.
   Topology changes and live marker columns retain their existing limits and behavior.
 
 - Self-closing raw-text and inert elements encountered in an HTML head contain their following text.

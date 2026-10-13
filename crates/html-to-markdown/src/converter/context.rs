@@ -19,6 +19,7 @@ use crate::types::structure_collector::StructureCollectorHandle;
 
 #[cfg(test)]
 thread_local! {
+    pub(crate) static INLINE_BUFFER_TAIL_CHAR_READS: Cell<usize> = const { Cell::new(0) };
     pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
 }
 
@@ -683,10 +684,14 @@ impl Context {
 }
 
 // ~keep This is only a necessary suffix check: an adjacent non-whitespace character rules
-// ~keep out a bullet token, and a non-digit rules out an ordered token. Ambiguous tails still
+// ~keep out a bullet token. An ordered token cannot have text adjoining its ASCII digit run.
+// ~keep Ambiguous tails still
 // ~keep use the whole-line classifier, including stacked bare markers and Unicode blanks (#862).
 fn line_cannot_end_in_bare_marker(output: &str) -> bool {
-    let mut tail = output.trim_end_matches([' ', '\t']).chars().rev();
+    let mut tail = output.trim_end_matches([' ', '\t']).chars().rev().inspect(|_| {
+        #[cfg(test)]
+        INLINE_BUFFER_TAIL_CHAR_READS.with(|reads| reads.set(reads.get() + 1));
+    });
     let Some(last) = tail.next() else {
         return false;
     };
@@ -695,7 +700,14 @@ fn line_cannot_end_in_bare_marker(output: &str) -> bool {
     }
     match last {
         '-' | '*' | '+' => tail.next().is_some_and(|previous| !previous.is_whitespace()),
-        '.' | ')' => !tail.next().is_some_and(|previous| previous.is_ascii_digit()),
+        '.' | ')' => {
+            if tail.next().is_some_and(|previous| previous.is_ascii_digit()) {
+                tail.find(|previous| !previous.is_ascii_digit())
+                    .is_some_and(|previous| !previous.is_whitespace())
+            } else {
+                true
+            }
+        }
         _ => true,
     }
 }
@@ -738,6 +750,12 @@ mod inline_buffer_tests {
             "x- ",
             "x+ ",
             "x) ",
+            "x1. ",
+            "雪12) ",
+            "x 1. ",
+            "1. - 2. ",
+            "\u{2000}1. ",
+            "1234567890123456. ",
             "1) ",
             "- + ",
             "\u{2000}* ",
