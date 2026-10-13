@@ -744,6 +744,11 @@ fn skip_or_render_tag(
     handler: HandlerContext<'_>,
 ) -> bool {
     if should_skip_tag(tag_name, node_handle, tag, parser, handler) {
+        if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+            && handler.ctx.excluded_node_ids.contains(&node_handle.get_inner())
+        {
+            handler.dom_ctx.record_absent_breaks(node_handle.get_inner(), true);
+        }
         if handler.ctx.inline_code_links.is_none() {
             trim_trailing_whitespace(output);
         }
