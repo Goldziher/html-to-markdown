@@ -96,6 +96,14 @@ name = "form_whitespace_followups_test"
 required-features = ["testkit"]
 
 [[test]]
+name = "inline_boundary_followups"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_863_nested_break_ownership_test"
+required-features = ["testkit"]
+
+[[test]]
 name = "issue_829_form_tree_test"
 required-features = ["testkit"]
 
@@ -105,6 +113,14 @@ required-features = ["testkit"]
 
 [[test]]
 name = "review_791_block_boundaries_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_silent_void_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_empty_inline_boundary_test"
 required-features = ["testkit"]
 
 [[test]]

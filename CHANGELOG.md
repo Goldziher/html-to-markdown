@@ -28,6 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Inline break-only wrappers retain a real break after text inside a div or after a nested
+  no-break space, including through transparent nested strong wrappers and after earlier
+  paragraphs (#863). A leading Backslash break followed only by blank
+  text collapses to the existing separator instead of emitting empty emphasis marks. A quote
+  containing only those artificial marks now matches Spaces style and is omitted; quotes with
+  real text keep their structure. Form-feed-only marked bodies retain the form feed outside the
+  markers, following #811.
+
+- Inline elements whose body is only a no-break space or another noncollapsible blank character
+  keep that character after an existing space instead of dropping it (#843). Breaks at the end of
+  emphasis use positions from the same output buffer, so preceding text length no longer removes
+  a hard break. With the default newline style, direct break-only emphasis after paragraph text
+  retains its hard break on every route, including in the first paragraph (#863). Code-like elements with block children or leading breaks use the full
+  converter's tree rules on every route, avoiding different output from the fast scanner (#842).
+
 - Removed script elements no longer insert a space between adjacent words. Authored whitespace
   and style-element boundaries retain their existing behavior
   ([#827](https://github.com/xberg-io/html-to-markdown/issues/827)).
@@ -179,6 +194,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default options.
 
 ### Fixed
+
+- Collapse no-break-space tails after empty options and empty or line-end-only inline descendants
+  to full-main spacing on every route (#868), retaining literal pre content and strict whitespace.
+
+- Avoid duplicating a space after line-ending text followed by a span containing only silent
+  void elements (#868); visible nested breaks and images retain their boundaries.
 
 - Keep the first document base effective when hidden content is dropped before removing a form, matching pages without a removed form.
 

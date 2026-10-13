@@ -530,20 +530,17 @@ fn a_line_end_after_a_zero_width_space_is_no_space() {
     ]);
 }
 
-/// A block in code writes its blank line on the fast converter, after a line end of the source
-/// too: the rule for the space at an element start does not take the separator of the block.
-///
-/// ~keep This row pins the output of the base on the fast converter, where the two converters
-/// ~keep differ: the full converter writes `y` with no code marks. Chrome shows `one`, a blank
-/// ~keep line and `y`.
+/// ~keep A block inside kbd closes its paragraph in the parsed tree (#842). The prior browser observation and
+/// ~keep the full converter show `one`, a blank line and `y`, without code marks.
 #[test]
-fn a_block_in_code_after_a_line_end_keeps_its_blank_line_on_the_fast_converter() {
+fn a_block_in_code_after_a_line_end_uses_the_full_converter_tree() {
     for html in [
         "<p>one\n<kbd><div>y</div></kbd></p>",
         "<p>one\n  <kbd><div>y</div></kbd></p>",
     ] {
         let written = tier1::run(html, &PrescanReport::default(), &tier_options());
-        assert_eq!(written.as_deref().ok(), Some("one\n\n`y`\n"), "{html}");
+        assert!(matches!(written, Err(tier1::BailReason::Classifier)), "{html}");
+        assert_eq!(tier2(html), "one\n\ny\n", "{html}");
     }
 }
 

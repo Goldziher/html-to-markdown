@@ -33,8 +33,9 @@ type DomContext = crate::converter::DomContext;
 /// # Code Block Detection
 /// Code blocks (identified by markdown formatting) are always preserved,
 /// even if they appear "empty" according to `trim()`.
+/// ~keep Returns normal child rendering, excluding custom visitor output, for boundary ownership.
 #[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
+pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) -> bool {
     use crate::converter::walk_node;
 
     let HandlerContext {
@@ -44,16 +45,18 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         dom_ctx,
     } = handler;
 
-    let Some(node) = node_handle.get(parser) else { return };
+    let Some(node) = node_handle.get(parser) else {
+        return false;
+    };
 
     let tag = match node {
         tl::Node::Tag(tag) => tag,
-        _ => return,
+        _ => return false,
     };
 
     #[cfg(feature = "visitor")]
     if visit_unknown(node_handle, parser, output, tag, handler) {
-        return;
+        return false;
     }
 
     let len_before = output.len();
@@ -97,6 +100,7 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
             }
         }
     }
+    true
 }
 
 #[cfg(feature = "visitor")]
