@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer promotes source line endings to hard breaks when subscript or
+  superscript visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
 - Strict whitespace no longer promotes source line endings to hard breaks when strikethrough,
   underline, insertion, or mark visitors skip a break subtree or replace it with only spaces/tabs (#868).
 

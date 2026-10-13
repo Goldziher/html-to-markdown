@@ -153,6 +153,12 @@ fn visit_script(tag: &tl::HTMLTag<'_>, kind: ScriptKind, handler: &HandlerContex
             ScriptKind::Superscript => visitor.visit_superscript(&node_context, &text_content),
         }
     };
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, VisitResult::Skip)
+            || matches!(&result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     match result {
         VisitResult::Continue => None,
         VisitResult::Custom(custom) => {
