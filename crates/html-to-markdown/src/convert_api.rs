@@ -164,26 +164,36 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
     // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
-    let repaired_scripts = crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
-        normalized_input.as_ref(),
-        (preserve_bodies
-            && options
-                .preserve_tags
-                .iter()
-                .any(|tag| tag.eq_ignore_ascii_case("script")))
-        .then_some(&mut inert_bodies),
-    );
-    let normalized_input = match repaired_scripts {
-        Cow::Borrowed(_) => normalized_input,
-        Cow::Owned(repaired) => Cow::Owned(repaired),
+    let normalized_input =
+        normalize_structured_data_scripts(normalized_input, options, preserve_bodies, &mut inert_bodies);
+    let removes_forms =
+        crate::converter::utility::preprocessing::removes_closed_forms(&normalized_input, options, has_visitor);
+    // ~keep A document base stays effective when hidden stripping or form removal removes its container.
+    let read_base = |source: &str| {
+        (options.base_url.is_some() || options.extract_metadata)
+            .then(|| crate::converter::url_resolve::document_base_href(source))
+            .flatten()
     };
+    let document_base_href = removes_forms.then(|| read_base(&normalized_input)).flatten();
+    // ~keep Hidden content still loses form-body ownership before the form-removal pass (#873).
+    let normalized_input = if removes_forms && options.hidden_content == crate::options::HiddenContent::Drop {
+        match crate::converter::utility::preprocessing::strip_hidden_elements(&normalized_input) {
+            Cow::Owned(stripped) => Cow::Owned(stripped),
+            Cow::Borrowed(_) => normalized_input,
+        }
+    } else {
+        normalized_input
+    };
+    let normalized_input = normalize_closed_forms(normalized_input, options.hidden_content, removes_forms);
     // ~keep The page of `drop` says whether the head is repaired, for each choice: a `<head>` tag
     // ~keep in kept content is no head of the page, and a browser ignores it there.
     let (normalized_html, head_repair_limit) = repair_head(normalized_input.as_ref(), options.hidden_content)
         .map_or((normalized_input, None), |(html, limit)| (Cow::Owned(html), limit));
-    let document_base_href = (options.base_url.is_some() || options.extract_metadata)
-        .then(|| crate::converter::url_resolve::document_base_href(&normalized_html))
-        .flatten();
+    let document_base_href = if removes_forms {
+        document_base_href
+    } else {
+        read_base(&normalized_html)
+    };
     let effective_base = options
         .base_url
         .as_deref()
@@ -201,6 +211,41 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         metadata_base_href,
         head_repair_limit,
     })
+}
+
+fn normalize_structured_data_scripts<'a>(
+    input: Cow<'a, str>,
+    options: &ConversionOptions,
+    preserve_bodies: bool,
+    inert_bodies: &mut std::collections::HashMap<String, String>,
+) -> Cow<'a, str> {
+    let repaired_scripts = crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
+        input.as_ref(),
+        (preserve_bodies
+            && options
+                .preserve_tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case("script")))
+        .then_some(inert_bodies),
+    );
+    match repaired_scripts {
+        Cow::Borrowed(_) => input,
+        Cow::Owned(repaired) => Cow::Owned(repaired),
+    }
+}
+
+fn normalize_closed_forms(
+    input: Cow<'_, str>,
+    hidden_content: crate::options::HiddenContent,
+    removes_forms: bool,
+) -> Cow<'_, str> {
+    if !removes_forms {
+        return input;
+    }
+    match crate::converter::utility::preprocessing::remove_closed_form_bodies(&input, hidden_content) {
+        Cow::Owned(source) => Cow::Owned(source),
+        Cow::Borrowed(_) => input,
+    }
 }
 
 /// The head repair of `html`, the page after the inert-body pass of `hidden_content`.
