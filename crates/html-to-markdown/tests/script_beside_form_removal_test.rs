@@ -146,21 +146,59 @@ fn script_before_html(end_tag: &str) -> String {
     format!("{OPEN}{JSON}{end_tag}<html><head><title>T</title></head><body><p>v</p></body></html>")
 }
 
-/// Decision: a script with no end tag before `<html>` is read as the same script with an end
-/// tag is. As plain text with `preserve_tags = ["script"]` neither has a record, and no text
-/// of the script is written.
+/// A script with no end tag before `<html>` keeps its record as plain text with
+/// `preserve_tags = ["script"]`, as on the integration branch. The same script with an end tag
+/// has no record there, as on the integration branch. No text of the script is written.
 #[test]
-fn a_preserved_script_before_html_gives_no_record_as_plain_text_with_an_end_tag_and_with_none() {
-    for end_tag in END_TAGS {
+fn a_preserved_script_before_html_gives_as_plain_text_no_record_with_an_end_tag_and_its_record_with_none() {
+    for (end_tag, raw_json) in END_TAGS.into_iter().zip([&[][..], &[JSON][..]]) {
         let html = script_before_html(end_tag);
         assert_eq!(
             content_and_raw_json(&html, |options| {
                 options.output_format = OutputFormat::Plain;
                 options.preserve_tags = vec!["script".to_string()];
             }),
-            on_each_route("v", &[]),
+            on_each_route("v", raw_json),
             "{html:?}"
         );
+    }
+}
+
+/// A script with no end tag before the document element keeps its record with
+/// `preserve_tags = ["script"]`, as plain text and as Markdown: before `<html>`, before
+/// `<head>` and before the doctype. Nothing of the script is written.
+#[test]
+fn a_preserved_script_with_no_end_tag_before_the_document_element_keeps_its_record() {
+    for (rest, plain, markdown) in [
+        (
+            "<html><head><title>T</title></head><body><p>v</p></body></html>",
+            "v",
+            "---\ntitle: T\n---\n\nv",
+        ),
+        (
+            "<head><title>x</title></head><body><p>t</p>",
+            "t",
+            "---\ntitle: x\n---\n\nt",
+        ),
+        (
+            "<!DOCTYPE html><html><head><title>T</title></head><body><p>v</p></body></html>",
+            "v",
+            "---\ntitle: T\n---\n\nv",
+        ),
+    ] {
+        let html = format!("{OPEN}{JSON}{rest}");
+        for (as_plain_text, content) in [(true, plain), (false, markdown)] {
+            assert_eq!(
+                content_and_raw_json(&html, |options| {
+                    if as_plain_text {
+                        options.output_format = OutputFormat::Plain;
+                    }
+                    options.preserve_tags = vec!["script".to_string()];
+                }),
+                on_each_route(content, &[JSON]),
+                "{html:?} plain text: {as_plain_text}"
+            );
+        }
     }
 }
 
@@ -212,5 +250,31 @@ mod with_a_visitor {
         let [with_an_end_tag, with_none] = shown.map(|count| count.load(Ordering::Relaxed));
         assert_ne!(with_an_end_tag, 0, "the visitor is shown the script with an end tag");
         assert_eq!(with_an_end_tag, with_none, "with an end tag, and with none");
+    }
+
+    /// A script with no end tag before `<html>` keeps its record as plain text with a visitor,
+    /// with `preserve_tags = ["script"]` and without it.
+    #[test]
+    fn a_script_with_no_end_tag_before_html_keeps_its_record_as_plain_text_with_a_visitor() {
+        let html = script_before_html("");
+        for preserves_script in [true, false] {
+            let records: Vec<Vec<String>> = content_and_raw_json(&html, |options| {
+                options.output_format = html_to_markdown_rs::OutputFormat::Plain;
+                if preserves_script {
+                    options.preserve_tags = vec!["script".to_string()];
+                }
+                options.visitor = Some(Arc::new(Mutex::new(CountScripts {
+                    shown: Shown::default(),
+                })));
+            })
+            .into_iter()
+            .map(|(_, raw_json)| raw_json)
+            .collect();
+            assert_eq!(
+                records,
+                vec![vec![JSON.to_string()]; 2],
+                "{html:?} preserve_tags: {preserves_script}"
+            );
+        }
     }
 }

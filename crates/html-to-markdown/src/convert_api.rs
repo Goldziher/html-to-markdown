@@ -164,11 +164,12 @@ fn prepare_conversion<'a>(html: &'a str, options: &ConversionOptions) -> Result<
         Cow::Owned(normalized) => Cow::Owned(normalized),
     };
     // ~keep Recover the JSON boundary before routing or raw-text stripping can consume visible siblings (#875).
-    let preserves_script = preserve_bodies
-        && options
-            .preserve_tags
-            .iter()
-            .any(|tag| tag.eq_ignore_ascii_case("script"));
+    // ~keep Plain text keeps the bytes of a repaired script apart too: the search for head content reads
+    // ~keep a tag in its JSON, so a script before `<head>` gives its record only with its body kept apart.
+    let preserves_script = options
+        .preserve_tags
+        .iter()
+        .any(|tag| tag.eq_ignore_ascii_case("script"));
     let bodies_before_repair = preserves_script.then(|| inert_bodies.clone());
     let mut repaired_page = written_page(
         crate::converter::utility::preprocessing::repair_unclosed_structured_data_scripts(
