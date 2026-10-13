@@ -54,6 +54,12 @@ impl TableContentSummary {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LineEndOwner {
+    Code,
+    Del,
+}
+
 /// DOM context that provides efficient access to parent/child relationships and text content.
 ///
 /// This context is built once during conversion and provides O(1) access to node relationships
@@ -61,6 +67,7 @@ impl TableContentSummary {
 pub struct DomContext {
     pub(crate) parent_map: Vec<Option<u32>>,
     pub(crate) literal_pre_map: Vec<bool>,
+    pub(crate) line_end_owner_map: Vec<Option<LineEndOwner>>,
     pub(crate) children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     pub(crate) sibling_index_map: Vec<Option<usize>>,
     pub(crate) root_children: Vec<tl::NodeHandle>,
@@ -114,6 +121,7 @@ impl DomContext {
             let new_len = idx + 1;
             self.parent_map.resize(new_len, None);
             self.literal_pre_map.resize(new_len, false);
+            self.line_end_owner_map.resize(new_len, None);
             self.children_map.resize_with(new_len, || None);
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
@@ -387,15 +395,17 @@ impl DomContext {
                 let raw = raw.as_utf8_str();
                 let decoded = text::decode_html_entities_cow(raw.as_ref());
                 let parent = self.parent_tag_name(child, parser);
-                let line_ends_only = if parent == Some("code") {
-                    decoded.trim_matches('\n').is_empty()
-                } else {
-                    decoded.trim_matches(['\n', '\r']).is_empty()
+                let owner = self.line_end_owner_map.get(child as usize).copied().flatten();
+                let line_ends_only = match owner {
+                    Some(LineEndOwner::Code) => decoded.trim_matches('\n').is_empty(),
+                    // ~keep Nested CR-only spans retain their existing boundary; only authored line ends collapse (#868).
+                    Some(LineEndOwner::Del) => {
+                        decoded.trim_matches(['\n', '\r']).is_empty()
+                            && (parent == Some("del") || decoded.contains('\n'))
+                    }
+                    None => false,
                 };
-                if line_ends_only
-                    && !self.literal_pre_map.get(child as usize).copied().unwrap_or(false)
-                    && parent.is_some_and(|name| matches!(name, "code" | "del"))
-                {
+                if line_ends_only && !self.literal_pre_map.get(child as usize).copied().unwrap_or(false) {
                     Held::No
                 } else {
                     Held::Yes
@@ -538,6 +548,13 @@ mod tests {
             ("<pre><i></i></pre>", false),
             ("<pre><span><code>\n</code></span></pre>", true),
             ("<code>&#13;&#10;</code>", true),
+            ("<code><span>\n</span></code>", false),
+            ("<del><span>\n</span></del>", false),
+            ("<code><del><span>&#13;</span></del></code>", true),
+            ("<code><del><span>&#13;&#10;</span></del></code>", true),
+            ("<del><code><span>&#13;</span></code></del>", true),
+            ("<del><span>&#13;</span></del>", true),
+            ("<pre><code><span>\n</span></code></pre>", true),
         ] {
             let source = format!("<span>{body}</span>");
             let dom = tl::parse(&source, tl::ParserOptions::default()).expect("parse literal ownership");

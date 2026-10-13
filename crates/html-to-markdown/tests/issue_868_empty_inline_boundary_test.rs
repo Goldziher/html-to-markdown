@@ -493,12 +493,12 @@ const LITERAL_OWNERSHIP: [(&str, &str, Option<&str>); 16] = [
     ),
     (
         "<p>a\n<span><code><span>\n</span></code></span>&nbsp;b</p>",
-        "a  b\n",
+        "a b\n",
         None,
     ),
     (
         "<p>a\n<span><del><span>\n</span></del></span>&nbsp;b</p>",
-        "a  b\n",
+        "a b\n",
         None,
     ),
     ("<p>a\n<span><code><b><br></b></code></span>&nbsp;b</p>", "a  b\n", None),
@@ -533,4 +533,105 @@ fn should_preserve_output_bearing_and_nested_literal_ownership() {
         count += assert_routes_with_fast(source, expected, "default", fast);
     }
     assert_eq!(count, 96);
+}
+
+#[test]
+fn should_join_nbsp_after_nested_code_and_del_line_ends() {
+    let mut rows = 0;
+    for owner in ["code", "del"] {
+        for body in ["\n", "\r\n", "&#10;"] {
+            for depth in [1, 3] {
+                for tail in ["&nbsp;", "\u{a0}"] {
+                    let inner = format!("{}{}{}", "<span>".repeat(depth), body, "</span>".repeat(depth));
+                    let source = format!("<p>a\n<span><{owner}>{inner}</{owner}></span>{tail}b</p>");
+                    rows += assert_routes(&source, "a b\n", "default");
+                }
+            }
+        }
+    }
+    assert_eq!(rows, 144);
+}
+#[test]
+fn should_keep_code_ownership_literal_content_and_unowned_line_ends() {
+    let mut rows = 0;
+    for (source, expected, fast) in [
+        (
+            "<p>a\n<span><code><del><span>&#13;</span></del></code></span>&nbsp;b</p>",
+            "a `\r` b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><code><del><span>&#13;&#10;</span></del></code></span>&nbsp;b</p>",
+            "a `\r` b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><del><code><span>&#13;</span></code></del></span>&nbsp;b</p>",
+            "a ~~`\r`~~ b\n",
+            Some("a ~~` `~~ b\n"),
+        ),
+        (
+            "<p>a\n<span><code><del><span> </span></del></code></span>&nbsp;b</p>",
+            "a ` ` b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><code><del><span>\n</span></del></code></span>&nbsp;b</p>",
+            "a b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><del><code><span>\n</span></code></del></span>&nbsp;b</p>",
+            "a b\n",
+            Some("a ~~` `~~ b\n"),
+        ),
+        (
+            "<p>a\n<span><del><span>&#13;</span></del></span>&nbsp;b</p>",
+            "a  b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><pre><code><del><span>\n</span></del></code></pre></span>&nbsp;b</p>",
+            "a\n\n```\n\n```\n\nb\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><code><span>&nbsp;</span></code></span>&nbsp;b</p>",
+            "a `\u{a0}` b\n",
+            None,
+        ),
+        (
+            "<p>a\n<span><code><span><br></span></code></span>&nbsp;b</p>",
+            "a  b\n",
+            None,
+        ),
+        ("<p>a\n<span>\n</span>&nbsp;b</p>", "a  b\n", None),
+    ] {
+        rows += assert_routes_with_fast(source, expected, "default", fast);
+    }
+    for (source, expected, mode) in [
+        (
+            "<p>a\n<span><code><span>\n</span></code></span>&nbsp;b</p>",
+            "a\n\u{a0}b\n",
+            "strict",
+        ),
+        (
+            "<p>a\n<span><del><span>\n</span></del></span>&nbsp;b</p>",
+            "a\n\n\u{a0}b\n",
+            "strict",
+        ),
+        (
+            "<p>a\n<span><code><span>\n</span></code></span>&nbsp;b</p>",
+            "a <code><span>\n</span></code> b\n",
+            "code",
+        ),
+        (
+            "<p>a\n<span><del><span>\n</span></del></span>&nbsp;b</p>",
+            "a <del><span>\n</span></del> b\n",
+            "del",
+        ),
+    ] {
+        rows += assert_routes(source, expected, mode);
+    }
+    assert_eq!(rows, 90);
 }

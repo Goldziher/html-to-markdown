@@ -4,6 +4,7 @@
 //! DOM context building.
 
 use crate::converter::DomContext;
+use crate::converter::dom_context::LineEndOwner;
 use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 
@@ -92,6 +93,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
     let mut ctx = DomContext {
         parent_map: Vec::new(),
         literal_pre_map: Vec::new(),
+        line_end_owner_map: Vec::new(),
         children_map: Vec::new(),
         sibling_index_map: Vec::new(),
         root_children: dom.children().to_vec(),
@@ -109,8 +111,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
     };
 
     // ~keep Node ids index `dom.nodes()`, so the arena length is an exact upper bound on them.
-    // ~keep Sizing every map once here replaces one incremental grow per map per newly-seen id
-    // ~keep (nine maps x one grow per node) with nine allocations for the whole document.
+    // ~keep Sizing every map once here replaces incremental grows with one allocation per map.
     if let Some(highest_node_id) = dom.nodes().len().checked_sub(1).and_then(|id| u32::try_from(id).ok()) {
         ctx.ensure_capacity(highest_node_id);
     }
@@ -145,10 +146,24 @@ pub fn record_node_hierarchy(
             .and_then(|parent| ctx.literal_pre_map.get(parent as usize))
             .copied()
             .unwrap_or(false);
+        ctx.line_end_owner_map[id as usize] = parent
+            .and_then(|parent| ctx.line_end_owner_map.get(parent as usize))
+            .copied()
+            .flatten();
         ctx.node_map[id as usize] = Some(node_handle);
 
         if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
             ctx.literal_pre_map[id as usize] |= tag.name().as_utf8_str().eq_ignore_ascii_case("pre");
+            let name = tag.name().as_utf8_str();
+            // ~keep Code renders its entire subtree literally, including a nested del (#868).
+            if name.eq_ignore_ascii_case("code") {
+                ctx.line_end_owner_map[id as usize] = Some(LineEndOwner::Code);
+            } else if name.eq_ignore_ascii_case("del")
+                && ctx.line_end_owner_map[id as usize] != Some(LineEndOwner::Code)
+            {
+                ctx.line_end_owner_map[id as usize] = Some(LineEndOwner::Del);
+            }
+
             let tag_children = tag.children();
             // ~keep `RawChildren::iter` reports no size hint, so collecting through it regrows the
             // ~keep Vec from empty (and over-allocates to the growth step). Copying the slice sizes
