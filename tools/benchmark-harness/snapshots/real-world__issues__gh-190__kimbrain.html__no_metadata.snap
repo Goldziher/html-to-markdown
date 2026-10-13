@@ -670,7 +670,7 @@ alias ros_study="humble; source ~/ros_study/install/local_setup.bash; echo \"ros
    
    
    
-QoS는 이론 설명을 제외했으나, Quality of Service의 약자로 데이터를 주고받을 때 약속에 대한 내용입니다.
+ QoS는 이론 설명을 제외했으나, Quality of Service의 약자로 데이터를 주고받을 때 약속에 대한 내용입니다.
 실제 로봇을 다룰 때 정말 중요한 내용 중 하나입니다.  
    
 두 파일 모두 이렇게 수정하시면 됩니다. 수정된 부분만 적으면

@@ -335,9 +335,28 @@ fn has_leading_blank_source(site: InlineSite<'_>) -> bool {
         .is_some_and(|node| matches!(node, tl::Node::Raw(raw) if raw.as_utf8_str().starts_with(crate::converter::utility::white_space::is_collapsible)))
 }
 
-fn strong_separator_content<'a>(output: &str, content: &'a str, site: InlineSite<'_>) -> &'a str {
+// ~keep A lone break is the #502 separator only in a block that starts its buffer. In a later
+// ~keep block and in a link label it stays the hard break the page had before #871.
+// ~keep White space after the break in the wrapper's own text leaves the separator as it is.
+fn keeps_lone_break(content: &str, site: InlineSite<'_>) -> bool {
+    let body = content.trim_start_matches([' ', '\t']);
+    (body == "\n" || body == crate::converter::main_helpers::hard_break_marker(site.options))
+        && (site.ctx.block_content_start != 0 || site.ctx.in_link)
+        && !site
+            .dom_ctx
+            .children_of(site.node_handle.get_inner())
+            .and_then(|children| children.last())
+            .and_then(|child| child.get(site.parser))
+            .is_some_and(|node| {
+                matches!(node, tl::Node::Raw(raw)
+                    if raw.as_utf8_str().ends_with(crate::converter::utility::white_space::is_collapsible))
+            })
+}
+
+fn strong_separator_content<'a>(output: &str, content: &'a str, keeps_break: bool, site: InlineSite<'_>) -> &'a str {
     let ctx = site.ctx;
-    if !content.ends_with('\n')
+    if keeps_break
+        || !content.ends_with('\n')
         || !content
             .trim_end_matches(crate::converter::main_helpers::hard_break_marker(site.options))
             .chars()
@@ -420,10 +439,10 @@ pub fn emit_wrapped_inline(
     use crate::converter::utility::siblings::get_previous_sibling_tag;
     use crate::converter::{append_inline_suffix, chomp_inline, merge_adjacent_emphasis};
 
-    let content = move_leading_hard_breaks(output, strict_blank_separator(content, site), ctx, options);
+    let moved = move_leading_hard_breaks(output, strict_blank_separator(content, site), ctx, options);
     // ~keep A blank wrapper after real strong markup remains a separator (#502/#504).
     // DOM provenance plus the configured close marker excludes marker-looking prose.
-    let content = strong_separator_content(output, content, site);
+    let content = strong_separator_content(output, moved, keeps_lone_break(content, site), site);
     let (prefix, suffix, trimmed) = chomp_inline(content);
     if emit_break_sentinel(output, content, ctx, options) {
         return;
