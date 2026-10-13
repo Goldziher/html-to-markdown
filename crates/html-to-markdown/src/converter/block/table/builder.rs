@@ -17,6 +17,7 @@ fn nested_table_wrapper_cell(
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     scan: &TableScan,
+    ctx: &super::super::super::Context,
 ) -> Option<(tl::NodeHandle, usize)> {
     if scan.row_counts != [1] || scan.nested_table_count == 0 || scan.has_span || !scan.has_text {
         return None;
@@ -24,6 +25,9 @@ fn nested_table_wrapper_cell(
     let mut cell = None;
     let mut pending: Vec<_> = tag.children().top().iter().map(|handle| (*handle, 1)).collect();
     while let Some((handle, depth)) = pending.pop() {
+        if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+            continue;
+        }
         let Some(tl::Node::Tag(child)) = handle.get(parser) else {
             continue;
         };
@@ -58,13 +62,14 @@ pub fn table_total_columns(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
 ) -> usize {
     let mut max_cols = 0usize;
     let mut cells = Vec::new();
 
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         for child_handle in tag.children().top().iter() {
-            max_cols = max_cols.max(table_child_columns(child_handle, parser, dom_ctx, &mut cells));
+            max_cols = max_cols.max(table_child_columns(child_handle, parser, dom_ctx, ctx, &mut cells));
         }
     }
 
@@ -75,8 +80,12 @@ fn table_child_columns(
     child_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) -> usize {
+    if ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return 0;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return 0;
     };
@@ -89,10 +98,10 @@ fn table_child_columns(
             .top()
             .iter()
             .filter(|row_handle| is_tag_name(row_handle, parser, dom_ctx, "tr"))
-            .map(|row_handle| row_columns(row_handle, parser, dom_ctx, cells))
+            .map(|row_handle| row_columns(row_handle, parser, dom_ctx, ctx, cells))
             .max()
             .unwrap_or(0),
-        "tr" | "row" => row_columns(child_handle, parser, dom_ctx, cells),
+        "tr" | "row" => row_columns(child_handle, parser, dom_ctx, ctx, cells),
         _ => 0,
     }
 }
@@ -101,9 +110,10 @@ fn row_columns(
     row_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) -> usize {
-    collect_table_cells(row_handle, parser, dom_ctx, cells);
+    collect_table_cells(row_handle, parser, dom_ctx, ctx, cells);
     cells.iter().fold(0usize, |count, handle| {
         count.saturating_add(get_colspan(handle, parser))
     })
@@ -170,6 +180,9 @@ fn render_layout_child(
     output: &mut String,
     handler: HandlerContext<'_>,
 ) {
+    if handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return;
     };
@@ -254,7 +267,7 @@ fn render_data_table(
     handler: HandlerContext<'_>,
     scan: &TableScan,
 ) {
-    let total_cols = table_total_columns(node_handle, parser, handler.dom_ctx);
+    let total_cols = table_total_columns(node_handle, parser, handler.dom_ctx, handler.ctx);
     let reuse_cell_text = !handler.options.compact_tables && cell_text_reuse_allowed(handler.ctx, scan);
     let mut cell_cache = CellTextCache::new(reuse_cell_text);
     let col_widths = column_widths(tag, parser, handler, total_cols, reuse_cell_text, &mut cell_cache);
@@ -339,6 +352,9 @@ struct WidthState<'a> {
 }
 
 fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize, state: &mut WidthState<'_>) {
+    if env.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(env.parser) else {
         return;
     };
@@ -357,6 +373,9 @@ fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: us
 }
 
 fn collect_width_row(row_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize, state: &mut WidthState<'_>) {
+    if env.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
     collect_row_cell_widths(
         row_handle,
         env,
@@ -368,6 +387,9 @@ fn collect_width_row(row_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize,
 }
 
 fn render_data_child(child_handle: &tl::NodeHandle, output: &mut String, env: DataEnv<'_>, state: &mut DataTableState) {
+    if env.handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(env.parser) else {
         return;
     };
@@ -649,8 +671,14 @@ pub fn handle_table(
         finish_table_visit(node_handle, parser, output, tag, handler, visitor_state);
         return;
     }
-    let table_scan = scan_table(node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
-    let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan).filter(|(_, cell_depth)| {
+    let table_scan = scan_table(
+        node_handle,
+        parser,
+        handler.dom_ctx,
+        handler.ctx,
+        handler.options.br_in_tables,
+    );
+    let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan, handler.ctx).filter(|(_, cell_depth)| {
         handler.depth + cell_depth + 1 < crate::converter::main_helpers::effective_max_depth(handler.options)
     });
     if is_layout_table(tag, &table_scan, wrapper_cell) {

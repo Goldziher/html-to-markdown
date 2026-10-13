@@ -273,6 +273,7 @@ impl TagDispatcher<'_, '_> {
                 self.node_handle,
                 self.parser,
                 self.handler.dom_ctx,
+                self.handler.ctx,
                 self.handler.options.br_in_tables,
             );
             self.output.push_str(text.as_str());

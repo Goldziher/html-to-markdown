@@ -143,6 +143,14 @@ required-features = ["testkit"]
 name = "issue_868_empty_list_block_prefix_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_868_header_list_prefix_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "bold_break_between_bold_test"
+required-features = ["testkit"]
+
 [[example]]
 name = "test_deser"
 required-features = ["serde"]

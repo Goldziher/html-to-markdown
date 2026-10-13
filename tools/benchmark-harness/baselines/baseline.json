@@ -209,7 +209,7 @@
       "median_ms": 2.805736277777778,
       "mad_ms": 0.0058021111111108414,
       "mb_per_s": 55.47636370403781,
-      "output_bytes": 39511
+      "output_bytes": 39513
     },
     {
       "fixture": "real-world/issues/gh-121-hacker-news.html",
