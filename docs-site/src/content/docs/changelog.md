@@ -186,6 +186,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `<audio>` or `<video>` gets its link also when `extract_metadata` is `false` and
   `highlight_style` is `none`: `<p>x</p><video src="/v.mp4"></video>` gives `x`, then
   `[video](/v.mp4)`, was `x` only.
+- Preserved repaired JSON-LD scripts retain their JSON after slash-separated tag names and
+  cannot claim authored bodies through markers joined by bogus-comment removal. Preserved
+  script attributes now serialize in key order on both HTML serialization paths
+  ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
+- An unclosed JSON-LD script beginning with a complete JSON value accepted by the JSON parser
+  (including scalars at valid JSON boundaries) keeps the markup after that value and its original
+  JSON bytes for metadata. Invalid or unrecognized JSON uses
+  the existing empty-script fallback ([#875](https://github.com/xberg-io/html-to-markdown/issues/875)).
+
 - Form controls inside code spans keep legends and buttons as separate words, without
   emphasis markers or split code spans in table cells
   ([#815](https://github.com/xberg-io/html-to-markdown/issues/815)).
