@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unmarked `mark` elements with only direct text children no longer count an unused line
+  column. Nested elements still retain live list columns; suffix classification and line
+  searches remain unchanged ([#862](https://github.com/xberg-io/html-to-markdown/issues/862)).
+
 - A source line ending before retained data-list content becomes a space in Markdown, as before
   a select list. Without visitor callbacks, empty, input-only or excluded data lists keep the
   existing source boundary. A no-break space beside retained content stays a no-break space. A source line ending at the end of an
