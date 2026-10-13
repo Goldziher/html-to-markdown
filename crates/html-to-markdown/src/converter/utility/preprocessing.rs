@@ -1,5 +1,6 @@
 //! HTML cleanup and normalization used before conversion.
 
+mod form_boundaries;
 mod head_scan;
 mod inert;
 mod kept;
@@ -12,7 +13,8 @@ mod restoration;
 mod structured_data;
 mod visibility;
 
-pub use inert::normalize_inert_bodies_with_preservation;
+pub use form_boundaries::removes_closed_forms;
+pub use inert::{html_inert_starts, normalize_inert_bodies_with_preservation, remove_closed_form_bodies};
 pub use lists::normalize_unclosed_list_items;
 pub use markup::{
     find_tag_end, normalize_bogus_comment_endings, normalize_split_closing_tags, preprocess_html, strip_html_cdata,

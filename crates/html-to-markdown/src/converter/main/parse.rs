@@ -481,10 +481,24 @@ mod tests {
 
     #[test]
     fn should_repair_a_form_nested_in_a_form_without_an_omitted_end_tag() {
+        let mut options = ConversionOptions {
+            tier_strategy: TierStrategy::Tier2,
+            ..ConversionOptions::default()
+        };
+        options.preprocessing.remove_forms = false;
+        PARSE_CALLS.with(|calls| calls.set(0));
+        let result = convert("<form>a<form>b</form>c</form>d", options).expect("retained nested form");
+
+        assert_eq!(result.content.as_deref(), Some("ab\n\ncd\n"));
+        PARSE_CALLS.with(|calls| assert_eq!(calls.get(), 2));
+    }
+
+    #[test]
+    fn should_parse_once_after_source_removal_of_closed_nested_forms() {
         let (calls, content) = parse_calls_for("<form>a<form>b</form>c</form>d");
 
         assert_eq!(content.as_deref(), Some("cd\n"));
-        assert_eq!(calls, 2);
+        assert_eq!(calls, 1);
     }
 
     #[test]
