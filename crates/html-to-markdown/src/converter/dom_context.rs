@@ -85,6 +85,7 @@ pub struct DomContext {
     pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
     pub(crate) blank_passthrough_renders: RefCell<HashSet<u32>>,
     pub(crate) authored_break_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) omitted_break_owners: RefCell<HashSet<u32>>,
 }
 
 #[cfg(test)]
@@ -488,13 +489,19 @@ impl DomContext {
         found
     }
 
-    // ~keep Strict wrappers must not transport BRs in omitted subtrees or empty callbacks.
+    // ~keep Strict wrappers must not transport BRs in omitted subtrees or space-only callbacks.
     // ~keep Later renders can retain them; status changes invalidate ancestors, preserving siblings.
+    // ~keep Ordinary negative query memo entries are not omissions and survive retaining renders.
     pub(crate) fn record_absent_breaks(&self, id: u32, skipped: bool) {
-        let mut cache = self.authored_break_cache.borrow_mut();
-        if (cache.get(&id) == Some(&false)) == skipped {
+        let changed = if skipped {
+            self.omitted_break_owners.borrow_mut().insert(id)
+        } else {
+            self.omitted_break_owners.borrow_mut().remove(&id)
+        };
+        if !changed {
             return;
         }
+        let mut cache = self.authored_break_cache.borrow_mut();
         if skipped {
             cache.insert(id, false);
         } else {
@@ -635,6 +642,22 @@ impl DomContext {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn should_keep_ordinary_negative_break_memo_when_no_owner_was_omitted() {
+        let source = "<b><span> </span></b>";
+        let dom = tl::parse(source, tl::ParserOptions::default()).expect("blank nodes");
+        let context = crate::converter::utility::caching::build_dom_context(&dom, dom.parser(), source.len());
+        let root = dom.children()[0].get_inner();
+        let child = context.children_of(root).expect("one span")[0].get_inner();
+        super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        assert!(!context.holds_authored_break(root, dom.parser()));
+        super::HOLDS_TEXT_NODE_READS.with(|reads| assert_eq!(reads.get(), 2));
+        context.record_absent_breaks(child, false);
+        super::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+        assert!(!context.holds_authored_break(root, dom.parser()));
+        super::HOLDS_TEXT_NODE_READS.with(|reads| assert_eq!(reads.get(), 0));
+    }
+
     #[cfg(feature = "visitor")]
     #[test]
     fn should_refresh_cached_break_ancestors_without_forgetting_siblings() {
