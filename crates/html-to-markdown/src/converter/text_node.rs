@@ -471,7 +471,22 @@ impl TextProcessor<'_, '_, '_> {
                         dom_ctx,
                         crate::converter::utility::white_space::writes_in_text_flow,
                     ),
-                    Some("p" | "div" | "table" | "h2" | "blockquote" | "pre" | "section")
+                    Some(
+                        "p" | "div"
+                            | "table"
+                            | "h1"
+                            | "h2"
+                            | "h3"
+                            | "h4"
+                            | "h5"
+                            | "h6"
+                            | "blockquote"
+                            | "pre"
+                            | "section"
+                            | "article"
+                            | "figure"
+                            | "dl"
+                    )
                 )
         })
     }
