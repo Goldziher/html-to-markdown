@@ -340,6 +340,17 @@ tasks:
     cmds:
       - alef docs
 
+  node:install:bun:
+    desc: "Install workspace dependencies with Bun"
+    cmds:
+      - bun install
+
+  node:build:bun:
+    desc: "Build the host Node binding with Bun"
+    dir: crates/html-to-markdown-node
+    cmds:
+      - bun run build
+
   node:verify-esm:
     desc: "Assert named ESM imports resolve from the built Node binding (#450 guard)"
     # Requires an already-built host binding: the guard loads the real `.node`, so it cannot run
