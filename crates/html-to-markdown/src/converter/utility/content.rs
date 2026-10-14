@@ -102,16 +102,21 @@ pub fn chomp_inline(text: &str) -> (&str, &str, &str) {
 /// ~keep content of the label (issue #497), and that side is given back whole, with the white
 /// ~keep space around the break for [`normalize_link_label`] to drop. Each edge is decided on its
 /// ~keep own: `[  \nGo ](/p)now` shows `Go now` after the break, so the end still gives its space.
+/// ~keep A leading form-feed-bearing incidental run stays outside before a break (#902), while
+/// ~keep the exact two-space-LF or backslash-LF marker stays inside the label.
 ///
 /// [`white_space::edges`]: crate::converter::utility::white_space::edges
 pub fn link_label_edges(content: &str) -> (&str, &str, &str) {
     let is_edge_space = |character: char| character.is_whitespace() && character != '\n';
     let after_start = content.trim_start_matches(is_edge_space);
+    let leading = &content[..content.len() - after_start.len()];
     let starts_at_break = after_start.starts_with('\n') || after_start.starts_with("\\\n");
-    let start = if starts_at_break {
+    let start = if starts_at_break && !leading.contains(FORM_FEED) {
         0
+    } else if after_start.starts_with('\n') {
+        leading.strip_suffix("  ").unwrap_or(leading).len()
     } else {
-        content.len() - after_start.len()
+        leading.len()
     };
     let before_end = content[start..].trim_end_matches(is_edge_space);
     let end = if before_end.ends_with('\n') {
@@ -728,6 +733,29 @@ mod tests {
             ("Go\u{c}now", ("", "", "Go\u{c}now")),
         ] {
             assert_eq!(link_label_edges(content), edges, "{content:?}");
+        }
+    }
+
+    #[test]
+    fn should_move_the_whole_leading_form_feed_edge_outside_a_label_but_keep_its_break_marker() {
+        let cases = [
+            ("\u{c}  \nMenu", ("\u{c}", "", "  \nMenu")),
+            ("\u{c}   \n菜单", ("\u{c} ", "", "  \n菜单")),
+            ("\u{c}\t\u{c}  \nMenu", ("\u{c}\t\u{c}", "", "  \nMenu")),
+            ("\u{c}\\\nMenu", ("\u{c}", "", "\\\nMenu")),
+            (" \u{c}\t\\\n菜单", (" \u{c}\t", "", "\\\n菜单")),
+            ("Menu  \n\u{c}", ("", "", "Menu  \n\u{c}")),
+            ("菜单\\\n \u{c}\t", ("", "", "菜单\\\n \u{c}\t")),
+            (
+                "\u{c} \\\n菜单\\\n\u{c} \u{c}",
+                ("\u{c} ", "", "\\\n菜单\\\n\u{c} \u{c}"),
+            ),
+            ("   \nMenu", ("", "", "   \nMenu")),
+            ("Menu  \n\u{a0}", ("", "", "Menu  \n\u{a0}")),
+        ];
+        assert_eq!(cases.len(), 10);
+        for (content, expected) in cases {
+            assert_eq!(link_label_edges(content), expected, "{content:?}");
         }
     }
 
