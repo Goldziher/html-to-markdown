@@ -384,6 +384,10 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     if href.is_none() && dest[trim_start..].ends_with(char::is_whitespace) {
         return Err(BailReason::Classifier);
     }
+    // ~keep An unaddressed anchor has running-text continuations, not the indentation of a link label (#903).
+    if href.is_none() && dest[trim_start..].contains(marker) {
+        return close_unaddressed_link_breaks(state, trim_start, marker);
+    }
     // ~keep One run of white space on both sides of the link start is one space, before the `[`
     // ~keep (rule 4 of the white space module); the start of a block owes none.
     let text_end = text_end_before_link(state, trim_start.saturating_sub(1));
@@ -435,6 +439,33 @@ fn close_link(state: &mut Tier1State, frame: &OpenTag, options: &ConversionOptio
     // ~keep The white space of the label end goes after the link, and after the text of a link
     // ~keep with an empty address.
     state.cell_or_output_mut().push_str(suffix);
+    Ok(())
+}
+
+fn close_unaddressed_link_breaks(
+    state: &mut Tier1State,
+    trim_start: usize,
+    marker: &'static str,
+) -> Result<(), BailReason> {
+    let dest = state.cell_or_output_mut();
+    let leading_break = dest[trim_start..].starts_with(marker);
+    let repeated_backslash_break = marker == "\\\n" && dest[trim_start..].matches(marker).nth(1).is_some();
+    let anchor_start = trim_start.saturating_sub(1);
+    let starts_paragraph = state
+        .stack
+        .iter()
+        .rev()
+        .find(|frame| matches!(frame.spec.kind, TagKind::Paragraph))
+        .is_some_and(|frame| frame.content_start == anchor_start)
+        || inline_break_starts_paragraph(state, anchor_start);
+    // ~keep Tier-2 suppresses paragraph-leading breaks and indents repeated backslash continuations.
+    if (leading_break && starts_paragraph) || repeated_backslash_break {
+        return Err(BailReason::Classifier);
+    }
+    let dest = state.cell_or_output_mut();
+    if let Some(bracket_pos) = dest[..trim_start].rfind('[') {
+        dest.remove(bracket_pos);
+    }
     Ok(())
 }
 

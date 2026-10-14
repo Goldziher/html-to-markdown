@@ -182,7 +182,6 @@ fn should_keep_unobserved_image_probes_out_of_preformatted_boundary_ownership() 
     assert_eq!(rows, 12);
 }
 
-// ~keep Forced-fast skip_images behavior is inherited; this repair preserves its current output.
 const HEADING_IMAGE_CONTROLS: [(&str, &str, &str, Option<&str>); 16] = [
     (
         "<h2>a\n<span><img alt='X' src='x'></span>&nbsp;b</h2>",
@@ -234,7 +233,7 @@ const HEADING_IMAGE_CONTROLS: [(&str, &str, &str, Option<&str>); 16] = [
         "<h2>a\n<span><img alt='X' src='x'></span>&nbsp;b</h2>",
         "skip",
         "## a  b\n",
-        Some("## a X b\n"),
+        None,
     ),
     (
         "<h2>a\n<span><img src='data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='></span>&nbsp;b</h2>",
