@@ -150,7 +150,7 @@ html-to-markdown --url https://example.com > output.md
 | `--convert-as-inline`  | Treat block elements as inline (no paragraph breaks).                               |
 | `--strip-tags TAGS`    | Comma-separated tags to strip (text content preserved, no Markdown conversion).     |
 | `--preserve-tags TAGS` | Comma-separated tags to emit verbatim as raw HTML instead of converting.            |
-| `--exclude-selectors SELECTORS` | Comma-separated CSS selectors. Matching elements and their descendants are removed before conversion (e.g. `.ad,#sidebar`). |
+| `--exclude-selectors SELECTORS` | Comma-separated CSS selectors. Matching elements and their descendants are removed before conversion (e.g. `.ad,#sidebar`). A selector with a combinator (`.menu a`, `div > p`) or a pseudo-class matches nothing. |
 | `--max-depth N`        | Silently truncate subtrees beyond this DOM nesting depth. Omit for unlimited depth. |
 
 ## Metadata

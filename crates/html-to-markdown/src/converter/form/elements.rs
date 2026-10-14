@@ -21,13 +21,13 @@ use std::borrow::Cow;
 /// Run `<form>`'s visitor hook, if one is installed.
 ///
 /// Returns `true` when the visitor already produced (or explicitly skipped) the output for
-/// this node and `handle_form` must return without falling through to its default rendering;
+/// this node and the caller must return without falling through to its default rendering;
 /// `false` when there is no visitor or it returned `VisitResult::Continue`.
 ///
-/// Extracted from `handle_form` — identical visitor dispatch and `VisitResult` handling,
-/// unchanged.
+/// `handle_form` calls it, and so does the dispatcher for a form inside a heading, which is
+/// written as a `div`.
 #[cfg(feature = "visitor")]
-fn dispatch_form_visitor(
+pub fn dispatch_form_visitor(
     node_handle: &tl::NodeHandle,
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
