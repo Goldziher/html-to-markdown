@@ -569,6 +569,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own, as Markdown output does. Before, the words joined:
   `<dl><dt>Bread</dt><dd>Baked dough.</dd></dl>` gave `BreadBaked dough.`. A `<dt>` or a `<dd>`
   outside a `<dl>` is a block too.
+- Plain text output writes the caption of a table as a block of its own before the rows. Before,
+  the caption text was lost, and a table with only a caption wrote nothing. A caption that
+  `exclude_selectors` names is not written.
 
 ## [3.17.2] - 2026-10-06
 
