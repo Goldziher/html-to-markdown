@@ -282,6 +282,10 @@ fn emit_image(
     html: &str,
     options: &ConversionOptions,
 ) -> Result<(), BailReason> {
+    if options.skip_images {
+        state.last_emitted_was_img = true;
+        return Ok(());
+    }
     let raw_src = find_attr(attrs, b"src").unwrap_or_default();
     if image_uses_lazy_source(attrs, raw_src) {
         return Err(BailReason::ImageLazyLoadSrc);

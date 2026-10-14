@@ -88,6 +88,9 @@ pub fn run_with_base(
     effective_base: Option<std::rc::Rc<url::Url>>,
     document_base_href: Option<&str>,
 ) -> Result<String, bail::BailReason> {
+    if !options.exclude_selectors.is_empty() {
+        return Err(bail::BailReason::Classifier);
+    }
     let scanner::ScanOutput { body, head_range } = scanner::scan(html, options, effective_base)?;
 
     // ~keep Phase C: prefer the head range the scanner discovered during its single
