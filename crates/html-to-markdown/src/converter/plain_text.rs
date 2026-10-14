@@ -71,6 +71,10 @@ const BLOCK_TAGS: &[&str] = &[
     "dialog",
     "menu",
     "legend",
+    // ~keep The terms and the descriptions are the blocks of a definition list; the list
+    // ~keep itself writes nothing of its own, so an empty list stays out of the line.
+    "dt",
+    "dd",
 ];
 
 /// Shared walker state threaded through all recursive calls.

@@ -561,6 +561,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside
   one text, and with only a comment between the two, a space and a no-break space are one
   space, as before.
+- Plain text output writes each term and each description of a definition list as a block of its
+  own, as Markdown output does. Before, the words joined:
+  `<dl><dt>Bread</dt><dd>Baked dough.</dd></dl>` gave `BreadBaked dough.`. A `<dt>` or a `<dd>`
+  outside a `<dl>` is a block too.
 
 ## [3.17.2] - 2026-10-06
 
