@@ -4,7 +4,6 @@ include = [
     "/Cargo.lock",
     "/src/**",
     "/README.md",
-    "!/src/converter/utility/preprocessing/tests.rs",
 ]
 name = "html-to-markdown-rs"
 version.workspace = true
