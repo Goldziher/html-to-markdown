@@ -118,6 +118,11 @@ impl WalkState<'_> {
             ..*self
         }
     }
+
+    /// Whether a selector of `exclude_selectors` names the node.
+    fn excludes(&self, node_handle: &tl::NodeHandle) -> bool {
+        self.excluded_node_ids.contains(&node_handle.get_inner())
+    }
 }
 
 /// Extract plain text from a parsed DOM tree.
@@ -202,9 +207,7 @@ fn walk_plain(
             emit_raw_text(bytes, buf, state, after_passed_over);
             false
         }
-        tl::Node::Tag(tag) => {
-            !state.excluded_node_ids.contains(&node_handle.get_inner()) && walk_tag(tag, parser, buf, list_ctx, state)
-        }
+        tl::Node::Tag(tag) => !state.excludes(node_handle) && walk_tag(tag, parser, buf, list_ctx, state),
         tl::Node::Comment(_) => true,
     }
 }
@@ -607,7 +610,7 @@ fn walk_children(
 /// Walk a `<table>` element, extracting cells as tab-separated, rows as newline-separated.
 fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutput, state: &WalkState<'_>) {
     let mut row_handles = Vec::new();
-    collect_descendant_handles(table_tag, parser, "tr", &mut row_handles);
+    collect_descendant_handles(table_tag, parser, "tr", state, &mut row_handles);
 
     for (row_idx, row_handle) in row_handles.iter().enumerate() {
         if row_idx > 0 {
@@ -621,7 +624,9 @@ fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutpu
         let row_children = row_tag.children();
         let row_top = row_children.top();
         for child in row_top.iter() {
-            if let Some(tl::Node::Tag(child_tag)) = child.get(parser) {
+            if !state.excludes(child)
+                && let Some(tl::Node::Tag(child_tag)) = child.get(parser)
+            {
                 let name = child_tag.name().as_utf8_str();
                 if name.eq_ignore_ascii_case("th") || name.eq_ignore_ascii_case("td") {
                     cell_handles.push(*child);
@@ -648,11 +653,13 @@ fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutpu
     }
 }
 
-/// Collect all descendant `NodeHandle`s matching `target_tag` (by cloning handles).
+/// Collect all descendant `NodeHandle`s matching `target_tag` (by cloning handles). An element
+/// that `exclude_selectors` names is not collected, and neither is an element in it.
 fn collect_descendant_handles(
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     target_tag: &str,
+    state: &WalkState<'_>,
     result: &mut Vec<tl::NodeHandle>,
 ) {
     let children = tag.children();
@@ -660,6 +667,9 @@ fn collect_descendant_handles(
     stack.reverse();
 
     while let Some(handle) = stack.pop() {
+        if state.excludes(&handle) {
+            continue;
+        }
         if let Some(tl::Node::Tag(child_tag)) = handle.get(parser) {
             let name = child_tag.name().as_utf8_str();
             if SKIP_TAGS.iter().any(|skip| name.eq_ignore_ascii_case(skip)) {
