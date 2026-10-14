@@ -6,9 +6,14 @@ build-backend = 'hatchling.build'
 name = 'html-to-markdown-hermes-plugin'
 version = '3.17.2'
 description = 'Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.'
+license = 'MIT'
 requires-python = '>=3.11'
 dependencies = ['mcp==1.28.1', 'PyYAML==6.0.3']
 keywords = ['html-to-markdown', 'markdown', 'html', 'conversion', 'metadata']
+
+[project.readme]
+content-type = 'text/markdown'
+text = "# html-to-markdown Hermes plugin\n\nFast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.\n\nInstall this package in the same Python environment as Hermes Agent:\n\n```sh\npython -m pip install html-to-markdown-hermes-plugin\n```\n\nEnable the plugin through Hermes Agent's plugin configuration. Available registrations depend on the plugin's authored Hermes adapter.\n"
 
 [project.entry-points]
 [project.entry-points.'hermes_agent.plugins']
