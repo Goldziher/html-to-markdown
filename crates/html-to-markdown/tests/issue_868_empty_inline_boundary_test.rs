@@ -927,11 +927,11 @@ fn should_preserve_font_observer_replacements_and_table_measurements() {
         (
             "<table><tr><td>a <font></font>&nbsp;b</td></tr></table>",
             [
-                ("| a b  |\n| ---- |\n", 3, 3),
-                ("| a V  b |\n| ---- |\n", 3, 3),
-                ("| a V  b |\n| ---- |\n", 3, 3),
+                ("| a b |\n| --- |\n", 3, 3),
+                ("| a V  b |\n| ------ |\n", 3, 3),
+                ("| a V  b |\n| ------ |\n", 3, 3),
                 ("| a  b |\n| ---- |\n", 3, 0),
-                ("| a b  |\n| ---- |\n", 3, 3),
+                ("| a b |\n| --- |\n", 3, 3),
             ],
         ),
         (
