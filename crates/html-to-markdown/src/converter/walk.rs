@@ -132,10 +132,7 @@ impl Child {
 pub enum CaptureEnd {
     Heading(usize),
     Figcaption,
-    Option {
-        list: bool,
-        word: bool,
-    },
+    Option(crate::converter::form::option::OptionEnd),
     Summary,
     Legend,
     Pre(crate::converter::handlers::code_block::PreEnd),
@@ -214,6 +211,34 @@ impl<N, F> Scratch<N, F> {
     }
 }
 
+fn enter_node<W: Walker>(
+    walker: &mut W,
+    node: W::Node,
+    work: &mut Vec<Step<W::Node>>,
+    frames: &mut Vec<W::Frame>,
+    children: &mut Vec<W::Node>,
+) {
+    if let Some(frame) = walker.enter(node, frames.last(), children) {
+        let hooked = walker.hooks_children(&frame);
+        frames.push(frame);
+        work.push(Step::Leave);
+        let first_child = work.len();
+        if hooked {
+            work.extend(
+                children
+                    .iter()
+                    .enumerate()
+                    .map(|(index, &child)| Step::Child(child, index)),
+            );
+        } else {
+            work.extend(children.iter().copied().map(Step::Enter));
+        }
+        work[first_child..].reverse();
+        children.clear();
+    }
+    debug_assert!(children.is_empty(), "a complete node gives no children");
+}
+
 /// Walk each tree of `roots` in order.
 pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node], scratch: &mut Scratch<W::Node, W::Frame>) {
     let Scratch { work, frames, children } = scratch;
@@ -222,27 +247,7 @@ pub fn drive<W: Walker>(walker: &mut W, roots: &[W::Node], scratch: &mut Scratch
         let mut next = Some(Step::Enter(root));
         while let Some(step) = next {
             match step {
-                Step::Enter(node) => {
-                    if let Some(frame) = walker.enter(node, frames.last(), children) {
-                        let hooked = walker.hooks_children(&frame);
-                        frames.push(frame);
-                        work.push(Step::Leave);
-                        let first_child = work.len();
-                        if hooked {
-                            work.extend(
-                                children
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(index, &child)| Step::Child(child, index)),
-                            );
-                        } else {
-                            work.extend(children.iter().copied().map(Step::Enter));
-                        }
-                        work[first_child..].reverse();
-                        children.clear();
-                    }
-                    debug_assert!(children.is_empty(), "a complete node gives no children");
-                }
+                Step::Enter(node) => enter_node(walker, node, work, frames, children),
                 Step::Leave => {
                     if let Some(frame) = frames.pop() {
                         walker.leave(frame);

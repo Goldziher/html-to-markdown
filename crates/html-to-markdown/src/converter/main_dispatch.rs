@@ -159,15 +159,9 @@ pub(super) fn close_capture<'a>(
         CaptureEnd::Figcaption => {
             crate::converter::semantic::figure::close_figcaption(content, node_handle, parser, inline.output, handler);
         }
-        CaptureEnd::Option { list, word } => crate::converter::form::elements::close_option(
-            list,
-            word,
-            content,
-            node_handle,
-            parser,
-            inline.output,
-            handler,
-        ),
+        CaptureEnd::Option(end) => {
+            crate::converter::form::option::close_option(&end, content, node_handle, parser, inline.output, handler);
+        }
         CaptureEnd::Emphasis(kind) => emphasis::close(kind, content, inline),
         CaptureEnd::Summary => {
             crate::converter::semantic::summary::close_summary(content, node_handle, parser, inline.output, handler);
@@ -176,23 +170,7 @@ pub(super) fn close_capture<'a>(
             crate::converter::form::elements::close_legend(content, node_handle, parser, inline.output, handler);
         }
         CaptureEnd::Pre(end) => crate::converter::handlers::code_block::close_pre(&end, content, inline),
-        CaptureEnd::Definition(kind) => {
-            let list = crate::converter::list::ListContext {
-                options: handler.options,
-                ctx: handler.ctx,
-                depth: handler.depth,
-                dom_ctx: handler.dom_ctx,
-            };
-            match kind {
-                "dt" => {
-                    crate::converter::list::definition::close_dt(content, node_handle, parser, inline.output, list);
-                }
-                "dd" => {
-                    crate::converter::list::definition::close_dd(content, node_handle, parser, inline.output, list);
-                }
-                _ => crate::converter::list::definition::close_dl(content, node_handle, parser, inline.output, list),
-            }
-        }
+        CaptureEnd::Definition(kind) => close_definition(kind, content, node_handle, parser, inline.output, handler),
         CaptureEnd::Figure(start) => crate::converter::semantic::figure::close_figure(
             start,
             content,
@@ -218,6 +196,28 @@ pub(super) fn close_capture<'a>(
             crate::converter::media::embedded::close_media_fallback(content, inline.output, handler.ctx);
         }
         CaptureEnd::Code(end) => crate::converter::handlers::code_block::close_code(&end, content, inline),
+    }
+}
+
+fn close_definition(
+    kind: &str,
+    content: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+) {
+    use crate::converter::list::definition::{close_dd, close_dl, close_dt};
+    let list = crate::converter::list::ListContext {
+        options: handler.options,
+        ctx: handler.ctx,
+        depth: handler.depth,
+        dom_ctx: handler.dom_ctx,
+    };
+    match kind {
+        "dt" => close_dt(content, node_handle, parser, output, list),
+        "dd" => close_dd(content, node_handle, parser, output, list),
+        _ => close_dl(content, node_handle, parser, output, list),
     }
 }
 
@@ -255,13 +255,17 @@ fn code_collection_handler(tag_name: &str) -> bool {
 impl TagDispatcher<'_, '_> {
     /// Run the handler of the element. Returns whether the element has no end.
     fn dispatch(&mut self) -> bool {
-        if self.open_inline() || self.dispatch_inline() || self.dispatch_blocks() {
+        if self.open_inline() || self.open_inline_styled() || self.dispatch_inline() || self.dispatch_blocks() {
             return false;
         }
         if let Some(stop) = self.dispatch_tables_and_lists() {
             return stop;
         }
-        if self.open_category() || self.dispatch_categories() {
+        if self.open_category()
+            || self.open_form_and_figure()
+            || self.open_media_and_controls()
+            || self.dispatch_categories()
+        {
             return false;
         }
         self.dispatch_fallback();
@@ -320,6 +324,15 @@ impl TagDispatcher<'_, '_> {
                     self.children,
                 );
             }
+            _ => return false,
+        }
+        true
+    }
+
+    /// The styled inline elements that give their children to the walk.
+    fn open_inline_styled(&mut self) -> bool {
+        let handler = self.handler;
+        match self.tag_name {
             "strong" | "b" | "em" | "i" => {
                 self.opened = crate::converter::inline::emphasis::open(
                     self.tag_name,
@@ -606,7 +619,7 @@ impl TagDispatcher<'_, '_> {
                 );
             }
             "select" | "datalist" | "option" => {
-                self.opened = crate::converter::form::elements::open_option(
+                self.opened = crate::converter::form::option::open_option(
                     self.tag_name,
                     self.node_handle,
                     self.parser,
@@ -639,6 +652,14 @@ impl TagDispatcher<'_, '_> {
                     self.children,
                 );
             }
+            _ => return false,
+        }
+        true
+    }
+
+    /// The form and figure elements that give their children to the walk.
+    fn open_form_and_figure(&mut self) -> bool {
+        match self.tag_name {
             "legend" => {
                 self.opened = crate::converter::form::elements::open_legend(
                     self.node_handle,
@@ -696,6 +717,14 @@ impl TagDispatcher<'_, '_> {
                 );
             }
             "optgroup" => self.open_children(),
+            _ => return false,
+        }
+        true
+    }
+
+    /// The quote, media and control elements that give their children to the walk.
+    fn open_media_and_controls(&mut self) -> bool {
+        match self.tag_name {
             "q" => {
                 self.opened = crate::converter::semantic::open_q(
                     self.node_handle,

@@ -168,6 +168,41 @@ fn mark_media_tail(ctx: &Context) {
     }
 }
 
+/// Apply the result of a media visitor callback. Returns whether the element is complete.
+#[cfg(feature = "visitor")]
+fn apply_media_visit_result(
+    visit_result: crate::visitor::VisitResult,
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    ctx: &Context,
+) -> bool {
+    use crate::visitor::VisitResult;
+
+    match visit_result {
+        VisitResult::Continue => false,
+        VisitResult::Skip => true,
+        VisitResult::Custom(custom) => {
+            output.push_str(&custom);
+            if !ctx.in_paragraph && !ctx.convert_as_inline && !custom.ends_with('\n') {
+                output.push('\n');
+            }
+            true
+        }
+        VisitResult::PreserveHtml => {
+            use crate::converter::utility::serialization::serialize_node;
+            output.push_str(&serialize_node(node_handle, parser));
+            true
+        }
+        VisitResult::Error(err) => {
+            if ctx.visitor_error.borrow().is_none() {
+                *ctx.visitor_error.borrow_mut() = Some(err);
+            }
+            true
+        }
+    }
+}
+
 /// Handle audio element conversion to Markdown.
 ///
 /// Extracts src from audio tag or nested source elements, outputs as a link,
@@ -194,7 +229,7 @@ fn handle_audio(
 
     #[cfg(feature = "visitor")]
     if let Some(ref visitor_handle) = ctx.visitor {
-        use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use crate::visitor::{NodeContext, NodeType};
 
         let node_id = node_handle.get_inner();
         let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
@@ -212,27 +247,8 @@ fn handle_audio(
             let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
             visitor.visit_audio(&node_ctx, src_opt)
         };
-        match visit_result {
-            VisitResult::Continue => {}
-            VisitResult::Skip => return,
-            VisitResult::Custom(custom) => {
-                output.push_str(&custom);
-                if !ctx.in_paragraph && !ctx.convert_as_inline && !custom.ends_with('\n') {
-                    output.push('\n');
-                }
-                return;
-            }
-            VisitResult::PreserveHtml => {
-                use crate::converter::utility::serialization::serialize_node;
-                output.push_str(&serialize_node(node_handle, parser));
-                return;
-            }
-            VisitResult::Error(err) => {
-                if ctx.visitor_error.borrow().is_none() {
-                    *ctx.visitor_error.borrow_mut() = Some(err);
-                }
-                return;
-            }
+        if apply_media_visit_result(visit_result, node_handle, parser, output, ctx) {
+            return;
         }
     }
 
@@ -282,7 +298,7 @@ fn handle_video(
 
     #[cfg(feature = "visitor")]
     if let Some(ref visitor_handle) = ctx.visitor {
-        use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use crate::visitor::{NodeContext, NodeType};
 
         let node_id = node_handle.get_inner();
         let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
@@ -300,27 +316,8 @@ fn handle_video(
             let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
             visitor.visit_video(&node_ctx, src_opt)
         };
-        match visit_result {
-            VisitResult::Continue => {}
-            VisitResult::Skip => return,
-            VisitResult::Custom(custom) => {
-                output.push_str(&custom);
-                if !ctx.in_paragraph && !ctx.convert_as_inline && !custom.ends_with('\n') {
-                    output.push('\n');
-                }
-                return;
-            }
-            VisitResult::PreserveHtml => {
-                use crate::converter::utility::serialization::serialize_node;
-                output.push_str(&serialize_node(node_handle, parser));
-                return;
-            }
-            VisitResult::Error(err) => {
-                if ctx.visitor_error.borrow().is_none() {
-                    *ctx.visitor_error.borrow_mut() = Some(err);
-                }
-                return;
-            }
+        if apply_media_visit_result(visit_result, node_handle, parser, output, ctx) {
+            return;
         }
     }
 
@@ -386,7 +383,7 @@ pub fn handle_iframe(
 
     #[cfg(feature = "visitor")]
     if let Some(ref visitor_handle) = ctx.visitor {
-        use crate::visitor::{NodeContext, NodeType, VisitResult};
+        use crate::visitor::{NodeContext, NodeType};
 
         let node_id = node_handle.get_inner();
         let parent_tag = dom_ctx.parent_tag_name(node_id, parser);
@@ -404,27 +401,8 @@ pub fn handle_iframe(
             let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
             visitor.visit_iframe(&node_ctx, src_opt)
         };
-        match visit_result {
-            VisitResult::Continue => {}
-            VisitResult::Skip => return,
-            VisitResult::Custom(custom) => {
-                output.push_str(&custom);
-                if !ctx.in_paragraph && !ctx.convert_as_inline && !custom.ends_with('\n') {
-                    output.push('\n');
-                }
-                return;
-            }
-            VisitResult::PreserveHtml => {
-                use crate::converter::utility::serialization::serialize_node;
-                output.push_str(&serialize_node(node_handle, parser));
-                return;
-            }
-            VisitResult::Error(err) => {
-                if ctx.visitor_error.borrow().is_none() {
-                    *ctx.visitor_error.borrow_mut() = Some(err);
-                }
-                return;
-            }
+        if apply_media_visit_result(visit_result, node_handle, parser, output, ctx) {
+            return;
         }
     }
 

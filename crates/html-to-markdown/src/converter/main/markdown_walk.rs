@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 use std::rc::Rc;
 
+use super::super::context::MediaBoundaryState;
 use super::table_parts::{is_table_part, walk_table_parts};
 use super::{
     Begun, Context, DomContext, HandlerContext, TagCapture, begin_tag, djot_context, effective_max_depth, finish_tag,
@@ -75,6 +76,61 @@ struct CaptureBuffer(Box<CaptureText>);
 /// The text of a capture, at an address that does not change while the capture is open.
 #[derive(Default)]
 struct CaptureText(String);
+
+fn end_media_boundary(scope: &Context, media_state: Option<MediaBoundaryState>, output: &mut String, start: usize) {
+    if let (Some(boundary), Some(incoming)) = (scope.media_boundary.as_ref(), media_state) {
+        super::finish_media_boundary(output, start, boundary, incoming);
+    }
+}
+
+/// Where the output of the node starts, when the node is among those that a task item watches
+/// for its first writer.
+fn first_writer_start(scope: &Context, node_handle: &tl::NodeHandle, output: &str) -> Option<usize> {
+    scope
+        .first_writer
+        .as_ref()
+        .filter(|first_writer| {
+            first_writer.is_open() && !scope.task_checkbox_ancestors.contains(&node_handle.get_inner())
+        })
+        .map(|_| output.len())
+}
+
+/// The state that an element reads when its handler made none: the state of its parent's children.
+fn inherited_scope<'a>(parent: Option<&Frame<'a>>, root_ctx: &'a Context) -> Scope<'a> {
+    match parent {
+        Some(frame) => frame
+            .child_scope
+            .as_ref()
+            .map_or_else(|| frame.scope.clone(), |ctx| Scope::Shared(Rc::clone(ctx))),
+        None => Scope::Root(root_ctx),
+    }
+}
+
+/// Move the options that a close carries to the frame, for the children to read.
+fn adopt_close_options(frame: &mut Frame<'_>) {
+    if let Some(end) = frame.end.as_mut() {
+        if matches!(end.close, Close::WithOptions(_, _)) {
+            if let Close::WithOptions(options, close) = std::mem::replace(&mut end.close, Close::Nothing) {
+                frame.options = Some(options);
+                end.close = *close;
+            }
+        }
+    }
+}
+
+/// Whether the buffer of the capture owns the line breaks of the inline content in it.
+fn owns_inline_break(close: &Close) -> bool {
+    use crate::converter::walk::CaptureEnd;
+    matches!(
+        close,
+        Close::Capture(
+            CaptureEnd::Blockquote
+                | CaptureEnd::Figcaption
+                | CaptureEnd::TaskItem(_)
+                | CaptureEnd::Definition("dt" | "dd")
+        )
+    )
+}
 
 /// The buffer that the walk writes to now: the innermost capture, or the output of the walk.
 fn current_output<'s>(captures: &'s mut [CaptureBuffer], output: &'s mut String) -> &'s mut String {
@@ -180,27 +236,17 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
             .map(|state| state.replace(Default::default()));
         if is_table_part(&node_handle, self.parser, handler.dom_ctx) {
             walk_table_parts(&node_handle, self.parser, output, handler);
-            if let (Some(boundary), Some(incoming)) = (scope.media_boundary.as_ref(), media_state) {
-                super::finish_media_boundary(output, media_start, boundary, incoming);
-            }
+            end_media_boundary(scope, media_state, output, media_start);
             return None;
         }
         scope.last_list.enter(output);
         // ~keep In a task item, the render of each node before the first content reports whether
         // ~keep it wrote, so the item knows which element wrote first (issue #650).
-        let first_writer_start = scope
-            .first_writer
-            .as_ref()
-            .filter(|first_writer| {
-                first_writer.is_open() && !scope.task_checkbox_ancestors.contains(&node_handle.get_inner())
-            })
-            .map(|_| output.len());
+        let first_writer_start = first_writer_start(scope, &node_handle, output);
         let mut frame = match enter_node(&node_handle, self.parser, output, handler, self.root.dom_ctx, children) {
             Entered::Complete => {
                 leave_node(node_handle, self.parser, output, scope, first_writer_start);
-                if let (Some(boundary), Some(incoming)) = (scope.media_boundary.as_ref(), media_state) {
-                    super::finish_media_boundary(output, media_start, boundary, incoming);
-                }
+                end_media_boundary(scope, media_state, output, media_start);
                 return None;
             }
             Entered::Children {
@@ -210,16 +256,7 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
                 end,
             } => Frame {
                 node: node_handle,
-                scope: djot_scope.map_or_else(
-                    || match parent {
-                        Some(frame) => frame
-                            .child_scope
-                            .as_ref()
-                            .map_or_else(|| frame.scope.clone(), |ctx| Scope::Shared(Rc::clone(ctx))),
-                        None => Scope::Root(self.root.ctx),
-                    },
-                    Scope::Shared,
-                ),
+                scope: djot_scope.map_or_else(|| inherited_scope(parent, self.root.ctx), Scope::Shared),
                 child_scope,
                 depth,
                 options: parent.and_then(|frame| frame.options.clone()),
@@ -232,27 +269,10 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
                 media_state,
             },
         };
-        if let Some(end) = frame.end.as_mut() {
-            if matches!(end.close, Close::WithOptions(_, _)) {
-                if let Close::WithOptions(options, close) = std::mem::replace(&mut end.close, Close::Nothing) {
-                    frame.options = Some(options);
-                    end.close = *close;
-                }
-            }
-        }
+        adopt_close_options(&mut frame);
         if frame.captures() {
             let buffer = self.spare_captures.pop().unwrap_or_default();
-            if frame.end.as_ref().is_some_and(|end| {
-                matches!(
-                    end.close,
-                    Close::Capture(
-                        crate::converter::walk::CaptureEnd::Blockquote
-                            | crate::converter::walk::CaptureEnd::Figcaption
-                            | crate::converter::walk::CaptureEnd::TaskItem(_)
-                            | crate::converter::walk::CaptureEnd::Definition("dt" | "dd")
-                    )
-                )
-            }) {
+            if frame.end.as_ref().is_some_and(|end| owns_inline_break(&end.close)) {
                 let context = frame
                     .child_scope
                     .as_deref()

@@ -23,6 +23,26 @@ fn ordered_start(tag: &tl::HTMLTag) -> i64 {
         })
 }
 
+fn leading_separator_delimiter(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    context: ListContext<'_>,
+) -> Option<char> {
+    let ListContext {
+        options, ctx, dom_ctx, ..
+    } = context;
+    let separator_comment = preceding_same_type_list_separator_comment(*node_handle, parser, dom_ctx, "ol");
+    add_list_leading_separator(output, ctx, options);
+    if let Some(comment) = separator_comment {
+        output.push_str(&comment);
+        output.push_str("\n\n");
+        None
+    } else {
+        switched_delimiter(output, ctx)
+    }
+}
+
 /// Handle ordered list element (<ol>).
 ///
 /// Extracts the `start` attribute to set initial counter value,
@@ -32,18 +52,8 @@ pub fn handle_ol(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut
     if super::render_itemless_list_as_div(node_handle, parser, output, context) {
         return;
     }
-    let ListContext {
-        options, ctx, dom_ctx, ..
-    } = context;
-    let separator_comment = preceding_same_type_list_separator_comment(*node_handle, parser, dom_ctx, "ol");
-    add_list_leading_separator(output, ctx, options);
-    let delimiter = if let Some(comment) = separator_comment {
-        output.push_str(&comment);
-        output.push_str("\n\n");
-        None
-    } else {
-        switched_delimiter(output, ctx)
-    };
+    let ListContext { ctx, dom_ctx, .. } = context;
+    let delimiter = leading_separator_delimiter(node_handle, parser, output, context);
 
     let nested_depth = calculate_list_nesting_depth(ctx);
     let is_loose = is_loose_list(*node_handle, parser, dom_ctx);
@@ -129,18 +139,8 @@ pub fn open(
             children,
         );
     }
-    let ListContext {
-        options, ctx, dom_ctx, ..
-    } = context;
-    let separator_comment = preceding_same_type_list_separator_comment(*node_handle, parser, dom_ctx, "ol");
-    add_list_leading_separator(output, ctx, options);
-    let delimiter = if let Some(comment) = separator_comment {
-        output.push_str(&comment);
-        output.push_str("\n\n");
-        None
-    } else {
-        switched_delimiter(output, ctx)
-    };
+    let ListContext { ctx, dom_ctx, .. } = context;
+    let delimiter = leading_separator_delimiter(node_handle, parser, output, context);
 
     let nested_depth = calculate_list_nesting_depth(ctx);
     let is_loose = is_loose_list(*node_handle, parser, dom_ctx);

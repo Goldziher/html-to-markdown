@@ -567,41 +567,15 @@ fn begin_tag<'a>(
     let tag_name = normalized_node_tag_name(node_handle, tag, parser, dom_ctx);
     let tag_name = tag_name.as_ref();
     #[cfg(feature = "visitor")]
-    let visitor_output_start = output.len();
-    #[cfg(feature = "visitor")]
-    let visitor_element_state = if ctx.skip_visitor_hooks {
+    let visitor_element_state = if ctx.skip_visitor_hooks || ctx.visitor.is_none() {
         None
-    } else if let Some(ref visitor_handle) = ctx.visitor {
-        use crate::converter::visitor_hooks::{VisitAction, build_visitor_element_state, handle_visitor_element_start};
-
-        let state = build_visitor_element_state(tag_name, node_handle, parser, dom_ctx);
-        let action = handle_visitor_element_start(visitor_handle, tag_name, tag, &state, output, depth);
-
-        match action {
-            VisitAction::Continue => {
-                if options.whitespace_mode == crate::options::WhitespaceMode::Strict
-                    && !ctx.excluded_node_ids.contains(&node_handle.get_inner())
-                {
-                    dom_ctx.record_absent_breaks(node_handle.get_inner(), false);
-                }
-                Some(state)
-            }
-            VisitAction::Skip => {
-                if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
-                    dom_ctx.record_absent_breaks(node_handle.get_inner(), true);
-                }
-                return Begun::Complete;
-            }
-            VisitAction::Custom => {
-                if let Some(replacement) = output.get(visitor_output_start..) {
-                    capture_custom_start(handler, tag_name, tag, node_handle.get_inner(), replacement);
-                }
-                return Begun::Complete;
-            }
-            VisitAction::Error => return Begun::Complete,
-        }
     } else {
-        None
+        let state =
+            crate::converter::visitor_hooks::build_visitor_element_state(tag_name, node_handle, parser, dom_ctx);
+        if start_visitor_element(&state, node_handle, tag, output, handler, tag_name).is_break() {
+            return Begun::Complete;
+        }
+        Some(state)
     };
 
     match skip_or_render_tag(
@@ -633,6 +607,49 @@ fn begin_tag<'a>(
         #[cfg(not(feature = "visitor"))]
         marker: std::marker::PhantomData,
     })
+}
+
+#[cfg(feature = "visitor")]
+fn start_visitor_element(
+    state: &crate::converter::visitor_hooks::VisitorElementState<'_>,
+    node_handle: &tl::NodeHandle,
+    tag: &tl::HTMLTag<'_>,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    tag_name: &str,
+) -> std::ops::ControlFlow<()> {
+    use crate::converter::visitor_hooks::{VisitAction, handle_visitor_element_start};
+    use std::ops::ControlFlow;
+
+    let (options, ctx, dom_ctx) = (handler.options, handler.ctx, handler.dom_ctx);
+    let Some(ref visitor_handle) = ctx.visitor else {
+        return ControlFlow::Continue(());
+    };
+    let visitor_output_start = output.len();
+    let action = handle_visitor_element_start(visitor_handle, tag_name, tag, state, output, handler.depth);
+    let strict = options.whitespace_mode == crate::options::WhitespaceMode::Strict;
+
+    match action {
+        VisitAction::Continue => {
+            if strict && !ctx.excluded_node_ids.contains(&node_handle.get_inner()) {
+                dom_ctx.record_absent_breaks(node_handle.get_inner(), false);
+            }
+            ControlFlow::Continue(())
+        }
+        VisitAction::Skip => {
+            if strict {
+                dom_ctx.record_absent_breaks(node_handle.get_inner(), true);
+            }
+            ControlFlow::Break(())
+        }
+        VisitAction::Custom => {
+            if let Some(replacement) = output.get(visitor_output_start..) {
+                capture_custom_start(handler, tag_name, tag, node_handle.get_inner(), replacement);
+            }
+            ControlFlow::Break(())
+        }
+        VisitAction::Error => ControlFlow::Break(()),
+    }
 }
 
 #[cfg(feature = "visitor")]

@@ -23,6 +23,7 @@
 //! their appropriate handlers and returns a boolean indicating success.
 
 pub mod elements;
+pub mod option;
 pub mod spacing;
 
 pub use super::Context;
