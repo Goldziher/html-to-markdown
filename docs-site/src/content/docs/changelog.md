@@ -219,6 +219,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
 - With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
   default options.
+- The documentation of `exclude_selectors` names the selector forms that match: a tag name, a
+  class, an id, an attribute, `*`, and these joined with no space. A selector with a combinator
+  (`.menu a`, `div > p`, `h2 + p`) or a pseudo-class matches nothing and reports no error, and
+  the documentation now says so. The conversion is the same as before.
 
 ### Fixed
 
