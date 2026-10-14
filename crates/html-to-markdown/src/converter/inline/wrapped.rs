@@ -337,11 +337,15 @@ fn has_leading_blank_source(site: InlineSite<'_>) -> bool {
 
 // ~keep A lone break is the #502 separator only in a block that starts its buffer. In a later
 // ~keep block and in a link label it stays the hard break the page had before #871.
+// ~keep A blank before the lone break, or a second break, makes it a hard break at every
+// ~keep position (#897): only a wrapper that holds one break and nothing else is a separator.
 // ~keep White space after the break in the wrapper's own text leaves the separator as it is.
-fn keeps_lone_break(content: &str, site: InlineSite<'_>) -> bool {
+fn keeps_hard_break(content: &str, site: InlineSite<'_>) -> bool {
+    let marker = crate::converter::main_helpers::hard_break_marker(site.options);
     let body = content.trim_start_matches([' ', '\t']);
-    (body == "\n" || body == crate::converter::main_helpers::hard_break_marker(site.options))
-        && (site.ctx.block_content_start != 0 || site.ctx.in_link)
+    let lone = body == "\n" || body == marker;
+    ((content.len() > marker.len() && content.ends_with(marker))
+        || (lone && (site.ctx.block_content_start != 0 || site.ctx.in_link)))
         && !site
             .dom_ctx
             .children_of(site.node_handle.get_inner())
@@ -442,7 +446,7 @@ pub fn emit_wrapped_inline(
     let moved = move_leading_hard_breaks(output, strict_blank_separator(content, site), ctx, options);
     // ~keep A blank wrapper after real strong markup remains a separator (#502/#504).
     // DOM provenance plus the configured close marker excludes marker-looking prose.
-    let content = strong_separator_content(output, moved, keeps_lone_break(content, site), site);
+    let content = strong_separator_content(output, moved, keeps_hard_break(content, site), site);
     let (prefix, suffix, trimmed) = chomp_inline(content);
     if emit_break_sentinel(output, content, ctx, options) {
         return;

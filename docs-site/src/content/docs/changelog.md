@@ -227,6 +227,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<p>x</p><p><b>a</b><b><br></b><b>c</b></p>` gave `**a** **c**` in the second paragraph and
   gives `**a**`, a hard break and `**c**`, as before. The block that starts the output keeps the
   one space (#502).
+- A bold element after bold text that holds two or more line breaks, or a blank element before its
+  line break, writes its hard break again at every position:
+  `<h1>Notes</h1><p><b>Name</b><b><br><br></b>Ada</p>` gave `**Name** Ada` and gives `**Name**`, a
+  hard break and `Ada`, as before
+  ([#897](https://github.com/xberg-io/html-to-markdown/issues/897)). Only an element that holds
+  one line break and nothing else is the one space of #502.
 
 - Collapse no-break-space tails after empty options and empty or line-end-only inline descendants
   to full-main spacing on every route (#868), retaining literal pre content and strict whitespace.
