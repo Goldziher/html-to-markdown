@@ -8,7 +8,6 @@
 
 use crate::converter::Context;
 use crate::converter::inline::HandlerContext;
-use crate::converter::main::walk_node;
 use crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer;
 
 #[cfg(feature = "visitor")]
@@ -24,17 +23,65 @@ use std::borrow::Cow;
 /// - Processing citation URLs from cite attribute
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Adding proper spacing and blockquote prefix formatting
-pub fn handle_blockquote(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
-    if handler.context.in_heading && !handler.context.in_table_cell {
-        render_heading_quote(tag, &mut handler);
-        return;
+pub fn open_blockquote(
+    tag: &tl::HTMLTag,
+    handler: &HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    use crate::converter::walk::{CaptureEnd, Close, Open};
+    children.extend(tag.children().top().iter().copied());
+    if handler.context.convert_as_inline && (!handler.context.in_heading || handler.context.in_table_cell) {
+        return Some(Open::children_only());
     }
-    if handler.context.convert_as_inline {
-        walk_children_to_output(tag, &mut handler);
-        return;
-    }
+    let follows_markers = handler.output.is_empty() && handler.context.in_marker_text();
+    let context = if handler.context.in_heading && !handler.context.in_table_cell {
+        handler.context.clone()
+    } else {
+        Context {
+            blockquote_depth: handler.context.blockquote_depth + 1,
+            in_list_item: false,
+            in_list: false,
+            list_indent_columns: 0,
+            real_item_columns: 0,
+            inline_buffer_column: None,
+            inline_depth: if follows_markers {
+                handler.context.inline_depth
+            } else {
+                0
+            },
+            quote_starts_after_markers: follows_markers,
+            item_lines: crate::converter::list::utils::ItemLineScan::new_item(),
+            ..handler.context.clone()
+        }
+    };
+    Some(Open {
+        scope: Some(std::rc::Rc::new(context)),
+        close: Close::Capture(CaptureEnd::Blockquote),
+    })
+}
 
-    // ~keep Relative citations must remain meaningful after the Markdown leaves its source page.
+pub fn close_blockquote(content: &str, mut handler: HandlerContext<'_>) {
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+        return;
+    };
+    let mut content = content.to_owned();
+    strip_trailing_backslash_breaks_from_fresh_buffer(&mut content, handler.options.newline_style);
+    if handler.context.in_heading && !handler.context.in_table_cell {
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        #[cfg(feature = "visitor")]
+        if visit_blockquote(tag, trimmed, &mut handler) {
+            return;
+        }
+        if !handler.output.is_empty() && !handler.output.ends_with(char::is_whitespace) {
+            handler.output.push(' ');
+        }
+        handler.output.push_str(trimmed);
+        handler.output.push(' ');
+        return;
+    }
     let cite = crate::converter::utility::attributes::decoded_attribute(tag, "cite")
         .filter(|_| handler.options.include_blockquote_citations)
         .map(std::borrow::Cow::into_owned)
@@ -44,9 +91,7 @@ pub fn handle_blockquote(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
                 .resolve_url(&value, handler.node_handle, handler.parser, handler.dom_context)
                 .unwrap_or(value)
         });
-    let content = collect_quote_content(tag, &handler);
     let trimmed = container_content(tag, handler.parser, &content, handler.options.code_block_style);
-
     #[cfg(feature = "visitor")]
     if visit_blockquote(tag, trimmed, &mut handler) {
         return;
@@ -101,84 +146,6 @@ fn starts_with_code_block<'p, 'a>(tag: &'p tl::HTMLTag<'a>, parser: &'p tl::Pars
             Some(element) => current = element,
             None => return false,
         }
-    }
-}
-
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
-fn render_heading_quote(tag: &tl::HTMLTag<'_>, handler: &mut HandlerContext<'_>) {
-    let mut content = String::new();
-    walk_children(tag, &mut content, handler.context, handler);
-    let trimmed = content.trim();
-    if trimmed.is_empty() {
-        return;
-    }
-    #[cfg(feature = "visitor")]
-    if visit_blockquote(tag, trimmed, handler) {
-        return;
-    }
-    if !handler.output.is_empty() && !handler.output.ends_with(char::is_whitespace) {
-        handler.output.push(' ');
-    }
-    handler.output.push_str(trimmed);
-    handler.output.push(' ');
-}
-
-fn collect_quote_content(tag: &tl::HTMLTag<'_>, handler: &HandlerContext<'_>) -> String {
-    // ~keep Quote children start in a container of their own; surrounding list columns do not
-    // alter nested lists, but an opening inline marker remains active on the first line (#654).
-    let follows_markers = handler.output.is_empty() && handler.context.in_marker_text();
-    let quote_context = Context {
-        blockquote_depth: handler.context.blockquote_depth + 1,
-        in_list_item: false,
-        in_list: false,
-        list_indent_columns: 0,
-        real_item_columns: 0,
-        inline_buffer_column: None,
-        inline_depth: if follows_markers {
-            handler.context.inline_depth
-        } else {
-            0
-        },
-        quote_starts_after_markers: follows_markers,
-        item_lines: crate::converter::list::utils::ItemLineScan::new_item(),
-        ..handler.context.clone()
-    };
-    let mut content = String::with_capacity(256);
-    let quote_context = quote_context.with_inline_break_owner(&content);
-    walk_children(tag, &mut content, &quote_context, handler);
-    // ~keep No later dispatch can close a trailing `<br>` run at the end of this buffer (#464).
-    strip_trailing_backslash_breaks_from_fresh_buffer(&mut content, handler.options.newline_style);
-    content
-}
-
-fn walk_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            handler.parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
     }
 }
 

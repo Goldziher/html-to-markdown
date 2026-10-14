@@ -35,12 +35,9 @@ pub fn handle_figure(
     output: &mut String,
     handler: super::HandlerContext<'_>,
 ) {
+    // ~keep In an inline context the dispatcher gives the children to the walk and this handler
+    // ~keep does not run.
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        if handler.ctx.convert_as_inline {
-            super::walk_tag_children(tag, parser, output, handler);
-            return;
-        }
-
         #[cfg(feature = "visitor")]
         if visit_figure_start(tag, node_handle, parser, output, handler) {
             return;
@@ -266,57 +263,76 @@ pub fn handle_figcaption(
     output: &mut String,
     handler: super::HandlerContext<'_>,
 ) {
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let mut text = String::new();
-        let children = tag.children();
-        {
-            let caption_ctx = super::Context {
-                text_in_markers: true,
-                ..handler.ctx.with_inline_break_owner(&text)
-            };
-            for child_handle in children.top().iter() {
-                super::walk_node(
-                    child_handle,
-                    parser,
-                    &mut text,
-                    crate::converter::block::container::HandlerContext::new(
-                        handler.options,
-                        &caption_ctx,
-                        handler.depth + 1,
-                        handler.dom_ctx,
-                    ),
-                );
-            }
-        }
-
-        // ~keep A trailing <br> run with no following sibling has no next dispatch to catch
-        // ~keep it in `walk_node`'s pre-block-dispatch strip, since the figcaption's content
-        // ~keep is simply finished here — so this closes its own trailing run the same way
-        // ~keep `paragraph.rs` closes its own (issue #464 follow-up). Left uncaught, the
-        // ~keep stray `\` below ends up between the text and the closing `*`, escaping the
-        // ~keep emphasis delimiter instead of merely surviving as a visible character.
-        crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer(
+    let mut children = Vec::new();
+    let Some(opened) = open_figcaption(node_handle, parser, handler, &mut children) else {
+        return;
+    };
+    let mut text = String::new();
+    let caption_ctx = opened
+        .scope
+        .as_deref()
+        .unwrap_or(handler.ctx)
+        .with_inline_break_owner(&text);
+    for child in &children {
+        super::walk_node(
+            child,
+            parser,
             &mut text,
-            handler.options.newline_style,
+            super::HandlerContext::new(handler.options, &caption_ctx, handler.depth + 1, handler.dom_ctx),
         );
-
-        let text = text.trim().to_owned();
-        if text.is_empty() {
-            return;
-        }
-
-        #[cfg(feature = "visitor")]
-        if visit_figcaption(tag, node_handle, parser, output, &text, handler) {
-            return;
-        }
-
-        separate_caption(output);
-
-        output.push(handler.options.strong_em_symbol);
-        output.push_str(&text);
-        output.push(handler.options.strong_em_symbol);
-        output.push_str("\n\n");
     }
+    close_figcaption(&text, node_handle, parser, output, handler);
+}
+
+pub fn open_figcaption(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    handler: super::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(crate::converter::walk::Open {
+        scope: Some(std::rc::Rc::new(super::Context {
+            text_in_markers: true,
+            ..handler.ctx.clone()
+        })),
+        close: crate::converter::walk::Close::Capture(crate::converter::walk::CaptureEnd::Figcaption),
+    })
+}
+
+pub fn close_figcaption(
+    content: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+) {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return;
+    };
+    #[cfg(not(feature = "visitor"))]
+    let _ = tag;
+    let mut text = content.to_owned();
+    crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer(
+        &mut text,
+        handler.options.newline_style,
+    );
+    let text = text.trim();
+    if text.is_empty() {
+        return;
+    }
+    #[cfg(feature = "visitor")]
+    if visit_figcaption(tag, node_handle, parser, output, text, handler) {
+        return;
+    }
+    separate_caption(output);
+    output.push(handler.options.strong_em_symbol);
+    output.push_str(text);
+    output.push(handler.options.strong_em_symbol);
+    output.push_str("\n\n");
 }
 
 #[cfg(feature = "visitor")]
@@ -406,6 +422,75 @@ pub fn handle(
         "figcaption" => handle_figcaption(tag_name, node_handle, parser, output, handler),
         _ => {}
     }
+}
+
+pub fn open_figure(
+    site: crate::converter::inline::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let node_handle = site.node_handle;
+    let parser = site.parser;
+    let output = site.output;
+    #[cfg(feature = "visitor")]
+    let handler = super::HandlerContext::new(site.options, site.context, site.depth, site.dom_context);
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    #[cfg(feature = "visitor")]
+    if visit_figure_start(tag, node_handle, parser, output, handler) {
+        return None;
+    }
+    children.extend(tag.children().top().iter().copied());
+    Some(crate::converter::walk::Open {
+        scope: None,
+        close: crate::converter::walk::Close::Capture(crate::converter::walk::CaptureEnd::Figure(output.len())),
+    })
+}
+
+pub fn close_figure(
+    figure_start: usize,
+    content: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+) {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return;
+    };
+    #[cfg(not(feature = "visitor"))]
+    let _ = (tag, figure_start);
+    let mut figure_content = content.to_owned();
+    // ~keep A trailing <br> run with no following sibling has no next dispatch to catch
+    // ~keep it in `walk_node`'s pre-block-dispatch strip, since the figure's content is
+    // ~keep simply finished here — so this closes its own trailing run the same way
+    // ~keep `paragraph.rs` closes its own (issue #464 follow-up). `trim_matches` below
+    // ~keep does not treat `\` as trimmable, so it cannot clean this up on its own.
+    crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer(
+        &mut figure_content,
+        handler.options.newline_style,
+    );
+
+    figure_content = figure_content.replace("\n![", "![");
+    figure_content = figure_content.replace(" ![", "![");
+
+    let content = figure_content
+        .trim_start_matches('\n')
+        .trim_end_matches(['\n', ' ', '\t']);
+    // ~keep Keep the code renderer's four-space prefix, but strip ordinary figure padding (#819).
+    let trimmed = if handler.options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && content.starts_with("    ")
+    {
+        content
+    } else {
+        content.trim_start_matches([' ', '\t'])
+    };
+    if !trimmed.is_empty() {
+        crate::converter::block::div::push_block(output, handler.options, handler.ctx, trimmed);
+    }
+
+    #[cfg(feature = "visitor")]
+    visit_figure_end(tag, node_handle, parser, output, figure_start, handler);
 }
 
 #[cfg(test)]

@@ -6,12 +6,14 @@
 //! - Nested code context tracking (suppress formatting inside <code>/<pre>)
 //! - Whitespace normalization for kbd/samp elements
 //!
-//! `<code>` itself is handled by `converter::handlers::code_block::handle_code`, which is
+//! `<code>` itself is handled by `converter::handlers::code_block::open_code`, which is
 //! what `converter::main`'s walk dispatches to; this module's own `<code>` arm was a second,
 //! silently divergent implementation that nothing ever reached. ~keep
 
-use crate::converter::inline::{HandlerContext, wrapped::InlineSite, wrapped::emit_code_span};
+use crate::converter::inline::{HandlerContext, wrapped::emit_code_span};
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::text;
+use std::rc::Rc;
 
 type Context = crate::converter::Context;
 
@@ -27,57 +29,48 @@ type Context = crate::converter::Context;
 /// # Note
 /// This function references helper functions and `walk_node` from converter.rs
 /// which must be accessible (pub(crate)) for this module to work correctly.
-pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
-    match tag_name {
-        "kbd" | "samp" | "tt" => handle_kbd_samp(context),
-        _ => {}
-    }
-}
-
-/// Handle keyboard and sample output elements (<kbd> and <samp> tags).
 ///
-/// These elements are rendered as inline code with:
-/// - Whitespace normalization (via `text::normalize_whitespace`)
-/// - Chomp inline handling for prefix/suffix spacing
-/// - The same delimiter selection and padding as `<code>` ~keep
-fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
-    use crate::converter::{append_inline_suffix, chomp_inline};
-
-    let site = handler.inline_site();
-    let Some(node) = handler.node_handle.get(handler.parser) else {
-        return;
-    };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+/// Lists the children of a `kbd` or a `samp` in `children`. An element that holds a link is
+/// written as a code element.
+pub fn open(handler: HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+        return None;
     };
 
     if !handler.context.in_code && crate::converter::handlers::code_block::contains_anchor(tag, handler.parser) {
-        crate::converter::handlers::code_block::handle_code(tag, handler);
-        return;
+        return Some(crate::converter::handlers::code_block::open_code(
+            tag,
+            handler.parser,
+            handler.context,
+            children,
+        ));
     }
-    let children = tag.children();
+    children.extend(tag.children().top().iter().copied());
     if handler.context.code_element_is_transparent() {
         // ~keep A nested `<code>` renders transparently inside an outer code span
-        // ~keep (`handlers::code_block::handle_code`); `<kbd>`/`<samp>` wrapped their own
+        // ~keep (`handlers::code_block::open_code`); `<kbd>`/`<samp>` wrapped their own
         // ~keep backticks anyway, so the outer span grew a second, nested pair.
-        for child_handle in children.top().iter() {
-            walk_child(child_handle, handler.output, handler.context, handler.depth, site);
-        }
-        return;
+        return Some(Open::children_only());
     }
 
-    let mut content = String::with_capacity(32);
     let code_ctx = Context {
         in_code: true,
         ..handler.context.clone()
     };
-    for child_handle in children.top().iter() {
-        walk_child(child_handle, &mut content, &code_ctx, handler.depth, site);
-    }
+    Some(Open {
+        scope: Some(Rc::new(code_ctx)),
+        close: Close::Capture(CaptureEnd::KbdSamp),
+    })
+}
 
-    let normalized = text::normalize_whitespace(&content);
+/// Write `content`, the text of the children of a `kbd` or a `samp`, as inline code:
+/// - Whitespace normalization (via `text::normalize_whitespace`)
+/// - Chomp inline handling for prefix/suffix spacing
+/// - The same delimiter selection and padding as `<code>` ~keep
+pub fn close(content: &str, mut handler: HandlerContext<'_>) {
+    use crate::converter::{append_inline_suffix, chomp_inline};
+
+    let normalized = text::normalize_whitespace(content);
     let (prefix, suffix, trimmed) = chomp_inline(&normalized);
 
     if content.is_empty() {
@@ -109,21 +102,6 @@ fn handle_kbd_samp(mut handler: HandlerContext<'_>) {
         handler.node_handle,
         handler.parser,
         handler.dom_context,
-    );
-}
-
-fn walk_child(
-    child_handle: &tl::NodeHandle,
-    output: &mut String,
-    context: &Context,
-    depth: usize,
-    site: InlineSite<'_>,
-) {
-    crate::converter::walk_node(
-        child_handle,
-        site.parser,
-        output,
-        crate::converter::block::container::HandlerContext::new(site.options, context, depth + 1, site.dom_ctx),
     );
 }
 

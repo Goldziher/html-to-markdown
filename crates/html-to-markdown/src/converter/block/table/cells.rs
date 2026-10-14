@@ -41,13 +41,17 @@ impl CellTextCache {
         }
     }
 
-    fn store(&mut self, node_id: u32, text: String) {
+    pub(super) const fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub(super) fn store(&mut self, node_id: u32, text: String) {
         if self.enabled {
             self.entries.insert(node_id, text);
         }
     }
 
-    fn take(&mut self, node_id: u32) -> Option<String> {
+    pub(super) fn take(&mut self, node_id: u32) -> Option<String> {
         if self.enabled {
             self.entries.remove(&node_id)
         } else {
@@ -225,13 +229,22 @@ pub fn append_layout_row(row_handle: &tl::NodeHandle, output: &mut String, env: 
         append_layout_cell_text(cell_handle, &mut row_text, env, depth);
     }
 
+    append_layout_text(output, &row_text, env.options, env.ctx);
+}
+
+pub(super) fn append_layout_text(
+    output: &mut String,
+    row_text: &str,
+    options: &crate::options::ConversionOptions,
+    ctx: &super::super::super::Context,
+) {
     let trimmed = row_text.trim();
     if !trimmed.is_empty() {
         if !output.is_empty() && !output.ends_with('\n') {
             output.push('\n');
         }
-        let marker = layout_row_bullet(env.options, env.ctx);
-        let formatted = strip_leading_bullet(trimmed, env.options);
+        let marker = layout_row_bullet(options, ctx);
+        let formatted = strip_leading_bullet(trimmed, options);
         output.push(marker);
         output.push(' ');
         output.push_str(formatted);
@@ -489,10 +502,20 @@ fn emit_rowspan_continuation(
 /// cyclomatic-complexity gate.
 #[cfg(feature = "visitor")]
 fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit: RowVisit<'_>) -> Option<bool> {
-    use crate::visitor::{NodeContext, NodeType, VisitResult};
-
-    let visitor_handle = visit.env.ctx.visitor.as_ref()?;
+    visit.env.ctx.visitor.as_ref()?;
     let cell_contents = visitor_cell_contents(visit);
+    run_row_visitor_with_contents(node_handle, output, visit, &cell_contents)
+}
+
+#[cfg(feature = "visitor")]
+pub(super) fn run_row_visitor_with_contents(
+    node_handle: &tl::NodeHandle,
+    output: &mut String,
+    visit: RowVisit<'_>,
+    cell_contents: &[String],
+) -> Option<bool> {
+    use crate::visitor::{NodeContext, NodeType, VisitResult};
+    let visitor_handle = visit.env.ctx.visitor.as_ref()?;
     let tl::Node::Tag(tag) = node_handle.get(visit.env.parser)? else {
         return None;
     };
@@ -509,7 +532,7 @@ fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit
 
     let visit_result = {
         let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
-        visitor.visit_table_row(&node_ctx, &cell_contents, visit.is_header)
+        visitor.visit_table_row(&node_ctx, cell_contents, visit.is_header)
     };
 
     match visit_result {
@@ -536,12 +559,12 @@ fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit
 
 #[cfg(feature = "visitor")]
 #[derive(Clone, Copy)]
-struct RowVisit<'a> {
-    env: RowEnv<'a>,
-    cells: &'a [tl::NodeHandle],
-    row_index: usize,
-    is_header: bool,
-    depth: usize,
+pub(super) struct RowVisit<'a> {
+    pub(super) env: RowEnv<'a>,
+    pub(super) cells: &'a [tl::NodeHandle],
+    pub(super) row_index: usize,
+    pub(super) is_header: bool,
+    pub(super) depth: usize,
 }
 
 #[cfg(feature = "visitor")]
@@ -621,19 +644,21 @@ pub fn convert_table_row(
     #[cfg(feature = "visitor")]
     let visitor_output_start = output.len();
     #[cfg(feature = "visitor")]
-    if let Some(early_return) = run_row_visitor_hook(
-        node_handle,
-        output,
-        RowVisit {
-            env,
-            cells: &cells,
-            row_index: render.row_index,
-            is_header: render.is_header,
-            depth: render.depth,
-        },
-    ) {
-        *render.has_content |= output.len() > visitor_output_start;
-        return early_return;
+    if !render.visitor_is_complete {
+        if let Some(early_return) = run_row_visitor_hook(
+            node_handle,
+            output,
+            RowVisit {
+                env,
+                cells: &cells,
+                row_index: render.row_index,
+                is_header: render.is_header,
+                depth: render.depth,
+            },
+        ) {
+            *render.has_content |= output.len() > visitor_output_start;
+            return early_return;
+        }
     }
 
     // ~keep Build the per-cell context once for the entire row.  Tier-2 hot-spot
@@ -686,6 +711,7 @@ fn append_rendered_row(
 }
 
 pub struct RowRender<'a> {
+    pub visitor_is_complete: bool,
     pub row_index: usize,
     pub has_content: &'a mut bool,
     pub has_span: bool,

@@ -20,8 +20,6 @@ pub mod image;
 pub mod link;
 mod srcset;
 
-pub use blockquote::handle_blockquote;
-pub use code_block::{handle_code, handle_pre};
 pub use graphic::handle_graphic;
 pub use image::handle_img;
-pub use link::handle_link;
+pub use link::open_link;
