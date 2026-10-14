@@ -19,6 +19,7 @@ mod flatten;
 pub mod layout;
 pub mod scanner;
 pub(super) mod utils;
+mod walk;
 
 use crate::converter::block::container::HandlerContext;
 
@@ -88,6 +89,16 @@ pub fn handle_table_with_context(
     let mut table_output = String::new();
     builder::handle_table(node_handle, parser, &mut table_output, handler);
 
+    append_table_output(node_handle, parser, output, handler, &table_output);
+}
+
+fn append_table_output(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    table_output: &str,
+) {
     if let Some(ref sc) = handler.ctx.structure_collector {
         if let Some(grid) = collect_table_grid(node_handle, parser, handler) {
             sc.borrow_mut().push_table_data(grid, table_output.trim().to_string());
@@ -114,7 +125,7 @@ pub fn handle_table_with_context(
         }
 
         let indented = layout::indent_table_for_list(
-            &table_output,
+            table_output,
             handler.ctx.list_depth,
             handler.ctx.list_indent_columns,
             handler.options,
@@ -128,7 +139,7 @@ pub fn handle_table_with_context(
                 output.push_str("\n\n");
             }
         }
-        output.push_str(&table_output);
+        output.push_str(table_output);
     }
 
     if !output.ends_with('\n') {
@@ -301,4 +312,21 @@ fn collect_grid_cell_content(cell_handle: &tl::NodeHandle, parser: &tl::Parser, 
         }
     }
     crate::text::normalize_whitespace_cow(&text).trim().to_string()
+}
+
+/// Open a table whose content is captured by the heap-backed Markdown walk.
+pub fn open_table_with_context(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    match walk::open(node_handle, parser, handler, children) {
+        walk::Opened::Children(open) => Some(open),
+        walk::Opened::Complete(text) => {
+            append_table_output(node_handle, parser, output, handler, &text);
+            None
+        }
+    }
 }

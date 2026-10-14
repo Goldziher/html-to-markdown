@@ -1,7 +1,7 @@
 //! Main conversion pipeline for HTML to Markdown.
 //!
-//! This module implements the core conversion functions and the recursive tree walker
-//! that transforms HTML DOM nodes into Markdown output.
+//! This module implements the core conversion functions and the tree walker that transforms
+//! HTML DOM nodes into Markdown output.
 
 #![allow(
     clippy::too_many_arguments,
@@ -36,16 +36,17 @@ use crate::types::structure_collector::StructureCollectorHandle;
 mod block_boundary;
 mod context_setup;
 mod exclusions;
+mod markdown_walk;
 mod parse;
 mod prepare;
 mod table_parts;
-mod tag;
 use self::block_boundary::{separate_in_list_item, separate_words_at_block_boundary};
 use self::context_setup::create_conversion_context;
+use self::markdown_walk::walk_nodes;
+pub use self::markdown_walk::{WalkSpares, walk_opened};
 use self::parse::{ParsedPage, finish_dom_parse, parse_for_conversion};
 pub use self::prepare::owner_mark_numbers_after_cleanup;
 use self::prepare::prepare_html;
-use self::table_parts::{is_table_part, walk_table_parts};
 
 type ConversionOutput = (
     String,
@@ -189,9 +190,7 @@ fn walk_document(
 ) {
     let top_level_start = output.len();
     let handler = HandlerContext::new(options, ctx, 0, dom_ctx);
-    for child_handle in dom.children() {
-        walk_node(child_handle, parser, output, handler);
-    }
+    walk_nodes(dom.children(), parser, output, handler);
     // ~keep The document end is the one block boundary no subsequent dispatch can observe.
     if options.newline_style == NewlineStyle::Backslash {
         strip_trailing_backslash_breaks(output, top_level_start);
@@ -493,33 +492,10 @@ fn parent_is_list(node_handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &D
         .is_some_and(|info| matches!(info.name.as_str(), "ul" | "ol"))
 }
 
-/// Recursively walk DOM nodes and convert to Markdown.
+/// Walk `node_handle` with its subtree and write the Markdown to `output`.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn walk_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, handler: HandlerContext<'_>) {
-    let ctx = handler.ctx;
-    let media_state = ctx
-        .media_boundary
-        .as_ref()
-        .map(|state| state.replace(Default::default()));
-    let media_start = output.len();
-    if is_table_part(node_handle, parser, handler.dom_ctx) {
-        walk_table_parts(node_handle, parser, output, handler);
-    } else {
-        ctx.last_list.enter(output);
-        // ~keep Task items need the first node that actually wrote content, including custom visitor output (#650).
-        match ctx.first_writer.as_ref().filter(|first_writer| first_writer.is_open()) {
-            Some(first_writer) => {
-                let start = output.len();
-                convert_node(node_handle, parser, output, handler);
-                first_writer.record(*node_handle, parser, output.get(start..));
-            }
-            None => convert_node(node_handle, parser, output, handler),
-        }
-        ctx.last_list.leave(output);
-    }
-    if let (Some(boundary), Some(incoming)) = (ctx.media_boundary.as_ref(), media_state) {
-        finish_media_boundary(output, media_start, boundary, incoming);
-    }
+    walk_nodes(std::slice::from_ref(node_handle), parser, output, handler);
 }
 
 // ~keep Resolve spacing from final emitted content after callbacks; skipped nodes and erased wrappers owe no edge.
@@ -555,53 +531,6 @@ fn finish_media_boundary(
     boundary.set(current);
 }
 
-/// Convert one DOM node and its children to Markdown.
-#[allow(clippy::only_used_in_recursion)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-#[allow(clippy::cast_possible_truncation)]
-fn convert_node(node_handle: &tl::NodeHandle, parser: &tl::Parser, output: &mut String, handler: HandlerContext<'_>) {
-    let options = handler.options;
-    let ctx = handler.ctx;
-    let depth = handler.depth;
-    let dom_ctx = handler.dom_ctx;
-    let Some(node) = node_handle.get(parser) else { return };
-
-    if depth >= effective_max_depth(options) {
-        ctx.depth_limit_reached.set(true);
-        return;
-    }
-
-    separate_from_block(node, node_handle, parser, output, handler);
-
-    let node_output_start = output.len();
-    match node {
-        tl::Node::Raw(bytes) => {
-            let raw = bytes.as_utf8_str();
-            crate::converter::text_node::process_text_node(
-                raw.as_ref(),
-                node_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth, dom_ctx),
-            );
-        }
-
-        tl::Node::Tag(tag) => tag::convert_tag(node_handle, tag, parser, output, handler),
-
-        tl::Node::Comment(_) => {}
-    }
-    // ~keep Whatever wrote content ends the start of the document: text, and also an image, a
-    // ~keep graphic or a form control. Text after it keeps its leading white space (issue #762).
-    // ~keep An element that wrote nothing, or white space only, is not content.
-    if ctx.at_fresh_block_start.get()
-        && output
-            .get(node_output_start..)
-            .is_some_and(|written| !written.trim().is_empty())
-    {
-        ctx.at_fresh_block_start.set(false);
-    }
-}
-
 struct TagCapture<'a> {
     structure: super::structure_capture::ElementTextCapture,
     #[cfg(feature = "visitor")]
@@ -614,6 +543,16 @@ struct TagCapture<'a> {
     marker: std::marker::PhantomData<&'a ()>,
 }
 
+/// How an element starts.
+enum Begun<'a> {
+    /// The element is complete: skipped, or written whole.
+    Complete,
+    /// The tag is dropped and the children are walked in its place.
+    Children,
+    /// The handler of the element runs, and `finish_tag` ends the element.
+    Open(TagCapture<'a>),
+}
+
 fn begin_tag<'a>(
     node_handle: &tl::NodeHandle,
     tag: &'a tl::HTMLTag<'a>,
@@ -621,7 +560,7 @@ fn begin_tag<'a>(
     output: &mut String,
     handler: HandlerContext<'_>,
     dom_ctx: &'a DomContext,
-) -> Option<TagCapture<'a>> {
+) -> Begun<'a> {
     let options = handler.options;
     let depth = handler.depth;
     let ctx = handler.ctx;
@@ -651,21 +590,21 @@ fn begin_tag<'a>(
                 if options.whitespace_mode == crate::options::WhitespaceMode::Strict {
                     dom_ctx.record_absent_breaks(node_handle.get_inner(), true);
                 }
-                return None;
+                return Begun::Complete;
             }
             VisitAction::Custom => {
                 if let Some(replacement) = output.get(visitor_output_start..) {
                     capture_custom_start(handler, tag_name, tag, node_handle.get_inner(), replacement);
                 }
-                return None;
+                return Begun::Complete;
             }
-            VisitAction::Error => return None,
+            VisitAction::Error => return Begun::Complete,
         }
     } else {
         None
     };
 
-    if skip_or_render_tag(
+    match skip_or_render_tag(
         tag_name,
         node_handle,
         tag,
@@ -673,7 +612,9 @@ fn begin_tag<'a>(
         output,
         HandlerContext::new(options, ctx, depth, dom_ctx),
     ) {
-        return None;
+        TagRoute::Handler => {}
+        TagRoute::Written => return Begun::Complete,
+        TagRoute::Children => return Begun::Children,
     }
     collect_document_attributes(tag_name, tag, ctx);
     let structure_capture = super::structure_capture::begin_element(tag_name, tag, ctx);
@@ -681,7 +622,7 @@ fn begin_tag<'a>(
     let element_output_start = output.len();
     strip_breaks_before_block(tag_name, output, options, ctx);
 
-    Some(TagCapture {
+    Begun::Open(TagCapture {
         structure: structure_capture,
         #[cfg(feature = "visitor")]
         visitor: visitor_element_state,
@@ -735,7 +676,7 @@ fn finish_tag(
             })
         {
             use crate::converter::visitor_hooks::VisitAction;
-            // ~keep Replacing leading output invalidates the label's first-button boundary; later hooks do not.
+            // ~keep Only replacing leading output invalidates a label's first-button boundary.
             if matches!(action, VisitAction::Skip | VisitAction::Custom)
                 && output.get(..safe_start).is_some_and(|before| before.trim().is_empty())
             {
@@ -788,6 +729,16 @@ fn djot_context(
     })
 }
 
+/// What the walk does with an element before any handler runs.
+enum TagRoute {
+    /// The handler of the element runs.
+    Handler,
+    /// The element is complete: skipped, or written as HTML.
+    Written,
+    /// The tag is dropped and the children are walked in its place.
+    Children,
+}
+
 fn skip_or_render_tag(
     tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -795,7 +746,7 @@ fn skip_or_render_tag(
     parser: &tl::Parser,
     output: &mut String,
     handler: HandlerContext<'_>,
-) -> bool {
+) -> TagRoute {
     if should_skip_tag(tag_name, node_handle, tag, parser, handler) {
         if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
             && handler.ctx.excluded_node_ids.contains(&node_handle.get_inner())
@@ -805,23 +756,15 @@ fn skip_or_render_tag(
         if handler.ctx.inline_code_links.is_none() {
             trim_trailing_whitespace(output);
         }
-        return true;
+        return TagRoute::Written;
     }
     if handler.ctx.strip_tags.contains(tag_name) {
-        for child_handle in tag.children().top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                HandlerContext::new(handler.options, handler.ctx, handler.depth + 1, handler.dom_ctx),
-            );
-        }
-        return true;
+        return TagRoute::Children;
     }
     let preserved_menu_placeholder = tag_name == "ul"
         && handler.ctx.preserve_tags.contains("menu")
         && tag.attributes().get(PRESERVED_MENU_ATTRIBUTE).is_some();
-    (handler.ctx.preserve_tags.contains(tag_name) || preserved_menu_placeholder)
+    if (handler.ctx.preserve_tags.contains(tag_name) || preserved_menu_placeholder)
         && render_preserved_tag(
             tag_name,
             node_handle,
@@ -830,6 +773,11 @@ fn skip_or_render_tag(
             handler,
             preserved_menu_placeholder,
         )
+    {
+        TagRoute::Written
+    } else {
+        TagRoute::Handler
+    }
 }
 
 pub(super) fn should_skip_tag(

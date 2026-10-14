@@ -352,7 +352,7 @@ fn render_cell_child(
     text.push_str(&nested);
 }
 
-fn finalize_cell_text(mut text: String, options: &crate::options::ConversionOptions) -> String {
+pub(super) fn finalize_cell_text(mut text: String, options: &crate::options::ConversionOptions) -> String {
     trim_in_place(&mut text);
     // ~keep Final invariant: a rendered cell never contains a newline, in any mode. This used
     // ~keep to be gated on `!br_in_tables`, which is what let issues #456 and #457 reach the

@@ -72,7 +72,7 @@ fn measurement(tier_strategy: TierStrategy) -> (f64, f64, f64) {
             fastest[index] = fastest[index].min(batched_sample(&inputs[index], &options));
         }
     }
-    (fastest[0], fastest[1], fastest[2])
+    fastest.into()
 }
 
 fn scales_linearly(small: f64, medium: f64, large: f64) -> bool {

@@ -15,6 +15,7 @@
 use super::FormContext;
 use super::spacing::{ControlStart, line_goes_on_after_parent, separate_from_next_text};
 use super::walk_node;
+use crate::converter::walk::{Close, Open};
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
 
@@ -578,28 +579,47 @@ pub fn handle_input(
 /// The text is a word of its own after the text before it. A blank line follows it where a
 /// block holds the control. In inline mode and in an inline element the line goes on, and the
 /// text after the control is a word of its own too.
-fn write_line_end_control(
-    node_handle: tl::NodeHandle,
-    tag: &tl::HTMLTag,
+///
+/// This is the first half: it records where the control starts and lists its children.
+pub fn open_line_end_control(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: None,
+        close: Close::LineEndControl(LineEndControlEnd {
+            start: ControlStart::new(output),
+            node: *node_handle,
+        }),
+    })
+}
+
+/// What `close_line_end_control` needs from `open_line_end_control`.
+pub struct LineEndControlEnd {
+    start: ControlStart,
+    node: tl::NodeHandle,
+}
+
+/// Ends the line of a control after its text.
+pub fn close_line_end_control(
+    end: &LineEndControlEnd,
     parser: &tl::Parser,
     output: &mut String,
-    context: FormContext<'_>,
+    handler: crate::converter::block::container::HandlerContext<'_>,
 ) {
-    let FormContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    let start = ControlStart::new(output);
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-        );
-    }
+    let LineEndControlEnd {
+        start,
+        node: node_handle,
+    } = end;
+    let node_handle = *node_handle;
+    let ctx = handler.ctx;
+    let dom_ctx = handler.dom_ctx;
     // ~keep In code the text of a control is written as the source has it: no space is added
     // ~keep and the line does not end.
     if ctx.in_code || !start.finish(output) {
@@ -612,22 +632,7 @@ fn write_line_end_control(
     }
 }
 
-/// Handles the `<textarea>`, `<output>`, `<meter>` and `<progress>` elements: their text content
-/// is plain text that ends its line.
-pub fn handle_line_end_control(
-    _tag_name: &str,
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    output: &mut String,
-    context: FormContext<'_>,
-) {
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        write_line_end_control(*node_handle, tag, parser, output, context);
-    }
-}
-
-/// Writes an option list: a `<select>` or a `<datalist>`, and an `<option>` that no such
-/// element holds.
+/// Handles the `<select>` and `<datalist>` elements.
 ///
 /// The options are one control: one space separates each option from the option before it,
 /// and the control from the text before and after it. Only the options of a `<select>` or a
@@ -715,57 +720,22 @@ pub fn handle_option(
     }
 }
 
-/// Writes an `<optgroup>`: its children alone, in an option list and outside one.
+/// Gives a `<button>` element to the visitor. Returns whether the visitor wrote or skipped the
+/// button, so that the walk does not open it.
 ///
-/// The `label` attribute is not text of the page: a browser shows it only inside the open list.
-pub fn handle_optgroup(
-    _tag_name: &str,
+/// A button element represents a clickable button. Its text content is plain text that ends
+/// its line: without a visitor result, `open_line_end_control` writes it.
+#[cfg(feature = "visitor")]
+pub fn visit_button(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
     context: FormContext<'_>,
-) {
+) -> bool {
     let FormContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
+        ctx, depth, dom_ctx, ..
     } = context;
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        let children = tag.children();
-        {
-            for child_handle in children.top().iter() {
-                walk_node(
-                    child_handle,
-                    parser,
-                    output,
-                    crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-                );
-            }
-        }
-    }
-}
-
-/// Handles the `<button>` element.
-///
-/// A button element represents a clickable button. Its content is inline text in the line of
-/// the text around it, as the content of a `span` is (issue #785). A browser draws a button as
-/// a box of its own, so one space separates its text from a word or a button right beside it.
-pub fn handle_button(
-    _tag_name: &str,
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    output: &mut String,
-    context: FormContext<'_>,
-) {
-    let FormContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = context;
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        #[cfg(feature = "visitor")]
         if let Some(ref visitor_handle) = ctx.visitor {
             use crate::converter::get_text_content;
             use crate::visitor::{NodeContext, NodeType, VisitResult};
@@ -789,44 +759,26 @@ pub fn handle_button(
             };
             match visit_result {
                 VisitResult::Continue => {}
-                VisitResult::Skip => return,
+                VisitResult::Skip => return true,
                 VisitResult::Custom(custom) => {
                     output.push_str(&custom);
-                    return;
+                    return true;
                 }
                 VisitResult::PreserveHtml => {
                     use crate::converter::utility::serialization::serialize_node;
                     output.push_str(&serialize_node(node_handle, parser));
-                    return;
+                    return true;
                 }
                 VisitResult::Error(err) => {
                     if ctx.visitor_error.borrow().is_none() {
                         *ctx.visitor_error.borrow_mut() = Some(err);
                     }
-                    return;
+                    return true;
                 }
             }
         }
-
-        let start = ControlStart::new(output);
-        let content_start = output.len();
-        let children = tag.children();
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
-        if output[..content_start].trim().is_empty() {
-            ctx.button_wrote.set(!output[content_start..].trim().is_empty());
-        }
-        // ~keep In code the text of a button is written as the source has it.
-        if !ctx.in_code && start.finish(output) {
-            separate_from_next_text(output, *node_handle, parser, dom_ctx);
-        }
     }
+    false
 }
 
 /// Dispatcher for form elements.
@@ -845,18 +797,295 @@ pub fn handle(
         "legend" => handle_legend(tag_name, node_handle, parser, output, context),
         "label" => handle_label(tag_name, node_handle, parser, output, context),
         "input" => handle_input(tag_name, node_handle, parser, output, context),
-        "textarea" | "output" | "meter" | "progress" => {
-            handle_line_end_control(tag_name, node_handle, parser, output, context);
-        }
-        // ~keep The outermost element of an option list writes the list. An option with no
-        // ~keep select list around it is a list of one option. An option group writes no list.
         "select" | "datalist" => handle_option_list(tag_name, node_handle, parser, output, context),
         "option" if !context.ctx.in_option_list => {
             handle_option_list(tag_name, node_handle, parser, output, context);
         }
         "option" => handle_option(tag_name, node_handle, parser, output, context),
-        "optgroup" => handle_optgroup(tag_name, node_handle, parser, output, context),
-        "button" => handle_button(tag_name, node_handle, parser, output, context),
         _ => {}
+    }
+}
+
+pub struct ButtonEnd {
+    start: ControlStart,
+    content_start: usize,
+    node: tl::NodeHandle,
+}
+
+pub fn open_button(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: None,
+        close: Close::Button(ButtonEnd {
+            start: ControlStart::new(output),
+            content_start: output.len(),
+            node: *node,
+        }),
+    })
+}
+
+pub fn close_button(
+    end: &ButtonEnd,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) {
+    if output
+        .get(..end.content_start)
+        .is_some_and(|before| before.trim().is_empty())
+    {
+        handler.ctx.button_wrote.set(
+            output
+                .get(end.content_start..)
+                .is_some_and(|content| !content.trim().is_empty()),
+        );
+    }
+    if !handler.ctx.in_code && end.start.finish(output) {
+        separate_from_next_text(output, end.node, parser, handler.dom_ctx);
+    }
+}
+
+pub struct CodeGroupEnd {
+    original_len: usize,
+    content_start: usize,
+}
+
+pub fn open_fieldset(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    if handler.ctx.in_code && !handler.ctx.in_code_block {
+        return open_code_group(node, parser, output, handler, children);
+    }
+    crate::converter::block::div::open(node, parser, output, handler, children)
+}
+
+fn open_code_group(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    let original_len = output.len();
+    if !output.is_empty() && !output.ends_with(char::is_whitespace) {
+        output.push(' ');
+    }
+    let end = CodeGroupEnd {
+        original_len,
+        content_start: output.len(),
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: Some(std::rc::Rc::new(super::Context {
+            convert_as_inline: true,
+            ..handler.ctx.clone()
+        })),
+        close: Close::CodeGroup(end),
+    })
+}
+
+pub fn close_code_group(end: &CodeGroupEnd, output: &mut String) {
+    if output.len() == end.content_start {
+        output.truncate(end.original_len);
+    } else if !output.ends_with(char::is_whitespace) {
+        output.push(' ');
+    }
+}
+
+pub fn open_label(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    context: FormContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    if context.ctx.in_code_block {
+        return Some(Open::children_only());
+    }
+    let first = first_content(tag, parser);
+    Some(Open {
+        scope: None,
+        close: Close::Hooked(Box::new(LabelHook {
+            content: String::new(),
+            ctx: std::rc::Rc::new(context.ctx.inline_buffer(output, false)),
+            handles: children.clone(),
+            first,
+            first_button_wrote: false,
+        })),
+    })
+}
+
+struct LabelHook {
+    content: String,
+    ctx: std::rc::Rc<super::Context>,
+    handles: Vec<tl::NodeHandle>,
+    first: Option<tl::NodeHandle>,
+    first_button_wrote: bool,
+}
+
+impl crate::converter::walk::ChildHook for LabelHook {
+    fn before_child(
+        &mut self,
+        _index: usize,
+        site: &mut crate::converter::walk::HookSite<'_>,
+    ) -> crate::converter::walk::Child {
+        site.context.button_wrote.set(false);
+        crate::converter::walk::Child::Walk {
+            depth: None,
+            buffer: Some(std::mem::take(&mut self.content)),
+            scope: Some(std::rc::Rc::clone(&self.ctx)),
+        }
+    }
+    fn after_child(&mut self, index: usize, own: Option<String>, site: &mut crate::converter::walk::HookSite<'_>) {
+        self.content = own.unwrap_or_default();
+        if self.first == Some(self.handles[index]) {
+            self.first_button_wrote = site.context.button_wrote.get();
+        }
+    }
+    fn close(self: Box<Self>, site: &mut crate::converter::walk::HookSite<'_>) {
+        let trimmed = self.content.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let start = ControlStart::new(site.output);
+        site.output.push_str(trimmed);
+        if !site.context.in_code
+            && starts_with_control(self.first, site.parser, site.dom_context, self.first_button_wrote)
+        {
+            start.finish(site.output);
+        }
+        if self.content.ends_with([' ', '\t']) {
+            site.output.push(' ');
+        }
+    }
+}
+
+pub fn open_legend(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    if handler.ctx.in_code && !handler.ctx.in_code_block {
+        return open_code_group(node, parser, output, handler, children);
+    }
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    let mut child_ctx = handler.ctx.inline_buffer(output, !handler.ctx.convert_as_inline);
+    if !handler.ctx.convert_as_inline {
+        child_ctx.in_strong = true;
+    }
+    Some(Open {
+        scope: Some(std::rc::Rc::new(child_ctx)),
+        close: Close::Capture(crate::converter::walk::CaptureEnd::Legend),
+    })
+}
+
+pub fn close_legend(
+    rendered: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) {
+    let options = handler.options;
+    let ctx = handler.ctx;
+    let dom_ctx = handler.dom_ctx;
+    let trimmed = rendered.trim();
+    if !trimmed.is_empty() {
+        if ctx.convert_as_inline {
+            output.push_str(trimmed);
+        } else {
+            let mut bold = String::with_capacity(trimmed.len() + 4);
+            crate::converter::inline::emphasis::emit_strong_wrapped_blocks(
+                &mut bold,
+                trimmed,
+                crate::converter::inline::wrapped::InlineSite {
+                    node_handle,
+                    parser,
+                    dom_ctx,
+                    ctx,
+                    options,
+                },
+            );
+            crate::converter::block::div::push_block(output, options, ctx, &bold);
+        }
+    }
+}
+
+pub fn open_option(
+    kind: &str,
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &str,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    let list = kind != "option" || !handler.ctx.in_option_list;
+    let child_ctx = if matches!(kind, "select" | "datalist") {
+        handler.ctx.inline_buffer(output, false)
+    } else {
+        handler.ctx.clone()
+    };
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: Some(std::rc::Rc::new(super::Context {
+            in_option_list: true,
+            ..child_ctx
+        })),
+        close: Close::Capture(crate::converter::walk::CaptureEnd::Option {
+            list,
+            word: kind == "option",
+        }),
+    })
+}
+
+pub fn close_option(
+    list: bool,
+    word: bool,
+    content: &str,
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) {
+    if !list {
+        super::spacing::write_option(output, content);
+        return;
+    }
+    let mut rendered = String::new();
+    let content = if word {
+        super::spacing::write_option(&mut rendered, content);
+        &rendered
+    } else {
+        content
+    };
+    if super::spacing::write_option_list(output, content, handler.ctx.in_code) {
+        separate_from_next_text(output, *node, parser, handler.dom_ctx);
     }
 }

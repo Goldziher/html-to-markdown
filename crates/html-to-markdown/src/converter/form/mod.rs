@@ -73,8 +73,7 @@ pub fn dispatch_form_handler(
     context: FormContext<'_>,
 ) -> bool {
     match tag_name {
-        "form" | "fieldset" | "legend" | "label" | "input" | "textarea" | "select" | "option" | "optgroup"
-        | "button" | "progress" | "meter" | "output" | "datalist" => {
+        "form" | "fieldset" | "legend" | "label" | "input" | "select" | "option" | "datalist" => {
             handle_form_elements(tag_name, node_handle, parser, output, context);
             true
         }

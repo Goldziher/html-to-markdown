@@ -74,38 +74,34 @@ fn find_checkbox<'a>(
     ctx: &Context,
     depth: usize,
 ) -> FirstContent {
-    // ~keep This helper recurses over the li subtree independently of `walk_node`
-    // ~keep (it runs before any handler dispatch), so it needs its own depth guard
-    // ~keep instead of relying on the main walker's check.
-    if depth >= effective_max_depth(options) {
-        ctx.depth_limit_reached.set(true);
-        return FirstContent::Other;
-    }
-    match node_handle.get(parser) {
-        Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => FirstContent::Other,
-        Some(tl::Node::Tag(node_tag)) => {
-            match normalized_tag_name(node_tag.name().as_utf8_str()).as_ref() {
-                "input" => {
-                    return crate::converter::form::elements::checkbox_state(node_tag)
-                        .map_or(FirstContent::Nothing, |checked| {
-                            FirstContent::Checkbox(checked, *node_handle)
-                        });
-                }
-                // ~keep A nested list's items own the checkboxes inside it (issue #604).
-                "ul" | "ol" | "img" | "hr" => return FirstContent::Other,
-                "script" | "style" | "template" | "noscript" => return FirstContent::Nothing,
-                _ => {}
-            }
-            for child_handle in node_tag.children().top().iter() {
-                let found = find_checkbox(child_handle, parser, options, ctx, depth + 1);
-                if !matches!(found, FirstContent::Nothing) {
-                    return found;
-                }
-            }
-            FirstContent::Nothing
+    let mut pending = vec![(*node_handle, depth)];
+    while let Some((handle, depth)) = pending.pop() {
+        if depth >= effective_max_depth(options) {
+            ctx.depth_limit_reached.set(true);
+            return FirstContent::Other;
         }
-        _ => FirstContent::Nothing,
+        match handle.get(parser) {
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => return FirstContent::Other,
+            Some(tl::Node::Tag(tag)) => {
+                match normalized_tag_name(tag.name().as_utf8_str()).as_ref() {
+                    "input" => {
+                        if let Some(checked) = crate::converter::form::elements::checkbox_state(tag) {
+                            return FirstContent::Checkbox(checked, handle);
+                        }
+                        continue;
+                    }
+                    "ul" | "ol" | "img" | "hr" => return FirstContent::Other,
+                    "script" | "style" | "template" | "noscript" => continue,
+                    _ => {}
+                }
+                let start = pending.len();
+                pending.extend(tag.children().top().iter().copied().map(|handle| (handle, depth + 1)));
+                pending[start..].reverse();
+            }
+            _ => {}
+        }
     }
+    FirstContent::Nothing
 }
 
 impl TaskInfo {
@@ -795,3 +791,6 @@ fn unordered_bullet(ctx: &Context, options: &ConversionOptions) -> char {
         bullets[bullet_index % bullets.len()]
     }
 }
+
+mod heap;
+pub use heap::{TaskItemEnd, close_task, open_regular};

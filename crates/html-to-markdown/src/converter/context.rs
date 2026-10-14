@@ -136,7 +136,7 @@ pub struct Context {
     /// Are we inside a `<pre>` code BLOCK specifically, as opposed to an inline code SPAN
     /// (`<code>`/`<kbd>`/`<samp>` outside a `<pre>`)?
     ///
-    /// Set only by `handle_pre` (`handlers/code_block.rs`); `handle_code` and
+    /// Set only by `handle_pre` (`handlers/code_block.rs`); `open_code` and
     /// `inline::code::handle` never set it themselves, so it propagates unchanged through
     /// their `..ctx.clone()` spread into any code nested inside a `<pre>`. `line_break.rs`
     /// needs this distinction that `in_code` alone cannot make: a `<br>` inside a code
@@ -275,7 +275,7 @@ pub struct Context {
     /// layout-table cell (its tag name is in `keep_inline_images_in`).
     pub(crate) cell_allow_inline_images: bool,
     /// Whether inline images should remain markdown inside the current `<a>` link label
-    /// ("a" is in `keep_inline_images_in`). Set once per `handle_link` call and carried
+    /// ("a" is in `keep_inline_images_in`). Set once per `open_link` call and carried
     /// unchanged into both the block-label and inline-label branches, so the option means
     /// the same thing whether or not the anchor happens to contain a block child (#492).
     pub(crate) link_allow_inline_images: bool,
@@ -346,9 +346,9 @@ pub struct Context {
     /// Shared flag set when `inline_data_media` replaced or dropped an element. A link reads it to
     /// tell a label emptied by that option from an empty one.
     pub(crate) inline_data_replaced: Rc<Cell<bool>>,
-    /// Shared flag set when a button writes text of its own, not a visitor's text for it. A label
-    /// reads it to tell whether the button at its start wrote.
     pub(crate) button_wrote: Rc<Cell<bool>>,
+    pub(crate) task_checkbox: Option<tl::NodeHandle>,
+    pub(crate) task_checkbox_ancestors: Rc<HashSet<u32>>,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     pub(crate) inline_collector: Option<InlineCollectorHandle>,
@@ -409,6 +409,8 @@ pub struct Context {
     /// of a script as written (see `KeptScripts`).
     #[cfg(feature = "metadata")]
     pub(crate) kept_scripts: Rc<crate::converter::utility::preprocessing::KeptScripts>,
+    /// The spare vectors of the Markdown walk, shared by every walk of the conversion.
+    pub(crate) walk_spares: Rc<crate::converter::main::WalkSpares>,
 }
 
 impl Context {

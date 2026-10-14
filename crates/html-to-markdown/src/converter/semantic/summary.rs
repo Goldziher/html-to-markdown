@@ -80,6 +80,68 @@ pub fn handle_details(
     }
 }
 
+pub fn open_details(
+    _tag_name: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        #[cfg(not(feature = "visitor"))]
+        let _ = tag;
+        #[cfg(feature = "visitor")]
+        if let Some(ref visitor_handle) = handler.ctx.visitor {
+            use crate::visitor::{NodeContext, NodeType, VisitResult};
+
+            let node_id = node_handle.get_inner();
+            let parent_tag = handler.dom_ctx.parent_tag_name(node_id, parser);
+            let index_in_parent = handler.dom_ctx.get_sibling_index(node_id).unwrap_or(0);
+            let open = tag.attributes().get("open").is_some();
+            let node_ctx = NodeContext::with_lazy_attributes(
+                NodeType::Details,
+                Cow::Borrowed("details"),
+                tag,
+                handler.depth,
+                index_in_parent,
+                parent_tag.map(Cow::Borrowed),
+                false,
+            );
+            let visit_result = {
+                let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
+                visitor.visit_details(&node_ctx, open)
+            };
+            match visit_result {
+                VisitResult::Continue => {}
+                VisitResult::Skip => return None,
+                VisitResult::Custom(custom) => {
+                    if !output.is_empty() && !output.ends_with("\n\n") {
+                        output.push_str("\n\n");
+                    }
+                    output.push_str(&custom);
+                    output.push_str("\n\n");
+                    return None;
+                }
+                VisitResult::PreserveHtml => {
+                    use crate::converter::utility::serialization::serialize_node;
+                    output.push_str(&serialize_node(node_handle, parser));
+                    return None;
+                }
+                VisitResult::Error(err) => {
+                    if handler.ctx.visitor_error.borrow().is_none() {
+                        *handler.ctx.visitor_error.borrow_mut() = Some(err);
+                    }
+                    return None;
+                }
+            }
+        }
+
+        return crate::converter::block::div::open(node_handle, parser, output, handler, children);
+    }
+    None
+}
+
 /// Handles the `<summary>` element.
 ///
 /// A summary element contains a caption for a details element.
@@ -260,5 +322,67 @@ pub fn handle(
         "details" => handle_details(tag_name, node_handle, parser, output, handler),
         "summary" => handle_summary(tag_name, node_handle, parser, output, handler),
         _ => {}
+    }
+}
+
+pub fn open_summary(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    handler: super::HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    let scope = (!handler.ctx.convert_as_inline && !handler.ctx.in_strong).then(|| {
+        std::rc::Rc::new(super::Context {
+            in_strong: true,
+            text_in_markers: true,
+            ..handler.ctx.clone()
+        })
+    });
+    Some(crate::converter::walk::Open {
+        scope,
+        close: crate::converter::walk::Close::Capture(crate::converter::walk::CaptureEnd::Summary),
+    })
+}
+
+pub fn close_summary(
+    captured: &str,
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+) {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return;
+    };
+    #[cfg(not(feature = "visitor"))]
+    let _ = tag;
+    let mut content = captured.to_owned();
+    // ~keep A trailing <br> run with no following sibling has no next dispatch to catch
+    // ~keep it in `walk_node`'s pre-block-dispatch strip, since the summary content is
+    // ~keep simply finished here — so this closes its own trailing run the same way
+    // ~keep `paragraph.rs` closes its own (issue #464 follow-up).
+    crate::converter::main_helpers::strip_trailing_backslash_breaks_from_fresh_buffer(
+        &mut content,
+        handler.options.newline_style,
+    );
+
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    #[cfg(feature = "visitor")]
+    if visit_summary(tag, node_handle, parser, output, trimmed, handler) {
+        return;
+    }
+
+    if handler.ctx.convert_as_inline {
+        output.push_str(trimmed);
+    } else {
+        render_summary_block(output, trimmed, node_handle, parser, handler);
     }
 }

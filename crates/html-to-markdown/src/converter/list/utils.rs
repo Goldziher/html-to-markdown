@@ -987,3 +987,6 @@ pub(super) fn process_list_children(
         }
     }
 }
+
+mod heap;
+pub(super) use heap::{ListWalkEnd, open_children_walk};

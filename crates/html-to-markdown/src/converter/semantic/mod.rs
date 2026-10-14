@@ -34,6 +34,7 @@ pub use super::{Context, DomContext};
 pub use crate::converter::block::container::HandlerContext;
 
 pub use attributes::handle as handle_attributes;
+pub use attributes::{CollectedQuoteEnd, close_collected_q, close_q, open_q};
 pub use definition_list::handle as handle_definition_list;
 pub use figure::handle as handle_figure;
 pub use sectioning::handle as handle_sectioning;

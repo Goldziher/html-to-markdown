@@ -15,7 +15,7 @@ use crate::converter::block::container::HandlerContext;
 
 /// Return the content cell of a one-cell layout wrapper containing a nested table.
 /// Stop at that cell, so nested data headers do not give the wrapper table semantics.
-fn nested_table_wrapper_cell(
+pub(super) fn nested_table_wrapper_cell(
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     scan: &TableScan,
@@ -135,7 +135,7 @@ fn row_columns(
 /// ~keep two-pass path. The metadata collector does not affect emitted bytes, so reuse stays on
 /// ~keep for it — its entries stop being recorded twice per table cell, which is the double
 /// ~keep walk's bug, not a behaviour worth preserving.
-const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan: &TableScan) -> bool {
+pub(super) const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan: &TableScan) -> bool {
     if table_scan.nested_table_count > 0 {
         return false;
     }
@@ -155,7 +155,11 @@ const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan:
 
 /// ~keep Ragged row widths alone do not imply layout: the regular renderer pads them. Layout
 /// ~keep requires stronger evidence such as nested tables, borderless spans, blanks, or dense links.
-fn is_layout_table(tag: &tl::HTMLTag<'_>, scan: &TableScan, wrapper_cell: Option<(tl::NodeHandle, usize)>) -> bool {
+pub(super) fn is_layout_table(
+    tag: &tl::HTMLTag<'_>,
+    scan: &TableScan,
+    wrapper_cell: Option<(tl::NodeHandle, usize)>,
+) -> bool {
     if wrapper_cell.is_some() || scan.has_header || scan.has_caption {
         return false;
     }
@@ -307,7 +311,7 @@ fn render_data_table(
 }
 
 #[cfg(feature = "visitor")]
-fn visitor_rendered_widths(handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+pub(super) fn visitor_rendered_widths(handler: HandlerContext<'_>) -> Option<RenderedWidths> {
     if handler.ctx.visitor.is_some()
         && !handler.options.compact_tables
         && !handler.ctx.in_code
@@ -321,13 +325,13 @@ fn visitor_rendered_widths(handler: HandlerContext<'_>) -> Option<RenderedWidths
 }
 
 #[cfg(not(feature = "visitor"))]
-const fn visitor_rendered_widths(_handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+pub(super) const fn visitor_rendered_widths(_handler: HandlerContext<'_>) -> Option<RenderedWidths> {
     None
 }
 
 /// ~keep Width measurement is an internal walk. When rendered text cannot be reused, collectors
 /// ~keep are detached so the pre-pass cannot duplicate caller-visible metadata or structure.
-fn column_widths(
+pub(super) fn column_widths(
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     handler: HandlerContext<'_>,
@@ -499,6 +503,7 @@ fn render_data_row(
             dom_ctx: env.handler.dom_ctx,
         },
         &mut RowRender {
+            visitor_is_complete: false,
             row_index: state.row_index,
             has_content: &mut state.has_content,
             has_span: env.scan.has_span,
@@ -520,7 +525,7 @@ fn render_data_row(
 
 /// ~keep GFM cannot nest tables, so a nested table from a single-cell row is emitted as a
 /// ~keep separate table after its enclosing table instead of being flattened (issues #469/#484).
-fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
+pub(super) fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
     for nested in deferred_tables {
         if !output.ends_with('\n') {
             output.push('\n');
@@ -534,13 +539,13 @@ fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
 }
 
 #[cfg(feature = "visitor")]
-struct TableVisitorState {
+pub(super) struct TableVisitorState {
     output_start: usize,
     custom_start: Option<String>,
 }
 
 #[cfg(feature = "visitor")]
-fn begin_table_visit(
+pub(super) fn begin_table_visit(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -594,7 +599,7 @@ fn begin_table_visit(
 }
 
 #[cfg(feature = "visitor")]
-fn finish_table_visit(
+pub(super) fn finish_table_visit(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,

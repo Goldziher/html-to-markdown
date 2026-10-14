@@ -156,8 +156,8 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
 // content-bearing containers with no formatting beyond block separation) all
 // render through a handler that pushes a leading and/or trailing `"\n\n"`.
 // The names below are the ones that still fall through to Tier-2's `_ =>` arm
-// (`block::unknown::handle`) or, for `html`/`body`,
-// `block::container::handle_structural_container` -- both of which just walk
+// (`block::unknown::open`) or, for `html`/`body`,
+// `block::container::open_children` -- both of which just walk
 // children with NO separator of their own, and deliberately so:
 // `colgroup`/`col` are table-internal metadata (never render visible content
 // of their own), `base` is void metadata, and `html`/`body` are document
