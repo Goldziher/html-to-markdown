@@ -26,11 +26,7 @@
       "default": "./index.js"
     }
   },
-  "files": [
-    "index.js",
-    "index.d.ts",
-    "*.node"
-  ],
+  "files": ["index.js", "index.d.ts", "*.node"],
   "optionalDependencies": {
     "@xberg-io/html-to-markdown-darwin-arm64": "3.17.2",
     "@xberg-io/html-to-markdown-darwin-x64": "3.17.2",
