@@ -135,6 +135,12 @@ fn visit_unknown(
         let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
         visitor.visit_custom_element(&node_ctx, &tag_name, &raw_html)
     };
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&visit_result, VisitResult::Skip)
+            || matches!(&visit_result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_ctx.record_absent_breaks(node_id, true);
+    }
     match visit_result {
         VisitResult::Continue => false,
         VisitResult::Skip => true,
