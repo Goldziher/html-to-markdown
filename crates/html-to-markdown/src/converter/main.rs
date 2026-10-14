@@ -735,6 +735,10 @@ fn finish_tag(
             })
         {
             use crate::converter::visitor_hooks::VisitAction;
+            // ~keep Output that a hook replaced is no text that a button wrote of its own.
+            if matches!(action, VisitAction::Skip | VisitAction::Custom) {
+                handler.ctx.button_wrote.set(false);
+            }
             if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
                 && (matches!(action, VisitAction::Skip)
                     || (matches!(action, VisitAction::Custom)

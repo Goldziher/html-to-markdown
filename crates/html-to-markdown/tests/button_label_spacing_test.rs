@@ -55,7 +55,7 @@ fn should_write_no_space_before_punctuation_after_a_button() {
 /// Markdown and Djot output, with forms removed and with forms kept, write `expected` when the
 /// visitor of the conversion answers `visit_button` with `answer`, or with no visitor.
 #[cfg(feature = "visitor")]
-fn assert_with_button_answer(html: &str, answer: Option<html_to_markdown_rs::VisitResult>, expected: &str) {
+fn assert_with_button_answer(html: &str, answer: Option<&html_to_markdown_rs::VisitResult>, expected: &str) {
     use html_to_markdown_rs::visitor::HtmlVisitor;
     use html_to_markdown_rs::{NodeContext, PreprocessingOptions, VisitResult};
     use std::sync::{Arc, Mutex};
@@ -77,7 +77,7 @@ fn assert_with_button_answer(html: &str, answer: Option<html_to_markdown_rs::Vis
                     ..Default::default()
                 },
                 visitor: answer
-                    .clone()
+                    .cloned()
                     .map(|answer| -> html_to_markdown_rs::VisitorHandle { Arc::new(Mutex::new(ButtonAnswer(answer))) }),
                 ..Default::default()
             };
@@ -115,23 +115,25 @@ fn should_not_separate_a_label_from_a_button_that_a_visitor_skipped() {
     use html_to_markdown_rs::VisitResult;
     assert_with_button_answer(
         "<p>a<label><button>x</button></label>b</p>",
-        Some(VisitResult::Skip),
+        Some(&VisitResult::Skip),
         "ab\n",
     );
     assert_with_button_answer(
         "<p>a<label><button>x</button><span>y</span></label>b</p>",
-        Some(VisitResult::Skip),
+        Some(&VisitResult::Skip),
         "ayb\n",
     );
-    assert_with_button_answer("<p>a<button>x</button>b</p>", Some(VisitResult::Skip), "ab\n");
+    assert_with_button_answer("<p>a<button>x</button>b</p>", Some(&VisitResult::Skip), "ab\n");
 }
 
 #[cfg(feature = "visitor")]
 #[test]
 fn should_not_separate_a_label_from_the_text_a_visitor_wrote_for_a_button() {
     use html_to_markdown_rs::VisitResult;
-    let q = || Some(VisitResult::Custom("Q".to_string()));
-    let empty = || Some(VisitResult::Custom(String::new()));
+    let q_answer = VisitResult::Custom("Q".to_string());
+    let empty_answer = VisitResult::Custom(String::new());
+    let q = || Some(&q_answer);
+    let empty = || Some(&empty_answer);
     assert_with_button_answer("<p>a<label><button>x</button></label>b</p>", q(), "aQb\n");
     assert_with_button_answer(
         "<p>a<label><button>x</button><span>y</span></label>b</p>",
@@ -152,13 +154,140 @@ fn should_not_separate_a_label_from_the_text_a_visitor_wrote_for_a_button() {
 #[test]
 fn should_separate_a_label_from_a_button_that_wrote_its_own_text() {
     use html_to_markdown_rs::VisitResult;
-    for answer in [None, Some(VisitResult::Continue)] {
-        assert_with_button_answer("<p>a<label><button>x</button></label>b</p>", answer.clone(), "a x b\n");
+    for answer in [None, Some(&VisitResult::Continue)] {
+        assert_with_button_answer("<p>a<label><button>x</button></label>b</p>", answer, "a x b\n");
         assert_with_button_answer(
             "<p>a<label><button>x</button><span>y</span></label>b</p>",
-            answer.clone(),
+            answer,
             "a x yb\n",
         );
         assert_with_button_answer("<p>a<button>x</button>b</p>", answer, "a x b\n");
+    }
+}
+
+/// Markdown and Djot output, on the default route and on the full converter, with forms kept
+/// and strict white space, write `expected` for `REWRITE_HTML` when the generic visitor hooks
+/// answer `start` and `end` for the button. `calls` is the count of start, end and
+/// `visit_button` calls for the button in each conversion.
+#[cfg(feature = "visitor")]
+fn assert_with_element_hooks(
+    start: &html_to_markdown_rs::VisitResult,
+    end: &html_to_markdown_rs::VisitResult,
+    expected: &str,
+    calls: [usize; 3],
+) {
+    use html_to_markdown_rs::visitor::HtmlVisitor;
+    use html_to_markdown_rs::{NodeContext, PreprocessingOptions, VisitResult, WhitespaceMode};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug)]
+    struct ElementHooks {
+        start: VisitResult,
+        end: VisitResult,
+        calls: [usize; 3],
+    }
+    fn is_rewrite(ctx: &NodeContext<'_>) -> bool {
+        ctx.attributes().get("id").map(String::as_str) == Some("rewrite")
+    }
+    impl HtmlVisitor for ElementHooks {
+        fn visit_element_start(&mut self, ctx: &NodeContext<'_>) -> VisitResult {
+            if !is_rewrite(ctx) {
+                return VisitResult::Continue;
+            }
+            self.calls[0] += 1;
+            self.start.clone()
+        }
+        fn visit_element_end(&mut self, ctx: &NodeContext<'_>, _output: &str) -> VisitResult {
+            if !is_rewrite(ctx) {
+                return VisitResult::Continue;
+            }
+            self.calls[1] += 1;
+            self.end.clone()
+        }
+        fn visit_button(&mut self, ctx: &NodeContext<'_>, _text: &str) -> VisitResult {
+            if is_rewrite(ctx) {
+                self.calls[2] += 1;
+            }
+            VisitResult::Continue
+        }
+    }
+
+    const REWRITE_HTML: &str = r#"<p>a<label><button id="rewrite">x</button>y</label>b</p>"#;
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let hooks = Arc::new(Mutex::new(ElementHooks {
+                start: start.clone(),
+                end: end.clone(),
+                calls: [0; 3],
+            }));
+            let options = ConversionOptions {
+                output_format,
+                tier_strategy,
+                whitespace_mode: WhitespaceMode::Strict,
+                preprocessing: PreprocessingOptions {
+                    remove_forms: false,
+                    ..Default::default()
+                },
+                visitor: Some(hooks.clone()),
+                ..Default::default()
+            };
+            let label = format!("{start:?} {end:?} {output_format:?} {tier_strategy:?}");
+            let written = convert(REWRITE_HTML, Some(options)).unwrap().content;
+            assert_eq!(written.unwrap_or_default(), expected, "{label}");
+            assert_eq!(hooks.lock().unwrap().calls, calls, "{label}");
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_not_separate_a_label_from_a_button_that_an_end_hook_replaced() {
+    use html_to_markdown_rs::VisitResult;
+    let custom = |text: &str| VisitResult::Custom(text.to_string());
+    assert_with_element_hooks(&VisitResult::Continue, &VisitResult::Skip, "ayb\n", [1, 1, 1]);
+    assert_with_element_hooks(&VisitResult::Continue, &custom("Q"), "aQyb\n", [1, 1, 1]);
+    assert_with_element_hooks(&VisitResult::Continue, &custom(""), "ayb\n", [1, 1, 1]);
+    assert_with_element_hooks(&VisitResult::Continue, &custom(" "), "ayb\n", [1, 1, 1]);
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_not_separate_a_label_from_a_button_that_a_start_hook_replaced() {
+    use html_to_markdown_rs::VisitResult;
+    assert_with_element_hooks(&VisitResult::Skip, &VisitResult::Continue, "ayb\n", [1, 0, 0]);
+    assert_with_element_hooks(
+        &VisitResult::Custom("Q".to_string()),
+        &VisitResult::Continue,
+        "aQyb\n",
+        [1, 1, 0],
+    );
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_separate_a_label_from_a_button_that_the_element_hooks_kept() {
+    use html_to_markdown_rs::VisitResult;
+    use html_to_markdown_rs::{PreprocessingOptions, WhitespaceMode};
+    assert_with_element_hooks(&VisitResult::Continue, &VisitResult::Continue, "a x yb\n", [1, 1, 1]);
+    for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+            let options = ConversionOptions {
+                output_format,
+                tier_strategy,
+                whitespace_mode: WhitespaceMode::Strict,
+                preprocessing: PreprocessingOptions {
+                    remove_forms: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let html = r#"<p>a<label><button id="rewrite">x</button>y</label>b</p>"#;
+            let written = convert(html, Some(options)).unwrap().content;
+            assert_eq!(
+                written.unwrap_or_default(),
+                "a x yb\n",
+                "{output_format:?} {tier_strategy:?}"
+            );
+        }
     }
 }
