@@ -227,6 +227,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A bold element that holds only a line break, after bold text, writes its hard break again in a
+  block that does not start the output and in a link label:
+  `<p>x</p><p><b>a</b><b><br></b><b>c</b></p>` gave `**a** **c**` in the second paragraph and
+  gives `**a**`, a hard break and `**c**`, as before. The block that starts the output keeps the
+  one space (#502).
+
 - Collapse no-break-space tails after empty options and empty or line-end-only inline descendants
   to full-main spacing on every route (#868), retaining literal pre content and strict whitespace.
 
