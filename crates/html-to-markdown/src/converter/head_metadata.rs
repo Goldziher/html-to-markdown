@@ -37,6 +37,7 @@ pub fn extract_frontmatter(
     }
 
     let head_content = head_range.and_then(|range| html.get(range.clone())).unwrap_or_default();
+    let head_content = crate::converter::utility::preprocessing::normalize_bogus_comment_endings(head_content);
 
     // ~keep Wrap the extracted head content in a minimal HTML document so that
     // ~keep `tl::parse` has the correct context.  The wrapper tags are never

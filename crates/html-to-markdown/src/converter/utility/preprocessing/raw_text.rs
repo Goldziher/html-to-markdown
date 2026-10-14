@@ -7,7 +7,9 @@ use std::borrow::Cow;
 use std::str;
 
 use super::kept_scripts::{ESCAPED_LT, KeptScripts, push_owner_mark};
-use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
+use super::markup::{
+    find_html_comment_end, find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start,
+};
 use super::structured_data::push_without_standalone_slashes;
 use super::visibility::{after_bogus_comment, is_bogus_comment_marker};
 
@@ -293,9 +295,9 @@ impl<C: FnMut(PassRead)> PageReads<C> {
         self.count(PassRead::CommentEndSearch);
         // ~keep `<!-->` and `<!--->` are whole comments: the search starts in the opening.
         let from = idx + 2;
-        let found = memchr::memmem::find(&bytes[from..], COMMENT_CLOSE);
+        let found = find_html_comment_end(bytes, from);
         self.comments_never_end = found.is_none();
-        found.map(|offset| from + offset + COMMENT_CLOSE.len())
+        found
     }
 
     /// The position after the tag that the `<` at `idx` starts, read whole with its quoted
@@ -685,7 +687,6 @@ pub(super) fn is_self_closing_tag(tag_slice: &[u8], tag_name: &[u8]) -> bool {
 /// Byte sequences delimiting the regions of an HTML document whose bytes are
 /// character data rather than markup.
 const COMMENT_OPEN: &[u8] = b"<!--";
-const COMMENT_CLOSE: &[u8] = b"-->";
 const CDATA_OPEN: &[u8] = b"<![CDATA[";
 const CDATA_CLOSE: &[u8] = b"]]>";
 
@@ -730,7 +731,7 @@ pub fn skip_opaque_region(bytes: &[u8], idx: usize) -> Option<usize> {
     }
 
     if bytes[idx..].starts_with(COMMENT_OPEN) {
-        return Some(find_sequence_end(bytes, idx + COMMENT_OPEN.len(), COMMENT_CLOSE));
+        return Some(find_html_comment_end(bytes, idx + COMMENT_OPEN.len()).unwrap_or(len));
     }
 
     if bytes[idx..].starts_with(CDATA_OPEN) {
