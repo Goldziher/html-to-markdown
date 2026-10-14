@@ -1,6 +1,6 @@
 {
   "schema_version": "v1",
-  "source_hash": "blake3:b4e45457828193fe66c1b837fddb114162b63251a7c1585ceb4830574147727b",
+  "source_hash": "blake3:d85ad7bf79fa4cb1ed116e7fd2574bf5e6f64f503331a1bacf3cc3d495e3c873",
   "outputs": {
     ".claude-plugin/plugin.json": {
       "content_hash": "blake3:147d68f791168c734da8931da51289eb131730b4a45f18f253788411c9399297",
@@ -235,7 +235,7 @@
       "mode": "0644"
     },
     ".hermes/package/src/html_to_markdown_hermes_plugin/hermes.py": {
-      "content_hash": "blake3:fabe884482aa606577cb09ddbe419acfab7fcabe5f50e91cb2891f6b146cef5d",
+      "content_hash": "blake3:8530f8a81a8a0e4db632f90a29a3f3cd3de89dee755f8aec125627667f9f2818",
       "mode": "0644"
     },
     ".hermes/package/src/html_to_markdown_hermes_plugin/plugin.yaml": {
@@ -447,7 +447,7 @@
       "mode": "0644"
     },
     ".hermes/plugins/html-to-markdown/hermes.py": {
-      "content_hash": "blake3:fabe884482aa606577cb09ddbe419acfab7fcabe5f50e91cb2891f6b146cef5d",
+      "content_hash": "blake3:8530f8a81a8a0e4db632f90a29a3f3cd3de89dee755f8aec125627667f9f2818",
       "mode": "0644"
     },
     ".hermes/plugins/html-to-markdown/plugin.yaml": {
