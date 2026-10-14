@@ -348,14 +348,20 @@ pub fn handle_label(
         }
         let mut rendered = String::new();
         let label_ctx = ctx.inline_buffer(output, false);
+        let first = first_content(tag, parser);
+        let mut first_button_wrote = false;
         {
             for child_handle in children.top().iter() {
+                ctx.button_wrote.set(false);
                 super::walk_node(
                     child_handle,
                     parser,
                     &mut rendered,
                     crate::converter::block::container::HandlerContext::new(options, &label_ctx, depth + 1, dom_ctx),
                 );
+                if first.is_some_and(|handle| handle.get_inner() == child_handle.get_inner()) {
+                    first_button_wrote = ctx.button_wrote.get();
+                }
             }
         }
 
@@ -365,7 +371,7 @@ pub fn handle_label(
             let start = ControlStart::new(output);
             output.push_str(trimmed);
             // ~keep In code the text of a control is written as the source has it.
-            if !ctx.in_code && starts_with_control(tag, parser, dom_ctx) {
+            if !ctx.in_code && starts_with_control(first, parser, dom_ctx, first_button_wrote) {
                 start.finish(output);
             }
             if rendered.ends_with([' ', '\t']) {
@@ -375,20 +381,53 @@ pub fn handle_label(
     }
 }
 
-/// Whether the first content of `tag` separates the label from the text before it: a control
-/// that writes text of its own, or an input with white space after it.
-fn starts_with_control(tag: &tl::HTMLTag, parser: &tl::Parser, dom_ctx: &crate::converter::DomContext) -> bool {
-    let first = tag.children().top().iter().find_map(|child| match child.get(parser)? {
-        tl::Node::Raw(raw) if raw.as_utf8_str().trim().is_empty() => None,
-        tl::Node::Comment(_) => None,
-        node => Some((*child, node)),
-    });
-    let Some((handle, tl::Node::Tag(control))) = first else {
+/// The first child with content after transparent spans, white space and comments are ignored.
+fn first_content(tag: &tl::HTMLTag, parser: &tl::Parser) -> Option<tl::NodeHandle> {
+    tag.children()
+        .top()
+        .iter()
+        .copied()
+        .find(|child| first_visible_content(*child, parser).is_some())
+}
+
+// ~keep Spans are transparent to control boundaries; an iterative search avoids source-controlled recursion.
+fn first_visible_content(handle: tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
+    let mut pending = vec![handle];
+    while let Some(handle) = pending.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => return Some(handle),
+            Some(tl::Node::Tag(tag)) if tag.name().as_utf8_str().eq_ignore_ascii_case("span") => {
+                let start = pending.len();
+                pending.extend(tag.children().top().iter().copied());
+                pending[start..].reverse();
+            }
+            Some(tl::Node::Tag(_)) => return Some(handle),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whether `first`, the first content of a label, separates the label from the text before it:
+/// a control that writes text of its own, or an input with white space after it. A button is one
+/// only when it wrote text of its own (`button_wrote`): an empty button, or one whose visitor
+/// skipped it or wrote text for it, does not separate.
+fn starts_with_control(
+    first: Option<tl::NodeHandle>,
+    parser: &tl::Parser,
+    dom_ctx: &crate::converter::DomContext,
+    button_wrote: bool,
+) -> bool {
+    let Some(handle) = first.and_then(|handle| first_visible_content(handle, parser)) else {
+        return false;
+    };
+    let Some(tl::Node::Tag(control)) = handle.get(parser) else {
         return false;
     };
     match crate::converter::utility::content::normalized_tag_name(control.name().as_utf8_str()).as_ref() {
         "input" => super::spacing::white_space_follows(handle.get_inner(), parser, dom_ctx),
-        name => super::spacing::writes_own_markdown_text(name),
+        "button" => button_wrote,
+        name => super::spacing::writes_own_text(name),
     }
 }
 
@@ -710,7 +749,8 @@ pub fn handle_optgroup(
 /// Handles the `<button>` element.
 ///
 /// A button element represents a clickable button. Its content is inline text in the line of
-/// the text around it, as the content of a `span` is (issue #785).
+/// the text around it, as the content of a `span` is (issue #785). A browser draws a button as
+/// a box of its own, so one space separates its text from a word or a button right beside it.
 pub fn handle_button(
     _tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -768,6 +808,8 @@ pub fn handle_button(
             }
         }
 
+        let start = ControlStart::new(output);
+        let content_start = output.len();
         let children = tag.children();
         for child_handle in children.top().iter() {
             walk_node(
@@ -776,6 +818,13 @@ pub fn handle_button(
                 output,
                 crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
             );
+        }
+        if output[..content_start].trim().is_empty() {
+            ctx.button_wrote.set(!output[content_start..].trim().is_empty());
+        }
+        // ~keep In code the text of a button is written as the source has it.
+        if !ctx.in_code && start.finish(output) {
+            separate_from_next_text(output, *node_handle, parser, dom_ctx);
         }
     }
 }

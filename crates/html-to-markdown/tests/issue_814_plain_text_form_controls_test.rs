@@ -173,7 +173,7 @@ fn a_pre_element_keeps_a_button_as_the_source_has_it_in_plain_text() {
 }
 
 #[test]
-fn the_markdown_output_of_the_same_inputs_does_not_change() {
+fn the_markdown_output_of_the_same_inputs_separates_each_control_too() {
     assert_markdown(
         &format!("<p>aaa<select>{OPTIONS}</select>bbb</p>"),
         "aaa Xone Xtwo bbb\n",
@@ -184,7 +184,7 @@ fn the_markdown_output_of_the_same_inputs_does_not_change() {
     );
     assert_markdown(
         "<h1>aaa<button>Xone</button><button>Xtwo</button>bbb</h1>",
-        "# aaaXoneXtwobbb\n",
+        "# aaa Xone Xtwo bbb\n",
     );
 }
 

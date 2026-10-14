@@ -440,6 +440,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`<div><p>one</div>two</p>rest</div>tail`), and an unquoted attribute value that runs into an
   end tag (`<div class=a</div>`)
   ([#772](https://github.com/xberg-io/html-to-markdown/issues/772)).
+- Markdown and Djot output write one space between the text of a `<button>` and a word or a
+  button right beside it when the source has no white space between them, as plain text output
+  does. `<p><button>All Methods</button><button>Instance Methods</button></p>` gave
+  `All MethodsInstance Methods`. Where the source has white space, the output is the same.
 - An inline `<svg>` keeps its text and no longer adds the words `SVG Image`. Its text is its
   `aria-label`, the `<title>` and `<desc>` of the graphic, its `<text>` elements and the HTML in a
   `<foreignObject>`, in document order. Style sheets, scripts, metadata and the content of `<defs>`

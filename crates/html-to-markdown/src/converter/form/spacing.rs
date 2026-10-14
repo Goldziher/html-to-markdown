@@ -8,19 +8,11 @@ use crate::converter::tier1::tags::{TagSpec, lookup};
 const MAX_LOOKAHEAD_NODES: usize = 64;
 
 /// Whether `tag_name` is a control that writes text of its own and separates it from the text
-/// before it. The plain text writer asks this of a button too. The Markdown writer asks
-/// [`writes_own_markdown_text`].
+/// before it.
 pub fn writes_own_text(tag_name: &str) -> bool {
-    tag_name == "button" || writes_own_markdown_text(tag_name)
-}
-
-/// Whether `tag_name` is a control that writes text of its own in Markdown and separates it
-/// from the text before it. A button is not one there: its content is inline text, as the
-/// content of a `span` is (issue #785).
-pub fn writes_own_markdown_text(tag_name: &str) -> bool {
     matches!(
         tag_name,
-        "select" | "datalist" | "textarea" | "output" | "meter" | "progress"
+        "button" | "select" | "datalist" | "textarea" | "output" | "meter" | "progress"
     )
 }
 

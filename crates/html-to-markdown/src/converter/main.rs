@@ -735,6 +735,12 @@ fn finish_tag(
             })
         {
             use crate::converter::visitor_hooks::VisitAction;
+            // ~keep Replacing leading output invalidates the label's first-button boundary; later hooks do not.
+            if matches!(action, VisitAction::Skip | VisitAction::Custom)
+                && output.get(..safe_start).is_some_and(|before| before.trim().is_empty())
+            {
+                handler.ctx.button_wrote.set(false);
+            }
             if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
                 && (matches!(action, VisitAction::Skip)
                     || (matches!(action, VisitAction::Custom)
