@@ -346,6 +346,9 @@ pub struct Context {
     /// Shared flag set when `inline_data_media` replaced or dropped an element. A link reads it to
     /// tell a label emptied by that option from an empty one.
     pub(crate) inline_data_replaced: Rc<Cell<bool>>,
+    /// Shared flag set when a button writes text of its own, not a visitor's text for it. A label
+    /// reads it to tell whether the button at its start wrote.
+    pub(crate) button_wrote: Rc<Cell<bool>>,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     pub(crate) inline_collector: Option<InlineCollectorHandle>,
