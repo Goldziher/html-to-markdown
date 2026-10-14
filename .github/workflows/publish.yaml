@@ -1419,8 +1419,6 @@ jobs:
           cache-key-prefix: publish-c-ffi-${{ matrix.platform }}
 
       - uses: xberg-io/actions/install-alef@v1
-        with:
-          version: "0.107.12"
 
       - uses: xberg-io/actions/build-rust-ffi@v1
         with:
