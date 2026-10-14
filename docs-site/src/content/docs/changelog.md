@@ -30,6 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer promotes source line endings to hard breaks when emphasis or
+  strong visitors replace a break subtree with only spaces/tabs (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when generic element
+  visitors skip a break subtree at exit or replace it with only spaces/tabs at entry or exit (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when inline-code
+  visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
+- Strict whitespace treats skipped links and space/tab-only link replacements as break-subtree
+  omissions. Partial link replacements that retain deferred blocks keep their existing break behavior (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when subscript or
+  superscript visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when strikethrough,
+  underline, insertion, or mark visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
 - Markdown, Djot and plain output honor `exclude_selectors` on table cells, rows, and sections,
   including layout and nested tables. The document table grid excludes the same selected parts
   ([#730](https://github.com/xberg-io/crawlberg/issues/730),

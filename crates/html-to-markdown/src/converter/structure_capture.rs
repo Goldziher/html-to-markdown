@@ -128,11 +128,13 @@ pub(super) struct VisitorEndCapture<'a, 'parser> {
 }
 
 #[cfg(feature = "visitor")]
-pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
+pub(super) fn handle_visitor_end(
+    end: VisitorEndCapture<'_, '_>,
+) -> Option<crate::converter::visitor_hooks::VisitAction> {
     use crate::converter::visitor_hooks::{VisitAction, VisitorElementEndContext, handle_visitor_element_end};
 
     let (Some(visitor_handle), Some(state)) = (end.ctx.visitor.as_ref(), end.state) else {
-        return;
+        return None;
     };
     let action = handle_visitor_element_end(
         visitor_handle,
@@ -162,4 +164,5 @@ pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
         VisitAction::Skip | VisitAction::Error => replace_element(end.ctx, None),
         VisitAction::Continue => {}
     }
+    Some(action)
 }

@@ -607,6 +607,8 @@ struct TagCapture<'a> {
     #[cfg(feature = "visitor")]
     visitor: Option<crate::converter::visitor_hooks::VisitorElementState<'a>>,
     #[cfg(feature = "visitor")]
+    node_id: u32,
+    #[cfg(feature = "visitor")]
     output_start: usize,
     #[cfg(not(feature = "visitor"))]
     marker: std::marker::PhantomData<&'a ()>,
@@ -653,8 +655,7 @@ fn begin_tag<'a>(
             }
             VisitAction::Custom => {
                 if let Some(replacement) = output.get(visitor_output_start..) {
-                    collect_document_attributes(tag_name, tag, ctx);
-                    super::structure_capture::replace_element_at_start(tag_name, tag, ctx, replacement);
+                    capture_custom_start(handler, tag_name, tag, node_handle.get_inner(), replacement);
                 }
                 return None;
             }
@@ -685,10 +686,29 @@ fn begin_tag<'a>(
         #[cfg(feature = "visitor")]
         visitor: visitor_element_state,
         #[cfg(feature = "visitor")]
+        node_id: node_handle.get_inner(),
+        #[cfg(feature = "visitor")]
         output_start: element_output_start,
         #[cfg(not(feature = "visitor"))]
         marker: std::marker::PhantomData,
     })
+}
+
+#[cfg(feature = "visitor")]
+fn capture_custom_start(
+    handler: HandlerContext<'_>,
+    tag_name: &str,
+    tag: &tl::HTMLTag<'_>,
+    node_id: u32,
+    replacement: &str,
+) {
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && replacement.trim_matches([' ', '\t']).is_empty()
+    {
+        handler.dom_ctx.record_absent_breaks(node_id, true);
+    }
+    collect_document_attributes(tag_name, tag, handler.ctx);
+    super::structure_capture::replace_element_at_start(tag_name, tag, handler.ctx, replacement);
 }
 
 fn finish_tag(
@@ -701,15 +721,30 @@ fn finish_tag(
 ) {
     #[cfg(feature = "visitor")]
     if !stop {
-        super::structure_capture::handle_visitor_end(super::structure_capture::VisitorEndCapture {
-            state: capture.visitor.as_ref(),
-            tag_name,
-            tag,
-            output,
-            element_output_start: capture.output_start,
-            ctx: handler.ctx,
-            depth: handler.depth,
-        });
+        let safe_start =
+            crate::converter::utility::content::floor_char_boundary(output, capture.output_start.min(output.len()));
+        if let Some(action) =
+            super::structure_capture::handle_visitor_end(super::structure_capture::VisitorEndCapture {
+                state: capture.visitor.as_ref(),
+                tag_name,
+                tag,
+                output,
+                element_output_start: capture.output_start,
+                ctx: handler.ctx,
+                depth: handler.depth,
+            })
+        {
+            use crate::converter::visitor_hooks::VisitAction;
+            if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+                && (matches!(action, VisitAction::Skip)
+                    || (matches!(action, VisitAction::Custom)
+                        && output
+                            .get(safe_start..)
+                            .is_some_and(|replacement| replacement.trim_matches([' ', '\t']).is_empty())))
+            {
+                handler.dom_ctx.record_absent_breaks(capture.node_id, true);
+            }
+        }
     }
     #[cfg(not(feature = "visitor"))]
     let _ = (output, stop);
