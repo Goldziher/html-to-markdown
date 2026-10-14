@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:16e6451fac12f8494f6b7c279b03be8eb50f4b823b7cb3113298b653cb2f519d
-Source-Hash: blake3:0f19d9609e55607f27db4df837426b012b20434ab0599d21b8599931a8e2b067
+Content-Hash: blake3:33dd90268a7637ff545d129b1751d8afce361b4d9a4ffac98c0b9a3ae2d83466
+Source-Hash: blake3:d85ad7bf79fa4cb1ed116e7fd2574bf5e6f64f503331a1bacf3cc3d495e3c873
 Schema-Version: v1
 -->
 
@@ -330,7 +330,7 @@ binding. There are no `convertBytes` / `createConversionOptionsHandle` /
 ## Node.js / npm
 
 **Package:** `@xberg-io/html-to-markdown`
-**Install:** `npm install @xberg-io/html-to-markdown`
+**Install:** `pnpm add @xberg-io/html-to-markdown`
 
 Uses NAPI-RS. Platform-specific native binaries are delivered as optional
 dependencies named `@xberg-io/html-to-markdown-<platform>`. See the

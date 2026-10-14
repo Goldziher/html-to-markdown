@@ -298,11 +298,18 @@ bin/
 
 # BEGIN ai-rulez (DO NOT EDIT - managed by ai-rulez)
 .ai-rulez/.generated-manifest.json
-.codex/agents/
-.codex/commands/
+.ai-rulez/.generated-manifest.local.json
+.ai-rulez/local/
+.github/agents/
+.github/prompts/iterate.prompt.md
+.github/prompts/parallelize.prompt.md
 .mcp.json
 .opencode/agents/
-.opencode/skills/
+.opencode/commands/
+.pi/agents/
+.pi/mcp.json
+.pi/prompts/
 AGENTS.md
 CLAUDE.md
+opencode.json
 # END ai-rulez

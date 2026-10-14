@@ -63,6 +63,19 @@
 
 {% endif %}
 
+## Coding-agent plugin
+
+Install the [html-to-markdown plugin](https://github.com/xberg-io/html-to-markdown/blob/main/plugin/README.md)
+for product skills and runtime integrations, or install [public skills](https://github.com/xberg-io/html-to-markdown/tree/main/skills)
+independently:
+
+```sh
+npx skills add xberg-io/html-to-markdown
+```
+
+Select the skills and target agents interactively. Install the product CLI separately for
+executable operations; the skill installer adds instructions only.
+
 ## Quick Start
 
 {% include 'partials/_quick_start.md' %}

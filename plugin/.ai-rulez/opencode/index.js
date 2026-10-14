@@ -1,4 +1,4 @@
-import { Plugin } from "@opencode/plugin";
+import { registerBundledContent } from "../ai-rulez-content.js";
 import { spawn } from "node:child_process";
 
 const headingStyle = {
@@ -89,9 +89,10 @@ function styleArgs(args, params) {
   pushOption(args, "--preset", params.preset);
 }
 
-export default Plugin.define({
+export default {
   id: "html-to-markdown",
   async setup(ctx) {
+    await registerBundledContent(ctx);
     await ctx.tool.transform((editor) => {
       editor.add({
         name: "html_to_markdown_convert",
@@ -194,4 +195,4 @@ export default Plugin.define({
       });
     });
   },
-});
+};

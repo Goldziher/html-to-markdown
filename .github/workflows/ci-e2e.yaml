@@ -267,8 +267,7 @@ jobs:
         }
       - {
           "name": "Setup Node.js workspace",
-          "if": "matrix.runtime == 'node'",
-          "uses": "xberg-io/actions/setup-node-workspace@v1",
+          "uses": "xberg-io/actions/setup-node-workspace@59f1b4d0d2e6186a995f4b8a543951c39ac5edd2",
         }
       - {
           "name": "Setup Bun",
@@ -285,14 +284,13 @@ jobs:
       - {
           "name": "Install workspace dependencies (Bun)",
           "if": "matrix.runtime == 'bun'",
-          "run": "bun install",
+          "run": "task node:install:bun",
           "shell": "bash",
         }
       - {
           "name": "Build NAPI-RS Bindings (Bun)",
           "if": "matrix.runtime == 'bun'",
-          "working-directory": "crates/html-to-markdown-node",
-          "run": "bun run build",
+          "run": "task node:build:bun",
           "shell": "bash",
         }
       - {
@@ -631,8 +629,7 @@ jobs:
       - { "name": "Setup Rust", "uses": "xberg-io/actions/setup-rust@v1" }
       - {
           "name": "Setup Node.js workspace",
-          "if": "matrix.runtime == 'node'",
-          "uses": "xberg-io/actions/setup-node-workspace@v1",
+          "uses": "xberg-io/actions/setup-node-workspace@59f1b4d0d2e6186a995f4b8a543951c39ac5edd2",
         }
       - {
           "name": "Setup Bun",
@@ -649,14 +646,13 @@ jobs:
       - {
           "name": "Install workspace dependencies (Bun)",
           "if": "matrix.runtime == 'bun'",
-          "run": "bun install",
+          "run": "task node:install:bun",
           "shell": "bash",
         }
       - {
           "name": "Build NAPI-RS Bindings (Bun)",
           "if": "matrix.runtime == 'bun'",
-          "working-directory": "crates/html-to-markdown-node",
-          "run": "bun run build",
+          "run": "task node:build:bun",
           "shell": "bash",
         }
       - { "name": "Install alef", "if": "matrix.runtime == 'node'", "uses": "xberg-io/actions/install-alef@v1" }

@@ -1,4 +1,9 @@
 [package]
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/src/**",
+]
 name = "html-to-markdown-cli"
 version.workspace = true
 edition.workspace = true

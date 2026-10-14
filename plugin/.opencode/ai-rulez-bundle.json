@@ -1,0 +1,48 @@
+{
+  "plugin": "html-to-markdown",
+  "mcp": {
+    "html-to-markdown": {
+      "type": "local",
+      "command": [
+        "${PLUGIN_ROOT}/scripts/mcp-launch.sh",
+        "mcp"
+      ]
+    }
+  },
+  "skills": {
+    "html-to-markdown": {
+      "name": "html-to-markdown",
+      "description": "Convert HTML to Markdown, Djot, or plain text with structured extraction. Use when writing code that calls html-to-markdown APIs in Rust, Python, TypeScript, Go, Ruby, PHP, Java, C#, Elixir, R, C, or WASM. Covers installation, conversion, configuration, metadata extraction, tables, document structure, inline images, URL fetching, and CLI usage."
+    },
+    "html-to-markdown-converting-html": {
+      "name": "html-to-markdown-converting-html",
+      "description": "Use when converting HTML to Markdown, Djot, or plain text. Covers output formats, heading and code-block styles, lists, escaping, wrapping, and HTML preprocessing."
+    },
+    "html-to-markdown-extracting-metadata": {
+      "name": "html-to-markdown-extracting-metadata",
+      "description": "Use when extracting metadata from HTML — title, description, language, Open Graph, JSON-LD / Microdata / RDFa, headers, links, and images. Covers the --json output shape and the --extract-metadata flag."
+    },
+    "html-to-markdown-extracting-tables": {
+      "name": "html-to-markdown-extracting-tables",
+      "description": "Use when extracting tabular data from HTML. Covers GFM Markdown tables, the structured tables array (grid cells plus pre-rendered markdown), and HTML line breaks in table cells."
+    },
+    "html-to-markdown-fetching-and-converting-urls": {
+      "name": "html-to-markdown-fetching-and-converting-urls",
+      "description": "Use when fetching a live URL and converting it to Markdown. Covers --url, custom user agents, preprocessing for noisy pages, and the --json ConversionResult shape."
+    },
+    "html-to-markdown-using-the-mcp-server": {
+      "name": "html-to-markdown-using-the-mcp-server",
+      "description": "Use when converting HTML to Markdown or extracting metadata and tables through the html-to-markdown MCP server's tools, rather than shelling out to the CLI. Covers the tool surface, the auto-installing launcher, and when MCP beats the CLI or SDK."
+    }
+  },
+  "commands": {
+    "html-to-markdown-convert": {
+      "name": "html-to-markdown-convert",
+      "description": "Convert HTML to Markdown"
+    },
+    "html-to-markdown-metadata": {
+      "name": "html-to-markdown-metadata",
+      "description": "Extract structured HTML metadata"
+    }
+  }
+}

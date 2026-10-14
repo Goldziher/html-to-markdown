@@ -1,5 +1,11 @@
 ---
-priority: high
+type: Decision
+title: Typescript Conventions
+x-ai-rulez:
+  kind: rule
+  id: typescript-conventions
+  metadata:
+    priority: high
 ---
 
 - `strict: true` + `noUncheckedIndexedAccess` in tsconfig, never `any` — use `unknown` with type guards.

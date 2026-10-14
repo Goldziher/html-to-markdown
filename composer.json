@@ -1,4 +1,16 @@
 {
+  "authors": [
+    {
+      "name": "Na'aman Hirschfeld",
+      "email": "naaman@xberg.io",
+      "role": "maintainer"
+    },
+    {
+      "name": "Tobias Perlstein",
+      "email": "tobias@xberg.io",
+      "role": "maintainer"
+    }
+  ],
   "name": "xberg-io/html-to-markdown",
   "description": "High-performance HTML to Markdown converter",
   "license": "MIT",

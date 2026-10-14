@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:bd17e25d2ecc4c814a2990a0512f1a7757832fe67a01d440ab6aa8a107adc5c3
-Source-Hash: blake3:0f19d9609e55607f27db4df837426b012b20434ab0599d21b8599931a8e2b067
+Content-Hash: blake3:1f460882f7a64720d63b663e83dcd68d562be012867f6b3965f60a23b7ee819d
+Source-Hash: blake3:d85ad7bf79fa4cb1ed116e7fd2574bf5e6f64f503331a1bacf3cc3d495e3c873
 Schema-Version: v1
 -->
 
@@ -14,7 +14,7 @@ Binary name: `html-to-markdown`
 ```bash
 brew install xberg-io/tap/html-to-markdown
 # or run without a persistent install (self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
+pnpm dlx @xberg-io/html-to-markdown-cli --help
 uvx --from html-to-markdown html-to-markdown --help
 # or build from source:
 cargo install html-to-markdown-cli
@@ -63,8 +63,6 @@ html-to-markdown [OPTIONS] [FILE]
 | `--sub-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sub>` text. E.g. `"~"`.                                           |
 | `--sup-symbol <SYMBOL>`     | string                | `""`     | Symbol wrapping `<sup>` text. E.g. `"^"`.                                           |
 | `--newline-style <STYLE>`   | `backslash`, `spaces` | `spaces` | `<br>` representation: `backslash` (`\`+newline) or `spaces` (two trailing spaces). |
-| `--no-expand-abbreviations` | flag                  | off      | Output the text of an `<abbr>` only. By default its title follows in parentheses.   |
-| `--no-blockquote-citations` | flag                  | off      | Output the quote only. By default the `cite` URL of a `<blockquote>` follows it.    |
 
 ## Code Blocks
 
@@ -180,7 +178,7 @@ Metadata is returned in `result.metadata` within the JSON output (use `--json` t
 | Flag                      | Default | Description                                                                                                                                 |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--json`                  | off     | Output the full `ConversionResult` as JSON instead of plain Markdown. JSON has keys: `content`, `tables`, `metadata`, `images`, `warnings`. |
-| `--include-structure`     | off     | Include document structure tree in JSON output (`document` key). Requires `--json`.                                                         |
+| `--include-structure`     | off     | Include document structure tree and structured tables in JSON output. Requires `--json`.                                                         |
 | `--extract-inline-images` | off     | Include extracted inline image data in JSON output (`images` key). Requires `--json`.                                                       |
 | `--show-warnings`         | off     | Print non-fatal processing warnings to stderr.                                                                                              |
 | `--no-content`            | off     | Suppress Markdown text output — only extract metadata/tables/images. Useful with `--json` for extraction-only mode.                         |
@@ -236,8 +234,8 @@ html-to-markdown --url https://example.com > output.md
 # Fetch URL with custom user agent
 html-to-markdown --url https://example.com --user-agent "MyBot/1.0"
 
-# JSON output (ConversionResult with content, tables, metadata, images, warnings)
-html-to-markdown --json input.html
+# JSON output with document structure and populated tables
+html-to-markdown --json --include-structure input.html
 
 # JSON output with document structure
 html-to-markdown --json --include-structure input.html

@@ -32,7 +32,7 @@ To install the CLI yourself:
 brew trust xberg-io/tap
 brew install xberg-io/tap/html-to-markdown
 # or run it without a persistent install (the CLI proxy package self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
+pnpm dlx @xberg-io/html-to-markdown-cli --help
 uvx --from html-to-markdown-cli html-to-markdown --help
 # or download a prebuilt binary from the latest GitHub release:
 #   https://github.com/xberg-io/html-to-markdown/releases/latest
@@ -44,21 +44,51 @@ The skills also cover the language SDKs. Install the one you need:
 
 ```bash
 pip install html-to-markdown                  # Python
-npm install @xberg-io/html-to-markdown        # TypeScript / Node.js
+pnpm add @xberg-io/html-to-markdown        # TypeScript / Node.js
 cargo add html-to-markdown-rs                  # Rust
 gem install html-to-markdown                   # Ruby
 ```
+
+### Kimi installation and compatibility
+
+From a checkout of this repository, install with the Python Kimi CLI version used for native
+plugin validation:
+
+```sh
+uvx --from kimi-cli==1.51.0 kimi plugin install ./plugin
+```
+
+Native plugin installation was validated with Python Kimi CLI 1.51.0. The replacement
+`@moonshot-ai/kimi-code` 2.1.1 does not provide a `plugin` CLI subcommand; its interactive
+plugin loading has not been verified. These results do not establish compatibility with
+newer Kimi releases.
+
+### Pi
+
+From a checkout of this repository:
+
+```bash
+pi install ./plugin
+```
+
+After the next plugin release, install the same package used by OpenCode:
+
+```bash
+pi install npm:@xberg-io/opencode-html-to-markdown
+```
+
+Pi loads the bundled skills and prompt templates. Use `/html-to-markdown-convert` or `/html-to-markdown-metadata` with the input as arguments. Install the `html-to-markdown` CLI separately for shell access. This package does not register MCP servers, hooks, or native Pi extensions.
 
 ## Skills shipped
 
 | Skill | Trigger |
 |-------|---------|
 | **html-to-markdown** | Convert HTML to Markdown, Djot, or plain text with structured extraction. Use when writing code that calls html-to-markdown APIs in Rust, Python, TypeScript, Go, Ruby, PHP, Java, C#, Elixir, R, C, or WASM. Covers installation, conversion, configuration, metadata extraction, tables, document structure, and CLI usage. |
-| **converting-html** | Use when converting HTML to Markdown, Djot, or plain text. Covers output formats, heading and code-block styles, escaping, wrapping, and HTML preprocessing. |
-| **extracting-metadata** | Use when extracting metadata from HTML — title, description, language, Open Graph, JSON-LD / Microdata / RDFa, headers, links, and images. Covers the `--json` output shape and the `--extract-metadata` flag. |
-| **extracting-tables** | Use when extracting tabular data from HTML. Covers GFM Markdown tables, the structured `tables` array (grid cells + pre-rendered markdown), and `<br>` handling in cells. |
-| **fetching-and-converting-urls** | Use when fetching a live URL and converting it to Markdown. Covers `--url`, custom user agents, preprocessing for noisy pages, and the `--json` ConversionResult shape. |
-| **using-the-mcp-server** | Use when converting HTML and extracting metadata through the MCP server's `convert_html`/`extract_metadata` tools instead of the CLI. Covers the tool surface and the auto-installing launcher. |
+| **html-to-markdown-converting-html** | Use when converting HTML to Markdown, Djot, or plain text. Covers output formats, heading and code-block styles, escaping, wrapping, and HTML preprocessing. |
+| **html-to-markdown-extracting-metadata** | Use when extracting metadata from HTML — title, description, language, Open Graph, JSON-LD / Microdata / RDFa, headers, links, and images. Covers the `--json` output shape and the `--extract-metadata` flag. |
+| **html-to-markdown-extracting-tables** | Use when extracting tabular data from HTML. Covers GFM Markdown tables, the structured `tables` array (grid cells + pre-rendered markdown), and `<br>` handling in cells. |
+| **html-to-markdown-fetching-and-converting-urls** | Use when fetching a live URL and converting it to Markdown. Covers `--url`, custom user agents, preprocessing for noisy pages, and the `--json` ConversionResult shape. |
+| **html-to-markdown-using-the-mcp-server** | Use when converting HTML and extracting metadata through the MCP server's `convert_html`/`extract_metadata` tools instead of the CLI. Covers the tool surface and the auto-installing launcher. |
 
 **Reference materials** (linked from the `html-to-markdown` skill):
 
@@ -73,7 +103,7 @@ gem install html-to-markdown                   # Ruby
 
 ## MCP server
 
-The plugin auto-registers an MCP server named `html-to-markdown`, launched via
+MCP-capable integrations auto-register a server named `html-to-markdown`, launched via
 `scripts/mcp-launch.sh` (which execs `html-to-markdown mcp`). It exposes two
 tools — `convert_html` (HTML string → Markdown/Djot/plain text, or the full
 `ConversionResult` JSON with `json: true`) and `extract_metadata` (structured
@@ -82,7 +112,7 @@ shelling out to the CLI. The launcher auto-installs a
 binary on first run (override with
 `HTML_TO_MARKDOWN_LAUNCHER=auto|npx|uvx|brew|download`). The `mcp` subcommand
 ships in a recent release of the tool; an older binary on `PATH` may need an
-upgrade to expose it. See the **using-the-mcp-server** skill for details.
+upgrade to expose it. See the **html-to-markdown-using-the-mcp-server** skill for details.
 
 ## CLI / SDK usage
 
@@ -172,3 +202,52 @@ MIT. The skill content references the upstream [html-to-markdown](https://github
 
 - **Marketplace**: this repo — `/plugin marketplace add xberg-io/html-to-markdown`
 - **Upstream**: [xberg-io/html-to-markdown](https://github.com/xberg-io/html-to-markdown)
+
+## Generated runtime bundles
+
+`plugin/.ai-rulez/config.toml` loads `config.plugins.toml` through the `plugins` layer;
+skills, commands and runtime adapters are authored alongside it. AI-Rulez 5.3.0 generates
+all eleven supported runtimes: Claude, Cursor, Codex, Gemini, Kimi, OpenCode, Factory,
+Hermes, Pi, Agent Plugins and Copilot. Codex ships both manifest layouts; repository-root
+Claude and Codex marketplace indexes point to the `plugin` bundle. Cursor also has a marketplace index.
+
+Pi packages skills and prompts without MCP integration. Copilot packages skills and MCP configuration, but does not package slash commands or hooks.
+Hermes includes a Python package under `.hermes/package`; OpenCode and Pi share the npm package.
+The Agent Plugins manifest uses the stable 1.0 specification. Runtime capabilities differ;
+install the CLI before using skills in a runtime without MCP registration.
+
+Run `ai-rulez generate --plugin` from the repository root to regenerate and
+`ai-rulez verify --plugin` to compare current source output and provenance.
+The release workflow packages every runtime into a deterministic archive, checksums,
+and marketplace metadata; npm and PyPI retain their existing publishing jobs.
+
+## Hermes runtime setup
+
+Install the product CLI with MCP support and put it on Hermes' PATH before using the plugin.
+The Hermes adapter registers every bundled skill under the product namespace and provides
+`html_to_markdown_call`, which calls the selected native MCP tool with `tool_arguments` through a local
+stdio session. Select `tool: "list_tools"` first to inspect the server's exact request schemas. Hermes skills are selected explicitly; they are not automatically appended to the
+system prompt. Enable the plugin in Hermes configuration; project plugins also require
+`HERMES_ENABLE_PROJECT_PLUGINS=true`.
+
+The bridge uses the installed CLI directly. The auto-installing launchers used by other MCP clients
+are not included in the Hermes Python wheel. Provider credentials are inherited from the environment,
+and are needed for provider-backed requests. Missing CLIs, unavailable tools and model preparation
+fail with an actionable request error. CLI result data remains untrusted document content.
+
+## Public Agent Skills
+
+The repository-root `skills/` directory contains the same generated skills and supporting
+resources as `plugin/skills/`. Install them independently of a plugin runtime:
+
+```sh
+npx skills add xberg-io/html-to-markdown --skill html-to-markdown
+```
+
+Edit `plugin/.ai-rulez/skills`, then run `task plugin:generate` to regenerate runtime
+bundles and synchronize the public export. `task plugin:verify` checks both projections;
+`task plugin:skills:test` verifies resource freshness, ownership and symlink protection.
+The public ownership manifest records SHA-256 hashes of every exported file.
+
+Launcher and visual assets are authored in `plugin/.ai-rulez/scripts/` and
+`plugin/.ai-rulez/assets/`; `task plugin:generate` copies them into the runtime bundle.

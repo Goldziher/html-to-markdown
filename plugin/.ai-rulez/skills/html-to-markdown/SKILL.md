@@ -1,16 +1,17 @@
 ---
-name: html-to-markdown
-description: >-
-  Convert HTML to Markdown, Djot, or plain text with structured extraction.
-  Use when writing code that calls html-to-markdown APIs in Rust, Python,
-  TypeScript, Go, Ruby, PHP, Java, C#, Elixir, R, C, or WASM.
-  Covers installation, conversion, configuration, metadata extraction,
-  tables, document structure, inline images, URL fetching, and CLI usage.
-license: MIT
-metadata:
-  author: xberg-io
-  version: "0.1.0"
-  repository: https://github.com/xberg-io/html-to-markdown
+type: Playbook
+title: Html To Markdown
+description: Convert HTML to Markdown, Djot, or plain text with structured extraction. Use when writing code that calls html-to-markdown APIs in Rust, Python, TypeScript, Go, Ruby, PHP, Java, C#, Elixir, R, C, or WASM. Covers installation, conversion, configuration, metadata extraction, tables, document structure, inline images, URL fetching, and CLI usage.
+x-ai-rulez:
+  kind: skill
+  id: html-to-markdown
+  metadata:
+    license: MIT
+    metadata:
+      author: xberg-io
+      version: "0.1.0"
+      repository: https://github.com/xberg-io/html-to-markdown
+    name: html-to-markdown
 ---
 
 # html-to-markdown
@@ -34,7 +35,7 @@ Use this skill when writing code that:
 | Read HTML from stdin / file / URL | `cat f \| …`, `FILE`, `--url URL` | `convert(htmlString, …)` |
 | ~30 config options (headings, code blocks, lists, escaping, wrapping…) | flags | `ConversionOptions` |
 | Metadata extraction | `--json` (default-extracted) | `result.metadata` |
-| Table extraction | `--json` → `tables[]` | `result.tables` |
+| Table extraction | `--json --include-structure` → `tables[]` | `result.tables` with structure enabled |
 | Document structure tree | `--json --include-structure` | `include_document_structure=true` |
 | Inline image extraction | `--json --extract-inline-images` | `extract_images=true` |
 | HTML preprocessing | `--preprocess [--preset …]` | `PreprocessingOptions` |
@@ -48,9 +49,6 @@ Use this skill when writing code that:
 # (Homebrew 6.0+ requires explicit trust for third-party taps)
 brew trust xberg-io/tap
 brew install xberg-io/tap/html-to-markdown
-# or run without a persistent install (the CLI proxy package self-installs the binary):
-npx @xberg-io/html-to-markdown-cli --help
-uvx --from html-to-markdown-cli html-to-markdown --help
 # or download a prebuilt binary from the latest GitHub release:
 #   https://github.com/xberg-io/html-to-markdown/releases/latest
 # or build from source:
@@ -61,13 +59,13 @@ cargo install html-to-markdown-cli
 
 ```bash
 pip install html-to-markdown                                # Python
-npm install @xberg-io/html-to-markdown                      # TypeScript / Node.js
+pnpm add @xberg-io/html-to-markdown                      # TypeScript / Node.js
 cargo add html-to-markdown-rs                                # Rust (features: metadata default; full = all)
 gem install html-to-markdown                                 # Ruby
 composer require xberg-io/html-to-markdown              # PHP
 go get github.com/xberg-io/html-to-markdown/packages/go/v3   # Go
 dotnet add package XbergIo.HtmlToMarkdown               # C#
-npm install @xberg-io/html-to-markdown-wasm                 # WASM
+pnpm add @xberg-io/html-to-markdown-wasm                 # WASM
 ```
 
 - Java (Maven): `io.xberg:html-to-markdown`
@@ -79,7 +77,7 @@ npm install @xberg-io/html-to-markdown-wasm                 # WASM
 
 - **CLI** — one-shot conversions, shell pipelines, fetching a single URL, ad-hoc metadata/table extraction via `--json | jq`. Flags only for conversion (`FILE` is positional; omit or use `-` for stdin); the only subcommand is `mcp`.
 - **SDK** — embedding conversion in application code, batch processing, custom element conversion (visitor pattern, Rust), and tight loops where process spawn overhead matters.
-- **MCP server** — `html-to-markdown mcp` exposes `convert_html` and `extract_metadata` as agent tools, so an MCP client can convert an HTML string directly with no shell-out. This plugin auto-registers it; see the **using-the-mcp-server** skill.
+- **MCP server** — `html-to-markdown mcp` exposes `convert_html` and `extract_metadata` as agent tools, so an MCP client can convert an HTML string directly with no shell-out. This plugin auto-registers it; see the **html-to-markdown-using-the-mcp-server** skill.
 
 Both share the same `ConversionResult` shape, so output is interchangeable.
 
@@ -106,8 +104,8 @@ cat page.html | html-to-markdown
 # Fetch and convert a URL
 html-to-markdown --url https://example.com > out.md
 
-# Full ConversionResult as JSON (content, tables, metadata, images, warnings)
-html-to-markdown --json input.html
+# ConversionResult as JSON with structured tables
+html-to-markdown --json --include-structure input.html
 
 # JSON with document structure tree
 html-to-markdown --json --include-structure input.html
@@ -165,7 +163,7 @@ All languages return the same structure (dict, object, or struct).
 
 ## Configuration
 
-All languages expose the same ~30 options. See [references/configuration.md](references/configuration.md) for the complete table. Common ones:
+All languages expose the same ~30 options. See [../../references/configuration.md](../../references/configuration.md) for the complete table. Common ones:
 
 | Option | Values | Default |
 | ------ | ------ | ------- |
@@ -209,11 +207,11 @@ result = convert(
 
 ## Metadata extraction
 
-The library `convert()` extracts metadata by default; the CLI needs `--json --extract-metadata` (see the **extracting-metadata** skill). Fields include `document` (title, description, language, canonical_url, open_graph), `headers`, `links` (with `link_type`), `images`, and `structured_data` (JSON-LD/Microdata/RDFa).
+The library `convert()` extracts metadata by default; the CLI needs `--json --extract-metadata` (see the **html-to-markdown-extracting-metadata** skill). Fields include `document` (title, description, language, canonical_url, open_graph), `headers`, `links` (with `link_type`), `images`, and `structured_data` (JSON-LD/Microdata/RDFa).
 
 ## Table extraction
 
-Tables appear in `result.tables`, each with a pre-rendered `markdown` string and a structured cell `grid`. Markdown tables also appear inline in `content`. See the **extracting-tables** skill.
+With document structure extraction enabled, tables appear in `result.tables`, each with a pre-rendered `markdown` string and a structured cell `grid`. Markdown tables also appear inline in `content`. See the **html-to-markdown-extracting-tables** skill.
 
 ## Document structure extraction
 
@@ -229,11 +227,11 @@ Enable structure extraction (`--include-structure` on the CLI, `include_document
 
 ## Additional resources
 
-- **[CLI Reference](references/cli-reference.md)** — every flag, JSON shape, exit codes
-- **[Configuration Reference](references/configuration.md)** — all 30+ options with defaults
-- **[Rust API Reference](references/rust-api.md)** — signatures, builder, feature flags
-- **[Python API Reference](references/python-api.md)** — functions, dataclasses, type hints
-- **[TypeScript API Reference](references/typescript-api.md)** — functions, interfaces, Buffer support
-- **[Other Bindings](references/other-bindings.md)** — Go, Ruby, PHP, Java, C#, Elixir, R, WASM, C FFI
+- **[CLI Reference](../../references/cli-reference.md)** — every flag, JSON shape, exit codes
+- **[Configuration Reference](../../references/configuration.md)** — all 30+ options with defaults
+- **[Rust API Reference](../../references/rust-api.md)** — signatures, builder, feature flags
+- **[Python API Reference](../../references/python-api.md)** — functions, dataclasses, type hints
+- **[TypeScript API Reference](../../references/typescript-api.md)** — functions, interfaces, Buffer support
+- **[Other Bindings](../../references/other-bindings.md)** — Go, Ruby, PHP, Java, C#, Elixir, R, WASM, C FFI
 
 GitHub: <https://github.com/xberg-io/html-to-markdown>

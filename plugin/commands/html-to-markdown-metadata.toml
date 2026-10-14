@@ -1,0 +1,4 @@
+description = "Extract structured HTML metadata"
+prompt = """
+Extract metadata from {{args}} with `html-to-markdown --json`. Read the extracting-metadata skill first. Report only fields present in the conversion result and distinguish missing metadata from extraction failures.
+"""

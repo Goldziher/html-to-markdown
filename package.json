@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@textlint-rule/textlint-rule-no-invalid-control-character": "^3.0.0",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "textlint": "^15.8.0",
     "textlint-filter-rule-comments": "^1.3.0",
     "textlint-filter-rule-node-types": "^1.1.0",
@@ -38,5 +38,19 @@
     "node": ">=22.12",
     "pnpm": ">=11"
   },
-  "packageManager": "pnpm@12.8.1"
+  "packageManager": "pnpm@12.11.2",
+  "pi": {
+    "prompts": [
+      "./plugin/.pi/prompts/html-to-markdown-convert.md",
+      "./plugin/.pi/prompts/html-to-markdown-metadata.md"
+    ],
+    "skills": [
+      "./plugin/.pi/skills/converting-html",
+      "./plugin/.pi/skills/extracting-metadata",
+      "./plugin/.pi/skills/extracting-tables",
+      "./plugin/.pi/skills/fetching-and-converting-urls",
+      "./plugin/.pi/skills/html-to-markdown",
+      "./plugin/.pi/skills/using-the-mcp-server"
+    ]
+  }
 }

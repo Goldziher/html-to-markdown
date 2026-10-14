@@ -348,7 +348,7 @@ fn every_flag_in_the_help_is_listed_in_the_plugin_cli_reference() {
 
     let reference_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../plugin/.ai-rulez/skills/html-to-markdown/references/cli-reference.md"
+        "/../../plugin/.ai-rulez/references/cli-reference.md"
     );
     let listed = words(&std::fs::read_to_string(reference_path).expect("read the plugin CLI reference"));
     let missing: Vec<&String> = flags.difference(&listed).collect();

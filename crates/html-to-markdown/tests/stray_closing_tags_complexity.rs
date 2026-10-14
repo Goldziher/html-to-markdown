@@ -12,41 +12,71 @@ use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
 const BASE_SIZE: usize = 1_000;
 const MAX_DOUBLING_RATIO: f64 = 3.0;
 const MAX_MEASUREMENT_ATTEMPTS: usize = 3;
-const REPEATS_PER_SAMPLE: usize = 3;
+const SAMPLES_PER_SIZE: usize = 7;
+const MIN_BATCH_DURATION: Duration = Duration::from_millis(20);
+const MAX_BATCH_REPEATS: usize = 128;
 
 fn input(size: usize) -> String {
     format!("a\n{}<br>b", "</i>\n".repeat(size))
 }
 
-fn fastest_run(html: &str, tier_strategy: TierStrategy) -> Duration {
+fn timed_batch(html: &str, options: &ConversionOptions, repeats: usize) -> Duration {
+    let prepared_options = vec![options.clone(); repeats];
+    let mut outputs = Vec::with_capacity(repeats);
+    let start = Instant::now();
+    for options in prepared_options {
+        outputs.push(
+            convert(std::hint::black_box(html), Some(options))
+                .expect("conversion must succeed")
+                .content
+                .unwrap_or_default(),
+        );
+    }
+    let elapsed = start.elapsed();
+    assert_eq!(outputs.len(), repeats);
+    for output in outputs {
+        assert_eq!(output, "a  \nb\n");
+    }
+    elapsed
+}
+
+fn batched_sample(html: &str, options: &ConversionOptions) -> f64 {
+    let mut repeats = 1;
+    loop {
+        let elapsed = timed_batch(html, options, repeats);
+        if elapsed >= MIN_BATCH_DURATION || repeats == MAX_BATCH_REPEATS {
+            let count = u32::try_from(repeats).expect("batch count fits u32");
+            return elapsed.as_secs_f64() / f64::from(count);
+        }
+        repeats *= 2;
+    }
+}
+
+fn measurement(tier_strategy: TierStrategy) -> (f64, f64, f64) {
+    let inputs = [input(BASE_SIZE), input(BASE_SIZE * 2), input(BASE_SIZE * 4)];
     let options = ConversionOptions {
         extract_metadata: false,
         highlight_style: HighlightStyle::None,
         tier_strategy,
         ..ConversionOptions::default()
     };
-    (0..REPEATS_PER_SAMPLE)
-        .map(|_| {
-            let start = Instant::now();
-            let output = convert(std::hint::black_box(html), Some(options.clone()))
-                .expect("conversion must succeed")
-                .content
-                .unwrap_or_default();
-            assert_eq!(output, "a  \nb\n");
-            start.elapsed()
-        })
-        .min()
-        .expect("at least one timing sample")
+    for html in &inputs {
+        let _ = timed_batch(html, &options, 1);
+    }
+    let mut fastest = [f64::INFINITY; 3];
+    // ~keep Coverage and scheduler pauses distort isolated millisecond samples; rotate
+    // size order and compare minima from batches with enough conversion work.
+    for round in 0..SAMPLES_PER_SIZE {
+        for offset in 0..inputs.len() {
+            let index = (round + offset) % inputs.len();
+            fastest[index] = fastest[index].min(batched_sample(&inputs[index], &options));
+        }
+    }
+    (fastest[0], fastest[1], fastest[2])
 }
 
-fn measurement(tier_strategy: TierStrategy) -> (f64, f64, f64) {
-    let small = input(BASE_SIZE);
-    let medium = input(BASE_SIZE * 2);
-    let large = input(BASE_SIZE * 4);
-    let small_secs = fastest_run(&small, tier_strategy).as_secs_f64().max(1e-6);
-    let medium_secs = fastest_run(&medium, tier_strategy).as_secs_f64().max(1e-6);
-    let large_secs = fastest_run(&large, tier_strategy).as_secs_f64().max(1e-6);
-    (small_secs, medium_secs, large_secs)
+fn scales_linearly(small: f64, medium: f64, large: f64) -> bool {
+    medium / small < MAX_DOUBLING_RATIO && large / medium < MAX_DOUBLING_RATIO
 }
 
 fn assert_linear(tier_strategy: TierStrategy) {
@@ -55,7 +85,7 @@ fn assert_linear(tier_strategy: TierStrategy) {
         let (small, medium, large) = measurement(tier_strategy);
         let first_ratio = medium / small;
         let second_ratio = large / medium;
-        if first_ratio < MAX_DOUBLING_RATIO && second_ratio < MAX_DOUBLING_RATIO {
+        if scales_linearly(small, medium, large) {
             return;
         }
         failures.push(format!(
@@ -63,13 +93,21 @@ fn assert_linear(tier_strategy: TierStrategy) {
         ));
     }
     panic!(
-        "{tier_strategy:?} scaled quadratically across every measurement:\n{}",
+        "{tier_strategy:?} exceeded the doubling ratio across every measurement:\n{}",
         failures.join("\n")
     );
 }
 
 #[test]
-fn stray_closing_tags_before_a_break_scale_linearly_in_both_tiers() {
+fn stray_closing_tags_before_a_break_scale_linearly_for_both_tier_strategies() {
     assert_linear(TierStrategy::Tier1);
     assert_linear(TierStrategy::Tier2);
+}
+
+#[test]
+fn scaling_gate_accepts_linear_work_and_rejects_quadratic_work() {
+    assert!(scales_linearly(1.0, 2.0, 4.0));
+    assert!(!scales_linearly(1.0, 4.0, 16.0));
+    assert!(!scales_linearly(1.0, 3.0, 6.0));
+    assert!(!scales_linearly(1.0, 2.0, 6.0));
 }

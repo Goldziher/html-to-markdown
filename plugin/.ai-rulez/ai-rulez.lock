@@ -1,0 +1,56 @@
+# ai-rulez.lock: pins remote includes, installed skills and authored content. Commit this file.
+# Refresh it with `ai-rulez lock`; `ai-rulez generate --locked` fails when it is stale.
+
+version = 1
+ai_rulez_version = '5.3.0'
+scope = 'all'
+outputs_pinned = true
+tree = 'sha256:819e9b9c0f831c8da78fd66aa6ea2009715cca69cdfac8326bde30ed6bb88193'
+
+[[item]]
+kind = 'command'
+id = 'html-to-markdown-convert'
+path = 'commands/html-to-markdown-convert.md'
+digest = 'sha256:b58c58894823756702bcfdcc3a1b629fe6f23a66a8594e76ba8047758cfb1e12'
+
+[[item]]
+kind = 'command'
+id = 'html-to-markdown-metadata'
+path = 'commands/html-to-markdown-metadata.md'
+digest = 'sha256:9472176e420dc00c83e0f3598003108cf9ba1223a2ad7b62882ed943611493c5'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown'
+path = 'skills/html-to-markdown'
+digest = 'sha256:4c8f7354eb414b05900cb4b729d84e195db8e1a9efbb268007554d759d5a935a'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown-converting-html'
+path = 'skills/html-to-markdown-converting-html'
+digest = 'sha256:ee0a6472bc5219d619275afa342f5ec95b7777bce70b89f31f8b67e1bb7fa492'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown-extracting-metadata'
+path = 'skills/html-to-markdown-extracting-metadata'
+digest = 'sha256:4c24192f46dc516918619581038404bcce60543ea7bcf04888609ee2915324f6'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown-extracting-tables'
+path = 'skills/html-to-markdown-extracting-tables'
+digest = 'sha256:695b6325b87757dbc9cfeed92e5795db53ae04f1c3edcc6832c15b3b300e79aa'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown-fetching-and-converting-urls'
+path = 'skills/html-to-markdown-fetching-and-converting-urls'
+digest = 'sha256:a771752cd3deba4085cca0c19de3d54605eb8fd50a86a724143b55706f31087a'
+
+[[item]]
+kind = 'skill'
+id = 'html-to-markdown-using-the-mcp-server'
+path = 'skills/html-to-markdown-using-the-mcp-server'
+digest = 'sha256:d062e3b5435c234daaf6d4945db04c38c1229a4a76a59738e49433229c2bda6c'

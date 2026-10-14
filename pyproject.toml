@@ -20,6 +20,7 @@ classifiers = [
 dev = [
   "covdefaults>=2.3",
   "jinja2>=3.1.6",
+  "mcp==1.28.1",
   "pyrefly>=1.1.1",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3",

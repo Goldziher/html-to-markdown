@@ -883,7 +883,7 @@ still tops out at 3.11.4. Also carries the release-gate fixes below.
   The hand-written `docs-site/src/snippets/typescript/*` snippets import the published package
   name (`@xberg-io/html-to-markdown`), same as a real consumer would, but the node and wasm
   snippet sessions' `cwd` IS that package (or its sibling), so nothing had ever installed it into
-  its own `node_modules` the way `npm install @xberg-io/html-to-markdown` would for a consumer.
+  its own `node_modules` the way `pnpm add @xberg-io/html-to-markdown` would for a consumer.
   Added a `before` hook to both sessions in `alef.toml` that self-links the package
   (`mkdir -p node_modules/@xberg-io && ln -sfn ../.. node_modules/@xberg-io/html-to-markdown` for
   node; the wasm session links to the sibling node crate since the snippets never import the wasm

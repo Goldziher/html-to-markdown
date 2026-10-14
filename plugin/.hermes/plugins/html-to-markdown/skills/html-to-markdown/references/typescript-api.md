@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:c60799ba2fbb56a6419fc1ec9711b708e7f8b3f189226ae566fdc6aa5547a18e
-Source-Hash: blake3:0f19d9609e55607f27db4df837426b012b20434ab0599d21b8599931a8e2b067
+Content-Hash: blake3:60f12b55e155a214be5fcc59b943fc53731941f308b3ce7c9832adaab92901ba
+Source-Hash: blake3:d85ad7bf79fa4cb1ed116e7fd2574bf5e6f64f503331a1bacf3cc3d495e3c873
 Schema-Version: v1
 -->
 
@@ -18,7 +18,7 @@ definitions.
 ## Installation
 
 ```bash
-npm install @xberg-io/html-to-markdown
+pnpm add @xberg-io/html-to-markdown
 # or
 pnpm add @xberg-io/html-to-markdown
 ```

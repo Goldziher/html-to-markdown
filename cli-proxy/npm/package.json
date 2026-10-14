@@ -3,7 +3,16 @@
   "version": "0.0.1",
   "description": "CLI proxy for html-to-markdown — downloads and runs the native html-to-markdown binary from GitHub releases.",
   "license": "MIT",
-  "author": "Na'aman Hirschfeld",
+  "author": {
+    "name": "Na'aman Hirschfeld",
+    "email": "naaman@xberg.io"
+  },
+  "contributors": [
+    {
+      "name": "Tobias Perlstein",
+      "email": "tobias@xberg.io"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xberg-io/html-to-markdown.git",
@@ -19,5 +28,6 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "packageManager": "pnpm@12.11.2"
 }

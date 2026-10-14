@@ -1,4 +1,14 @@
 {
+  "author": {
+    "name": "Na'aman Hirschfeld",
+    "email": "naaman@xberg.io"
+  },
+  "contributors": [
+    {
+      "name": "Tobias Perlstein",
+      "email": "tobias@xberg.io"
+    }
+  ],
   "name": "@xberg-io/html-to-markdown-darwin-x64",
   "version": "3.17.2",
   "license": "MIT",
@@ -11,5 +21,6 @@
   "os": ["darwin"],
   "cpu": ["x64"],
   "engines": { "node": ">= 22" },
-  "publishConfig": { "access": "public" }
+  "publishConfig": { "access": "public" },
+  "packageManager": "pnpm@12.11.2"
 }

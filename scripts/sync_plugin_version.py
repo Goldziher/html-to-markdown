@@ -27,7 +27,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PLUGIN_CONFIG = ROOT / "plugin" / ".ai-rulez" / "config.toml"
+PLUGIN_CONFIG = ROOT / "plugin" / ".ai-rulez" / "config.plugins.toml"
+if not PLUGIN_CONFIG.exists():
+    PLUGIN_CONFIG = ROOT / "plugin" / ".ai-rulez" / "config.toml"
 # ~keep Matches the `version` key of the `[plugin]` table only. The file also has a
 # top-level ai-rulez schema `version = "4.0"` that must never be rewritten.
 PLUGIN_VERSION_RE = re.compile(r'(\[plugin\][^\[]*?\nversion = ")([^"]*)(")', re.DOTALL)

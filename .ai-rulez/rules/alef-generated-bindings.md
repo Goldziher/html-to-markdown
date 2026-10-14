@@ -1,5 +1,11 @@
 ---
-priority: critical
+type: Decision
+title: Alef Generated Bindings
+x-ai-rulez:
+  kind: rule
+  id: alef-generated-bindings
+  metadata:
+    priority: critical
 ---
 
 - Files in `packages/*/` and binding crates are generated or managed by Alef — check `alef.toml` before editing
