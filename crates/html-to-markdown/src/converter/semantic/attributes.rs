@@ -13,6 +13,8 @@
 //! or have their attributes included in the output.
 
 use crate::converter::utility::content::chomp_inline;
+use crate::converter::walk::{CaptureEnd, Close, Open};
+use std::rc::Rc;
 
 /// Handles the `<dfn>` element.
 ///
@@ -118,7 +120,9 @@ pub fn handle_abbr(
         if !trimmed.is_empty() {
             output.push_str(trimmed);
 
-            if let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title") {
+            if handler.options.expand_abbreviations
+                && let Some(title) = crate::converter::utility::attributes::decoded_attribute(tag, "title")
+            {
                 let trimmed_title = title.trim();
                 if !trimmed_title.is_empty() {
                     output.push_str(" (");
@@ -232,74 +236,85 @@ pub fn handle_cite(
 /// Internal backslashes and double quotes are escaped:
 /// - `\` → `\\`
 /// - `"` → `\"`
-pub fn handle_q(
-    _tag_name: &str,
+///
+/// Lists the children in `children`. The walk captures their text for [`close_q`]. Where the
+/// links of inline code are collected, the children write to the buffer of the element and
+/// [`close_collected_q`] ends it.
+pub fn open_q(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
     handler: super::HandlerContext<'_>,
-) {
-    if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
-        if handle_collected_q(tag, parser, output, handler) {
-            return;
-        }
-        let mut content = String::with_capacity(32);
-        let children = tag.children();
-        {
-            let q_ctx = super::Context {
-                text_in_markers: true,
-                ..handler.ctx.clone()
-            };
-            for child_handle in children.top().iter() {
-                super::walk_node(
-                    child_handle,
-                    parser,
-                    &mut content,
-                    crate::converter::block::container::HandlerContext::new(
-                        handler.options,
-                        &q_ctx,
-                        handler.depth + 1,
-                        handler.dom_ctx,
-                    ),
-                );
-            }
-        }
-
-        let trimmed = content.trim();
-        if trimmed.is_empty() {
-            // ~keep issue #481: `<q>` wraps in quotes, which a whitespace-only body has
-            // ~keep nothing to wrap -- but the body is still the word separator the source
-            // ~keep wrote, and dropping it outright joined the words either side together.
-            if !content.is_empty() {
-                crate::converter::inline::wrapped::emit_whitespace_only_inline_body(&content, output);
-            }
-            return;
-        }
-        // ~keep A block remains a block when inline text follows it inside the quotation (#820).
-        if !handler.ctx.convert_as_inline && content.contains("\n\n") {
-            let quoted = format!("\"{trimmed}\"");
-            crate::converter::block::div::push_block(output, handler.options, handler.ctx, &quoted);
-            return;
-        }
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    if let Some(links) = handler.ctx.inline_code_links.as_ref() {
+        let end = CollectedQuoteEnd {
+            link_count: links.borrow().len(),
+            start: output.len(),
+        };
         output.push('"');
-        output.push_str(trimmed);
-        output.push('"');
+        return Some(Open {
+            scope: None,
+            close: Close::CollectedQuote(end),
+        });
     }
+    let q_ctx = super::Context {
+        text_in_markers: true,
+        ..handler.ctx.clone()
+    };
+    Some(Open {
+        scope: Some(Rc::new(q_ctx)),
+        close: Close::Capture(CaptureEnd::Quote),
+    })
 }
 
-fn handle_collected_q(
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser<'_>,
-    output: &mut String,
-    handler: super::HandlerContext<'_>,
-) -> bool {
-    let Some(links) = handler.ctx.inline_code_links.as_ref() else {
-        return false;
-    };
-    let link_count = links.borrow().len();
-    let start = output.len();
+/// Write the quotation marks around `content`, the text of the children of a `q`.
+pub fn close_q(content: &str, output: &mut String, handler: super::HandlerContext<'_>) {
+    // ~keep Where the white space of the source is kept, no space moves out of the marks.
+    let (prefix, suffix, trimmed) =
+        if crate::converter::utility::content::keeps_source_white_space(handler.options, handler.ctx) {
+            ("", "", content.trim())
+        } else {
+            chomp_inline(content)
+        };
+    if trimmed.is_empty() {
+        // ~keep issue #481: `<q>` wraps in quotes, which a whitespace-only body has
+        // ~keep nothing to wrap -- but the body is still the word separator the source
+        // ~keep wrote, and dropping it outright joined the words either side together.
+        if !content.is_empty() {
+            crate::converter::inline::wrapped::emit_whitespace_only_inline_body(content, output);
+        }
+        return;
+    }
+    if !handler.ctx.convert_as_inline && content.contains("\n\n") {
+        let quoted = format!("\"{trimmed}\"");
+        crate::converter::block::div::push_block(output, handler.options, handler.ctx, &quoted);
+        return;
+    }
+    crate::converter::utility::content::push_inline_prefix(output, prefix, handler.options, handler.ctx);
     output.push('"');
-    super::walk_tag_children(tag, parser, output, handler);
+    output.push_str(trimmed);
+    output.push('"');
+    output.push_str(suffix);
+}
+
+/// What `close_collected_q` needs from `open_q`: the count of collected links and the place of
+/// the opening mark.
+pub struct CollectedQuoteEnd {
+    link_count: usize,
+    start: usize,
+}
+
+/// End a `q` whose children wrote to the buffer of the element.
+pub fn close_collected_q(end: &CollectedQuoteEnd, output: &mut String, handler: super::HandlerContext<'_>) {
+    let Some(links) = handler.ctx.inline_code_links.as_ref() else {
+        return;
+    };
+    let CollectedQuoteEnd { link_count, start } = *end;
     if links.borrow().len() == link_count {
         let body = output[start + 1..].to_string();
         output.truncate(start);
@@ -314,7 +329,6 @@ fn handle_collected_q(
         // ~keep Quoted links were collected in this buffer; preserve their offsets.
         output.push('"');
     }
-    true
 }
 
 /// Dispatcher for semantic inline attribute elements.
@@ -333,7 +347,6 @@ pub fn handle(
         "abbr" => handle_abbr(tag_name, node_handle, parser, output, handler),
         "time" | "data" => handle_time_data(tag_name, node_handle, parser, output, handler),
         "cite" => handle_cite(tag_name, node_handle, parser, output, handler),
-        "q" => handle_q(tag_name, node_handle, parser, output, handler),
         _ => {}
     }
 }

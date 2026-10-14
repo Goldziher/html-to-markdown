@@ -113,7 +113,10 @@ fn decode_and_collapse_into_inner(
 ) -> Result<(), BailReason> {
     let bytes = s.as_bytes();
     let mut i = 0;
-    let mut prev_was_space = false;
+    // ~keep Rule 4 of the module: white space at the start of the text is the run that `out`
+    // ~keep ends with, so after a space or a line end it writes nothing. `<td>one <span>two&#10;
+    // ~keep </span> three</td>` is `one two three`, as the full converter writes it.
+    let mut prev_was_space = !crate::converter::utility::white_space::space_is_owed(out);
     // ~keep Mirrors Tier-2's `normalize_block_whitespace_cow` (text.rs): when a literal
     // `\n` survives into the output (only possible here when `collapse_newlines`
     // is false -- the `true` variant folds `\n` straight into a space below and
@@ -127,60 +130,70 @@ fn decode_and_collapse_into_inner(
     // a genuine mid-text line break, never the text node's own edge.
     let mut at_line_start = false;
     while i < bytes.len() {
-        let next_special = match (has_entities, collapse_newlines) {
-            (true, true) => {
-                let s_pos = memchr3(b' ', b'\t', b'\n', &bytes[i..]).map(|pos| i + pos);
-                let e_pos = memchr::memchr(b'&', &bytes[i..]).map(|pos| i + pos);
-                match (s_pos, e_pos) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (Some(a), None) | (None, Some(a)) => Some(a),
-                    (None, None) => None,
-                }
-            }
-            (true, false) => memchr3(b' ', b'\t', b'&', &bytes[i..]).map(|pos| i + pos),
-            (false, true) => memchr3(b' ', b'\t', b'\n', &bytes[i..]).map(|pos| i + pos),
-            (false, false) => memchr::memchr2(b' ', b'\t', &bytes[i..]).map(|pos| i + pos),
-        };
-
-        if let Some(pos) = next_special {
-            if pos > i {
-                out.push_str(&s[i..pos]);
-                prev_was_space = false;
-                at_line_start = !collapse_newlines && bytes[pos - 1] == b'\n';
-            }
-            match bytes[pos] {
-                b' ' | b'\t' if at_line_start => {
-                    i = pos + 1;
-                }
-                b' ' | b'\t' => {
-                    if !prev_was_space {
-                        out.push(' ');
-                    }
-                    prev_was_space = true;
-                    i = pos + 1;
-                }
-                b'\n' if collapse_newlines => {
-                    if !prev_was_space {
-                        out.push(' ');
-                    }
-                    prev_was_space = true;
-                    i = pos + 1;
-                }
-                b'&' => {
-                    prev_was_space = false;
-                    at_line_start = false;
-                    i = decode_entity_at(bytes, s, pos, out, base_offset, ReferenceContext::Text)?;
-                }
-                _ => unreachable!(),
-            }
-        } else {
-            if i < bytes.len() {
-                out.push_str(&s[i..]);
-            }
+        let Some(pos) = next_special_byte(bytes, i, has_entities, collapse_newlines) else {
+            out.push_str(&s[i..]);
             break;
+        };
+        if pos > i {
+            out.push_str(&s[i..pos]);
+            prev_was_space = false;
+            at_line_start = !collapse_newlines && bytes[pos - 1] == b'\n';
         }
+        // ~keep A character reference that decodes to a space, a tab or a line end (`&#10;`,
+        // ~keep `&#32;`, `&Tab;`) is that white space: the module decides on the decoded text.
+        // ~keep `<td><span>one&#10;</span><span>&#10;two</span></td>` is `one two`, as the full
+        // ~keep converter writes it.
+        let (special, next) = match bytes[pos] {
+            b'&' => match crate::text::decode_character_reference(s, pos, ReferenceContext::Text) {
+                Some((end, decoded @ (' ' | '\t' | '\n'), None))
+                    if bytes[end - 1] == b';' && (decoded != '\n' || collapse_newlines) =>
+                {
+                    (decoded as u8, end)
+                }
+                _ => (b'&', pos),
+            },
+            byte => (byte, pos + 1),
+        };
+        match special {
+            b' ' | b'\t' if at_line_start => {}
+            b' ' | b'\t' | b'\n' => {
+                if !prev_was_space {
+                    out.push(' ');
+                }
+                prev_was_space = true;
+            }
+            b'&' => {
+                prev_was_space = false;
+                at_line_start = false;
+                i = decode_entity_at(bytes, s, pos, out, base_offset, ReferenceContext::Text)?;
+                continue;
+            }
+            _ => unreachable!(),
+        }
+        i = next;
     }
     Ok(())
+}
+
+/// The position of the next byte of `bytes` from `from` that the collapse decides on: a space,
+/// a tab, a line end when `collapse_newlines`, and `&` when `has_entities`.
+fn next_special_byte(bytes: &[u8], from: usize, has_entities: bool, collapse_newlines: bool) -> Option<usize> {
+    let rest = &bytes[from..];
+    let pos = match (has_entities, collapse_newlines) {
+        (true, true) => {
+            let space = memchr3(b' ', b'\t', b'\n', rest);
+            let entity = memchr::memchr(b'&', rest);
+            match (space, entity) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) | (None, Some(a)) => Some(a),
+                (None, None) => None,
+            }
+        }
+        (true, false) => memchr3(b' ', b'\t', b'&', rest),
+        (false, true) => memchr3(b' ', b'\t', b'\n', rest),
+        (false, false) => memchr::memchr2(b' ', b'\t', rest),
+    };
+    pos.map(|pos| from + pos)
 }
 
 /// `raw` without its leading whitespace, where a character reference that decodes to whitespace
@@ -201,6 +214,108 @@ fn trim_leading_text_whitespace(raw: &str) -> &str {
         }
     }
     rest
+}
+
+/// Whether the white space that the source text `raw` starts with holds a Unicode space, as a
+/// character or as a character reference (`&nbsp;`, `&#160;`, `&#xA0;`).
+///
+/// ~keep The source form of `white_space::starts_with_unicode_space`, which reads decoded text.
+fn source_starts_with_unicode_space(raw: &str) -> bool {
+    let mut rest = raw;
+    loop {
+        let Some(first) = rest.chars().next() else {
+            return false;
+        };
+        let (character, end) = if first == '&' {
+            match crate::text::decode_character_reference(rest, 0, ReferenceContext::Text) {
+                Some((end, decoded, None)) if rest.as_bytes()[end - 1] == b';' => (decoded, end),
+                _ => return false,
+            }
+        } else {
+            (first, first.len_utf8())
+        };
+        if !character.is_whitespace() {
+            return false;
+        }
+        if crate::text::is_unicode_space(character) {
+            return true;
+        }
+        rest = &rest[end..];
+    }
+}
+
+/// Hand the page to Tier-2 at a text that starts with a Unicode space after a written space,
+/// unless the tag before the text tells that the space joins the written one.
+///
+/// ~keep Tier-2 writes that space (`a <span></span>&nbsp;b` is `a  b`) by what stands before
+/// ~keep the text in the tree. The scanner knows that only for a text that starts where an
+/// ~keep opening tag ends, or the closing tag of an element that holds text and is no `span`
+/// ~keep (`emit_close`): there the two converters join the spaces, and the scanner answers.
+/// ~keep Any other text has an unknown place, and Tier-2 takes the page: a text after a `<br>`
+/// ~keep in a table cell is one, and Tier-2 keeps the Unicode space there. A text of only white
+/// ~keep space after a closing tag is another (`is_blank_after_text`).
+/// ~keep In `pre` and in code the white space rule does not apply, and nothing is handed over.
+/// ~keep A heading has one line. Tier-2 writes a `<br>` there as a space, and this scanner writes
+/// ~keep a hard break that the close of the heading folds to a space: that hard break is a
+/// ~keep written space here (`<h2>a<br><span></span>&nbsp;b</h2>` is `## a  b`). The text right
+/// ~keep after the `<br>` has a known place and joins.
+fn hand_over_unicode_space_after_space(
+    state: &mut Tier1State,
+    raw: &str,
+    base_offset: usize,
+) -> Result<(), BailReason> {
+    if state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::CODE) || !source_starts_with_unicode_space(raw) {
+        return Ok(());
+    }
+    let in_label = state.link_stack.iter().any(|(href, ..)| href.is_some());
+    let in_empty_address_link = state.link_stack.iter().any(|(href, ..)| href.as_deref() == Some(""));
+    let place = state
+        .text_place
+        .and_then(|(offset, place)| (offset == base_offset).then_some(place));
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_cell = state.in_table_cell();
+    let written = state.cell_or_output_mut();
+    let after_heading_break = in_heading && (written.ends_with("  \n") || written.ends_with("\\\n"));
+    // ~keep A text with a word that starts a line after a hard break keeps its Unicode spaces as
+    // ~keep the indent of that line in Tier-2 (#839). This scanner has no such rule, in the label
+    // ~keep of a link either, and Tier-2 takes the page.
+    // ~keep A link with an empty address is running text in Tier-2: a `<br>` in it is a break of
+    // ~keep the block there, and this scanner writes the break of a label. What a text of only
+    // ~keep Unicode spaces writes after that break is decided in Tier-2 (issue #845).
+    let after_hard_break = !in_heading
+        && !in_cell
+        && (written.ends_with("  \n") || written.ends_with("\\\n"))
+        && (in_empty_address_link
+            || !crate::converter::utility::white_space::is_blank(crate::text::decode_html_entities_cow(raw).as_ref()));
+    if after_hard_break {
+        return Err(BailReason::UnicodeSpaceAfterSpace);
+    }
+    // ~keep In the label of a link every run of white space is one space in both converters
+    // ~keep (`normalize_link_label`), and a Unicode space at a label edge is the one space of that
+    // ~keep edge: the place of the text decides nothing there. A link with no address is running
+    // ~keep text, not a label.
+    if in_label {
+        return Ok(());
+    }
+    if (written.ends_with(' ') || after_heading_break)
+        && place.is_none_or(|place| unicode_space_is_kept(written, place) || is_blank_after_text(place, raw))
+    {
+        return Err(BailReason::UnicodeSpaceAfterSpace);
+    }
+    Ok(())
+}
+
+/// Whether the source text `raw` stands after text and holds no word: every character of it is
+/// white space, a Unicode space included.
+///
+/// ~keep The place after text (`emit_close`) answers for a text that holds a word: the Unicode
+/// ~keep space that `</a>&nbsp;now` starts with joins the written space in both converters. A
+/// ~keep text of only white space is no word to join: Tier-2 writes an em space (U+2003)
+/// ~keep between `<b>Go </b>` and `<i>now</i>` with no space before it, by rules this scanner
+/// ~keep does not have. The place of such a text counts as unknown, and Tier-2 takes the page.
+fn is_blank_after_text(place: TextPlace, raw: &str) -> bool {
+    place == TextPlace::AfterText
+        && crate::converter::utility::white_space::is_blank(&crate::text::decode_html_entities_cow(raw))
 }
 
 /// Scan and decode a single HTML entity starting at `amp_pos` (the `&` byte).
@@ -595,58 +710,6 @@ fn prefix_blockquote_lines(content: &str) -> String {
         }
     }
     result.push('\n');
-    result
-}
-
-/// Indent each line of a pre block by 4 spaces, after dedenting common leading whitespace.
-///
-/// Mirrors Tier-2's `dedent_code_block` + 4-space indent logic.
-fn indent_pre_lines(raw: &str) -> String {
-    let raw = raw.strip_prefix('\n').unwrap_or(raw);
-    let raw = raw.trim_end_matches('\n');
-    if raw.is_empty() {
-        return String::new();
-    }
-
-    let min_indent = raw
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().take_while(|c| c.is_whitespace()).count())
-        .min()
-        .unwrap_or(0);
-
-    let mut result = String::with_capacity(raw.len() + raw.lines().count() * 4);
-    for line in raw.lines() {
-        if line.trim().is_empty() {
-            // ~keep Empty / whitespace-only line: emit as a bare `\n` (no 4-space
-            // indent prefix).  Tier-2's `block/code.rs` also skips the indent
-            // for blank lines inside indented code blocks — without this,
-            // round-tripped CommonMark `    code\n    \n    code` would
-            // render with stray trailing spaces in the blank gap.
-        } else {
-            result.push_str("    ");
-            // ~keep Convert char-count `min_indent` into a byte offset by walking
-            // `char_indices`.  Indexing `line[min_indent..]` directly panics
-            // when the leading whitespace contains multibyte characters such
-            // as `\u{a0}` (NBSP).  Mirrors Tier-2's `dedent_code_block`
-            // (text/processing.rs:38-50).
-            let mut remaining = min_indent;
-            let mut cut = 0;
-            for (idx, ch) in line.char_indices() {
-                if remaining == 0 {
-                    break;
-                }
-                if ch.is_whitespace() {
-                    remaining -= 1;
-                    cut = idx + ch.len_utf8();
-                } else {
-                    break;
-                }
-            }
-            result.push_str(&line[cut..]);
-        }
-        result.push('\n');
-    }
     result
 }
 

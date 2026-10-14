@@ -48,7 +48,7 @@ struct ImageData<'a> {
 pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let data = image_data(tag, &handler);
     #[cfg(feature = "metadata")]
-    let metadata = handler.context.metadata_wants_images.then(|| image_metadata(tag));
+    let metadata = handler.context.metadata_wants.images.then(|| image_metadata(tag));
     #[cfg(feature = "inline-images")]
     collect_inline_image(tag, &data, handler.context);
     let inline_data = handler
@@ -57,6 +57,18 @@ pub fn handle_img(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
     let rendered = render_image(tag, &data, inline_data, &handler);
     if !handler.options.skip_images {
         if let Some(image_text) = rendered {
+            // ~keep Heading images can emit no alt text; record actual output before the next boundary query (#868).
+            if image_text.is_empty()
+                && handler.context.in_heading
+                && !handler.context.code_element_is_transparent()
+                && !handler.context.in_code_block
+            {
+                handler
+                    .dom_context
+                    .silent_heading_images
+                    .borrow_mut()
+                    .insert(handler.node_handle.get_inner());
+            }
             if data.src.is_empty() && image_text.is_empty() {
                 collapse_empty_image_boundary(&mut handler);
             }
@@ -211,6 +223,8 @@ fn render_image(
     if let std::ops::ControlFlow::Break(result) = visit_image(tag, data, handler) {
         return result;
     }
+    // ~keep Code has no image marks. An image in code is its alt text as literal code text, as
+    // ~keep where a heading or a table cell cannot hold an image. A visitor is asked first.
     if context.in_code {
         return (inline_data != InlineDataMedia::DropElement).then(|| data.alt.to_string());
     }

@@ -845,7 +845,7 @@ values = ["comment", "doc-comment"]
 [[entries]]
 relative_path = "poly.toml"
 key_path = "per-file-ignores.crates/html-to-markdown-php/src/lib.rs"
-values = ["file-too-long", "function-too-long", "too-many-parameters"]
+values = ["file-too-long", "function-too-long", "too-many-parameters", "type-too-long"]
 
 [[entries]]
 relative_path = "poly.toml"

@@ -2,12 +2,14 @@
 //!
 //! Processes HTML elements that don't have specific handlers by passing through
 //! their children while managing whitespace and content preservation:
-//! - Processes all child nodes recursively
+//! - Gives all child nodes to the walk
 //! - Validates UTF-8 character boundaries when checking content
 //! - Preserves code blocks (indented or fenced) while removing empty content
 //! - Manages trailing whitespace intelligently
 
+#[cfg(feature = "visitor")]
 use crate::converter::block::container::HandlerContext;
+use crate::converter::walk::{Close, Open};
 #[cfg(feature = "visitor")]
 use std::borrow::Cow;
 use tl::{NodeHandle, Parser};
@@ -19,7 +21,7 @@ type DomContext = crate::converter::DomContext;
 ///
 /// For elements without specific handlers, this function:
 /// 1. Records the output position before processing children
-/// 2. Processes all children recursively
+/// 2. Gives all children to the walk
 /// 3. Checks if any content was added
 /// 4. Validates UTF-8 character boundaries for safe string slicing
 /// 5. Detects if added content is a code block (indented or fenced)
@@ -33,44 +35,39 @@ type DomContext = crate::converter::DomContext;
 /// # Code Block Detection
 /// Code blocks (identified by markdown formatting) are always preserved,
 /// even if they appear "empty" according to `trim()`.
-#[cfg_attr(not(feature = "visitor"), allow(unused_variables))]
-pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let HandlerContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = handler;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+///
+/// This is the first half: it measures the output before the children and lists them in
+/// `children`. With a visitor, `visit` runs before it and decides whether it runs at all.
+pub fn open(node_handle: &NodeHandle, parser: &Parser, output: &str, children: &mut Vec<NodeHandle>) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
-
-    #[cfg(feature = "visitor")]
-    if visit_unknown(node_handle, parser, output, tag, handler) {
-        return;
-    }
 
     let len_before = output.len();
     let had_trailing_space = output.ends_with(' ');
 
-    let children = tag.children();
-    {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
-            );
-        }
-    }
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: None,
+        close: Close::Unknown(UnknownEnd {
+            len_before,
+            had_trailing_space,
+        }),
+    })
+}
 
+/// What `close` needs from `open`.
+pub struct UnknownEnd {
+    len_before: usize,
+    had_trailing_space: bool,
+}
+
+/// Remove what the children of an unknown element wrote when it is white space only.
+pub fn close(end: &UnknownEnd, output: &mut String) {
+    let UnknownEnd {
+        len_before,
+        had_trailing_space,
+    } = *end;
     let len_after = output.len();
     if len_after > len_before {
         let start_idx = if output.is_char_boundary(len_before) {
@@ -99,18 +96,17 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
     }
 }
 
+/// Give an unknown element to the visitor. Returns whether the visitor wrote or skipped the
+/// element, so that the walk does not open it.
 #[cfg(feature = "visitor")]
-fn visit_unknown(
-    node_handle: &NodeHandle,
-    parser: &Parser,
-    output: &mut String,
-    tag: &tl::HTMLTag<'_>,
-    handler: HandlerContext<'_>,
-) -> bool {
+pub fn visit(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) -> bool {
     use crate::converter::utility::serialization::serialize_tag_to_html;
     use crate::visitor::{NodeContext, NodeType, VisitResult};
 
     let Some(ref visitor_handle) = handler.ctx.visitor else {
+        return false;
+    };
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
         return false;
     };
     let tag_name = tag.name().as_utf8_str();
@@ -131,6 +127,12 @@ fn visit_unknown(
         let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
         visitor.visit_custom_element(&node_ctx, &tag_name, &raw_html)
     };
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&visit_result, VisitResult::Skip)
+            || matches!(&visit_result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_ctx.record_absent_breaks(node_id, true);
+    }
     match visit_result {
         VisitResult::Continue => false,
         VisitResult::Skip => true,

@@ -42,6 +42,10 @@ pub(super) fn finish_element(capture: ElementTextCapture, tag_name: &str, tag: &
 }
 
 pub(super) fn replace_element(ctx: &Context, replacement: Option<&str>) {
+    if let Some(boundary) = ctx.media_boundary.as_ref() {
+        boundary.set(Default::default());
+    }
+
     if let Some(collector) = ctx.structure_collector.as_ref() {
         collector.borrow_mut().replace_current_element(replacement);
     }
@@ -124,11 +128,13 @@ pub(super) struct VisitorEndCapture<'a, 'parser> {
 }
 
 #[cfg(feature = "visitor")]
-pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
+pub(super) fn handle_visitor_end(
+    end: VisitorEndCapture<'_, '_>,
+) -> Option<crate::converter::visitor_hooks::VisitAction> {
     use crate::converter::visitor_hooks::{VisitAction, VisitorElementEndContext, handle_visitor_element_end};
 
     let (Some(visitor_handle), Some(state)) = (end.ctx.visitor.as_ref(), end.state) else {
-        return;
+        return None;
     };
     let action = handle_visitor_element_end(
         visitor_handle,
@@ -158,4 +164,5 @@ pub(super) fn handle_visitor_end(end: VisitorEndCapture<'_, '_>) {
         VisitAction::Skip | VisitAction::Error => replace_element(end.ctx, None),
         VisitAction::Continue => {}
     }
+    Some(action)
 }

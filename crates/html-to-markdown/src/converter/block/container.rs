@@ -8,6 +8,7 @@
 //! - source: Media source element
 //! - wbr: Word break opportunity (no-op)
 
+use crate::converter::walk::Open;
 use crate::options::ConversionOptions;
 use tl::{NodeHandle, Parser};
 
@@ -33,85 +34,22 @@ impl<'a> HandlerContext<'a> {
     }
 }
 
-/// Handle structural container elements that recursively process children.
-///
-/// This is used for elements like `body` and `html` that should process their
-/// children directly without any whitespace truncation or special formatting.
-///
-/// # Arguments
-/// * `node_handle` - Handle to the HTML node
-/// * `parser` - The HTML parser
-/// * `output` - Accumulation buffer for Markdown output
-/// * `options` - Conversion options
-/// * `ctx` - Current conversion context
-/// * `depth` - Current recursion depth
-/// * `dom_ctx` - DOM context for tracking relationships
-pub fn handle_structural_container(
-    node_handle: &NodeHandle,
-    parser: &Parser,
-    output: &mut String,
-    handler: HandlerContext<'_>,
-) {
-    let Some(node) = node_handle.get(parser) else {
-        return;
+/// Open a container that writes nothing of its own: `body` and `html`, `time` and `data`, `small`,
+/// a stray table part. The walk visits every child with the state of the container.
+pub fn open_children(node_handle: &NodeHandle, parser: &Parser, children: &mut Vec<NodeHandle>) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
-
-    let tl::Node::Tag(tag) = node else {
-        return;
-    };
-
-    let children = tag.children();
-    for child_handle in children.top().iter() {
-        crate::converter::main::walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.ctx,
-                handler.depth + 1,
-                handler.dom_ctx,
-            ),
-        );
-    }
+    children.extend(tag.children().top().iter().copied());
+    Some(Open::children_only())
 }
 
-/// Handle pass-through container elements that process children inline.
-///
-/// This is used for semantic elements like `time` and `data` that wrap content
-/// but should not add any additional formatting or block breaks.
-///
-/// # Arguments
-/// * `node_handle` - Handle to the HTML node
-/// * `parser` - The HTML parser
-/// * `output` - Accumulation buffer for Markdown output
-/// * `options` - Conversion options
-/// * `ctx` - Current conversion context
-/// * `depth` - Current recursion depth
-/// * `dom_ctx` - DOM context for tracking relationships
+/// Write the children of a container that writes nothing of its own, for a handler that the walk
+/// does not drive.
 pub fn handle_passthrough(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    let Some(node) = node_handle.get(parser) else {
-        return;
-    };
-
-    let tl::Node::Tag(tag) = node else {
-        return;
-    };
-
-    let children = tag.children();
-    for child_handle in children.top().iter() {
-        crate::converter::main::walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.ctx,
-                handler.depth + 1,
-                handler.dom_ctx,
-            ),
-        );
-    }
+    crate::converter::main::walk_opened(parser, output, handler, |_, children| {
+        open_children(node_handle, parser, children)
+    });
 }
 
 /// Handle no-op container elements that should be ignored.

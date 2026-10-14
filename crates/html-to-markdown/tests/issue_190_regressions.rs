@@ -56,7 +56,7 @@ fn decode_utf16_without_bom(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn test_code_block_dedent_handles_unicode_whitespace() {
+fn test_code_block_keeps_unicode_whitespace_at_line_starts() {
     let nbsp = '\u{00A0}';
     let html = format!("<pre><code> msg = String()\n{nbsp}msg = String()\n</code></pre>");
     let options = ConversionOptions {
@@ -66,8 +66,9 @@ fn test_code_block_dedent_handles_unicode_whitespace() {
 
     let markdown = convert(&html, Some(options)).expect("conversion should succeed");
 
-    assert!(markdown.contains("msg = String()"));
-    assert!(!markdown.contains(nbsp));
+    // ~keep The indentation of a line of code is code (issue #782); it was removed here once.
+    assert!(markdown.contains("\n msg = String()\n"));
+    assert!(markdown.contains(&format!("\n{nbsp}msg = String()\n")));
 }
 
 #[test]

@@ -39,7 +39,7 @@ fn an_image_prints_the_payload_the_alt_text_or_nothing() {
     let [keep, alt, drop] = all_choices(&html);
     assert_eq!(keep, format!("Before ![icon]({PNG}) after\n"));
     assert_eq!(alt, "Before icon after\n");
-    assert_eq!(drop, "Before  after\n");
+    assert_eq!(drop, "Before after\n");
 }
 
 #[test]
@@ -333,8 +333,8 @@ fn a_video_falls_back_to_a_nested_source_that_is_not_data() {
     let html = format!(r#"<video src="{MP4}"><source src="{MP4}"><source src="{real}"></video>"#);
     let [keep, alt, drop] = all_choices(&html);
     assert!(keep.contains(MP4), "Keep writes the payload: {keep:?}");
-    assert_eq!(alt, format!("[{real}]({real})\n"));
-    assert_eq!(drop, format!("[{real}]({real})\n"));
+    assert_eq!(alt, format!("[video]({real})\n"));
+    assert_eq!(drop, format!("[video]({real})\n"));
 }
 
 #[test]

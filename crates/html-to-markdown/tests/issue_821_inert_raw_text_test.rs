@@ -63,7 +63,7 @@ fn should_keep_visible_siblings_after_iframe_with_an_unclosed_child() {
 fn should_keep_frame_address_and_following_visible_siblings() {
     assert_routes(
         "<p>before</p><iframe src='/f.html'><p></iframe><p>visible</p>",
-        "before\n\n[/f.html](/f.html)\n\nvisible\n",
+        "before\n\n[iframe](/f.html)\n\nvisible\n",
         false,
     );
 }

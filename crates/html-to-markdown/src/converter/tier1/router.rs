@@ -2,8 +2,8 @@
 
 use crate::converter::prescan::PrescanReport;
 use crate::options::{
-    CodeBlockStyle, ConversionOptions, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
-    NewlineStyle, OutputFormat, PreprocessingPreset, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, ConversionOptions, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle,
+    ListIndentType, NewlineStyle, OutputFormat, PreprocessingPreset, UrlEscapeStyle, WhitespaceMode,
 };
 
 /// The routing decision produced by [`classify`] for a given input + options.
@@ -145,6 +145,7 @@ pub enum RouterDecision {
 /// | `url_escape_style`   | `UrlEscapeStyle::Angle` (raw href)      | Yes — Percent                            |
 /// | `compact_tables`     | `false` (padded cells: `\| cell \|`)    | Yes — `true`                             |
 /// | `inline_data_media`  | `InlineDataMedia::Keep` (payload written) | Yes — AltTextOnly, DropElement         |
+/// | `hidden_content`     | `HiddenContent::Drop` (hidden elements bail, templates skipped) | Yes — Reachable, All |
 /// | `br_in_tables`       | honored in cells (literal `<br>` vs space) | No — scanner reads the option directly |
 ///
 /// # Practical reachability & benchmark findings
@@ -273,6 +274,7 @@ fn destination_formatting_differs(options: &ConversionOptions) -> bool {
         || options.url_escape_style != UrlEscapeStyle::Angle
         || options.compact_tables
         || options.inline_data_media != InlineDataMedia::Keep
+        || options.hidden_content != HiddenContent::Drop
 }
 
 const fn feature_options_require_tier2(options: &ConversionOptions) -> bool {

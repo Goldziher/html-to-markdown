@@ -76,9 +76,6 @@ pub fn first_address<T: AsRef<str>>(choice: InlineDataMedia, addresses: impl Int
 /// | Tag(s) | Handler | Description |
 /// |--------|---------|-------------|
 /// | `iframe` | embedded | Embedded content frames |
-/// | `video` | embedded | Video elements |
-/// | `audio` | embedded | Audio elements |
-/// | `picture` | embedded | Responsive image containers |
 /// | `svg` | svg | SVG image elements |
 /// | `math` | svg | `MathML` elements |
 ///
@@ -103,18 +100,6 @@ pub fn dispatch_media_handler(
     match tag_name {
         "iframe" => {
             embedded::handle_iframe(node_handle, tag, parser, output, context);
-            true
-        }
-        "video" => {
-            embedded::handle_video(node_handle, tag, parser, output, context);
-            true
-        }
-        "audio" => {
-            embedded::handle_audio(node_handle, tag, parser, output, context);
-            true
-        }
-        "picture" => {
-            embedded::handle_picture(node_handle, tag, parser, output, context);
             true
         }
         "svg" => {

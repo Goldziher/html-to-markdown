@@ -2,8 +2,8 @@
 
 use crate::options::preprocessing::PreprocessingOptions;
 use crate::options::validation::{
-    CodeBlockStyle, HeadingStyle, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType, NewlineStyle,
-    OutputFormat, UrlEscapeStyle, WhitespaceMode,
+    CodeBlockStyle, HeadingStyle, HiddenContent, HighlightStyle, InlineDataMedia, LinkStyle, ListIndentType,
+    NewlineStyle, OutputFormat, UrlEscapeStyle, WhitespaceMode,
 };
 
 /// Native recursion guard used as the default when the caller does not set an
@@ -96,6 +96,10 @@ pub struct ConversionOptions {
     pub code_language: String,
     /// Automatically convert bare URLs into Markdown autolinks.
     pub autolinks: bool,
+    /// Append the title of an `<abbr>` in parentheses (default `true`).
+    pub expand_abbreviations: bool,
+    /// Append the `cite` URL after a blockquote (default `true`).
+    pub include_blockquote_citations: bool,
     /// Emit a default title when no `<title>` tag is present.
     pub default_title: bool,
     /// Render `<br>` elements inside table cells as literal line breaks.
@@ -172,6 +176,12 @@ pub struct ConversionOptions {
     /// `data:` URL: the URL with its payload ([`InlineDataMedia::Keep`], the default), the alt
     /// text alone, or nothing. See [`InlineDataMedia`] for the elements it covers.
     pub inline_data_media: InlineDataMedia,
+    /// Which text that a browser does not show at first the output holds: none of it
+    /// ([`HiddenContent::Drop`], the default), the text a reader can get to in the page, such as
+    /// an inactive tab panel ([`HiddenContent::Reachable`]), or that text and the content of
+    /// `<template>` and `<noscript>` ([`HiddenContent::All`]). No choice writes a script or a
+    /// style sheet as text. See [`HiddenContent`] for each kind of hidden markup.
+    pub hidden_content: HiddenContent,
     /// URL encoding strategy for link and image destinations.
     ///
     /// Controls how special characters in URL destinations are escaped:
@@ -211,8 +221,17 @@ pub struct ConversionOptions {
     ///
     /// Unlike `strip_tags` (which removes the tag wrapper but keeps children),
     /// excluded elements and all their descendants are dropped from the output.
-    /// Supports any CSS selector that `tl` supports: tag names, `.class`,
-    /// `#id`, `[attribute]`, etc.
+    ///
+    /// A selector matches an element by its own properties: a tag name (`nav`), `.class`,
+    /// `#id`, an attribute (`[hidden]`, `[role=banner]`, and the `~=`, `^=`, `$=` and `*=`
+    /// forms), `*`, and these joined with no space (`div.note`, `a[href$="share"]`). One entry
+    /// can hold a comma-separated list of such selectors (`nav, footer`). Write a tag name in
+    /// lower case.
+    ///
+    /// A selector with a combinator (`.menu a`, `div > p`, `h2 + p`, `h2 ~ p`) or a
+    /// pseudo-class (`li:first-child`) matches nothing, and the conversion reports no error.
+    /// In a comma-separated list, such a member can stop the other members of the list too:
+    /// give each selector as an entry of its own.
     ///
     /// Invalid selectors are silently skipped at conversion time.
     ///
@@ -280,6 +299,8 @@ impl Default for ConversionOptions {
             escape_ascii: false,
             code_language: String::new(),
             autolinks: true,
+            expand_abbreviations: true,
+            include_blockquote_citations: true,
             default_title: false,
             br_in_tables: false,
             compact_tables: false,
@@ -302,6 +323,7 @@ impl Default for ConversionOptions {
             preserve_tags: Vec::new(),
             skip_images: false,
             inline_data_media: InlineDataMedia::Keep,
+            hidden_content: HiddenContent::Drop,
             url_escape_style: UrlEscapeStyle::default(),
             link_style: LinkStyle::default(),
             output_format: OutputFormat::default(),
@@ -399,6 +421,8 @@ impl ConversionOptionsBuilder {
     builder_setter_into!(code_language, String);
     builder_setter!(link_style, LinkStyle);
     builder_setter!(autolinks, bool);
+    builder_setter!(expand_abbreviations, bool);
+    builder_setter!(include_blockquote_citations, bool);
     builder_setter!(default_title, bool);
     builder_setter!(br_in_tables, bool);
     builder_setter!(compact_tables, bool);
@@ -418,6 +442,7 @@ impl ConversionOptionsBuilder {
     builder_setter!(convert_as_inline, bool);
     builder_setter!(skip_images, bool);
     builder_setter!(inline_data_media, InlineDataMedia);
+    builder_setter!(hidden_content, HiddenContent);
     builder_setter!(url_escape_style, UrlEscapeStyle);
 
     /// Set the list of HTML tag names whose content is stripped from output.
@@ -524,6 +549,10 @@ pub struct ConversionOptionsUpdate {
     pub code_language: Option<String>,
     /// Optional override for [`ConversionOptions::autolinks`].
     pub autolinks: Option<bool>,
+    /// Optional override for [`ConversionOptions::expand_abbreviations`].
+    pub expand_abbreviations: Option<bool>,
+    /// Optional override for [`ConversionOptions::include_blockquote_citations`].
+    pub include_blockquote_citations: Option<bool>,
     /// Optional override for [`ConversionOptions::default_title`].
     pub default_title: Option<bool>,
     /// Optional override for [`ConversionOptions::br_in_tables`].
@@ -568,6 +597,8 @@ pub struct ConversionOptionsUpdate {
     pub skip_images: Option<bool>,
     /// Optional override for [`ConversionOptions::inline_data_media`].
     pub inline_data_media: Option<InlineDataMedia>,
+    /// Optional override for [`ConversionOptions::hidden_content`].
+    pub hidden_content: Option<HiddenContent>,
     /// Optional override for [`ConversionOptions::url_escape_style`].
     pub url_escape_style: Option<UrlEscapeStyle>,
     /// Optional override for [`ConversionOptions::link_style`].
@@ -622,6 +653,8 @@ impl ConversionOptions {
         apply!(escape_ascii);
         apply!(code_language);
         apply!(autolinks);
+        apply!(expand_abbreviations);
+        apply!(include_blockquote_citations);
         apply!(default_title);
         apply!(br_in_tables);
         apply!(compact_tables);
@@ -643,6 +676,7 @@ impl ConversionOptions {
         apply!(preserve_tags);
         apply!(skip_images);
         apply!(inline_data_media);
+        apply!(hidden_content);
         apply!(url_escape_style);
         apply!(link_style);
         apply!(output_format);

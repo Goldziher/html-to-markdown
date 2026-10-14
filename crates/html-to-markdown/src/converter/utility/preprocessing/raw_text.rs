@@ -6,18 +6,37 @@
 use std::borrow::Cow;
 use std::str;
 
-use super::markup::{find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start};
+use super::kept_scripts::{ESCAPED_LT, KeptScripts, push_owner_mark};
+use super::markup::{
+    find_html_comment_end, find_tag_end, is_json_ld_script_open_tag, matches_end_tag_start, matches_tag_start,
+};
+use super::structured_data::push_without_standalone_slashes;
+use super::visibility::{after_bogus_comment, is_bogus_comment_marker};
+
+/// If the `<` at `idx` starts a bogus comment (see `strip_bogus_comments`), return the position
+/// after it. The caller has read a real comment (`<!--`) before.
+///
+/// ~keep The first pass over raw-text elements reads a bogus comment with this function, so a
+/// ~keep `<textarea>` in `<? ... >` starts nothing there. It reads `<![CDATA[` as a bogus
+/// ~keep comment too: it reads no markup inside `<svg>`, and outside foreign content the
+/// ~keep tokenizer ends the comment at the first `>`.
+fn bogus_comment_end(bytes: &[u8], idx: usize) -> Option<usize> {
+    let next = *bytes.get(idx + 1)?;
+    is_bogus_comment_marker(bytes, idx, bytes.len(), next, &bytes[idx + 2..]).then(|| after_bogus_comment(bytes, idx))
+}
 
 /// If `idx` starts an `<svg`/`</svg` tag, adjust `svg_depth` accordingly and return the index
 /// just past the tag. Returns `None` when `idx` does not start an svg tag (or the tag is
 /// unterminated), in which case the caller's scan is unaffected.
 ///
-/// Extracted from `strip_script_and_style_tags` — identical `<svg`/`</svg` detection and depth
-/// bookkeeping, unchanged.
+/// ~keep A start tag that ends with `/>` opens nothing: the parser and the tree builder end the
+/// ~keep element there, so what follows `<svg/>` is outside it and the passes read it.
 pub(super) fn track_svg_tag(bytes: &[u8], idx: usize, svg_depth: &mut usize) -> Option<usize> {
     if matches_tag_start(bytes, idx + 1, b"svg") {
         if let Some(open_end) = find_tag_end(bytes, idx + 1 + b"svg".len()) {
-            *svg_depth += 1;
+            if !bytes[idx..open_end].ends_with(b"/>") {
+                *svg_depth += 1;
+            }
             return Some(open_end);
         }
     } else if matches_end_tag_start(bytes, idx + 1, b"svg") {
@@ -31,173 +50,443 @@ pub(super) fn track_svg_tag(bytes: &[u8], idx: usize, svg_depth: &mut usize) -> 
     None
 }
 
-/// Strip a `<script>…</script>` or `<style>…</style>` element starting at `idx` (which must
-/// point at the `<`), appending everything before it to `*output` (lazily allocated) and
-/// inserting a single space if collapsing the removed span would otherwise fuse two
-/// non-whitespace characters together.
-///
-/// `open_tag_pattern` is the lowercase opening-tag prefix including `<` (e.g. `b"<script"`);
-/// `close_tag_name` is the bare lowercase tag name for the closing-tag scan (e.g. `b"script"`).
-/// `json_ld_exempt` additionally requires the opening tag not be a `type="application/ld+json"`
-/// script — only meaningful for the script element, so callers stripping `<style>` pass `false`.
-///
-/// Returns `Some(new_pos)` when the element was stripped — the caller should set both `last`
-/// and `idx` to it and `continue` the scan — or `None` when `idx` does not start a strippable
-/// element of this kind, in which case the caller falls through unchanged.
-///
-/// Extracted from `strip_script_and_style_tags` — identical prefix/whitespace-boundary/
-/// closing-tag-scan logic, unchanged.
+/// What the first pass does with the content of a raw-text element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RawTextContent {
+    /// The element is removed (`style`).
+    Removed,
+    /// The element is removed, but a structured data script is kept for the metadata.
+    RemovedUnlessStructuredData,
+    /// The element is kept and its content is text (`textarea`).
+    Kept,
+}
+
+/// What the first pass did with a raw-text element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Outcome {
+    /// The element stays as the page has it.
+    Unchanged,
+    /// The element is removed.
+    Removed,
+    /// The element is written again, with its content as text.
+    Kept,
+}
+
+/// A candidate raw-text element: `idx` is its `<`, `last` is the end of the copied input and
+/// `name` is the tag name in lower case. `mark` is the number of its owner mark, when it is a
+/// kept script that has one.
 struct RawTextElement<'a> {
     input: &'a str,
-    bytes: &'a [u8],
     idx: usize,
-    len: usize,
     last: usize,
-    open_tag_pattern: &'a [u8],
-    close_tag_name: &'a [u8],
-    json_ld_exempt: bool,
+    name: &'a str,
+    content: RawTextContent,
+    mark: Option<usize>,
 }
 
-impl<'a> RawTextElement<'a> {
-    const fn new(
-        input: &'a str,
-        idx: usize,
-        last: usize,
-        open_tag_pattern: &'a [u8],
-        close_tag_name: &'a [u8],
-        json_ld_exempt: bool,
-    ) -> Self {
-        Self {
-            input,
-            bytes: input.as_bytes(),
-            idx,
-            len: input.len(),
-            last,
-            open_tag_pattern,
-            close_tag_name,
-            json_ld_exempt,
-        }
-    }
-}
+/// Remove or rewrite the raw-text element that starts at `element.idx`, appending the input
+/// before it to `*output` (lazily allocated). `tag_end` is the end of its start tag;
+/// `close_start` and `close_idx` are the two ends of its end tag.
+///
+/// A removed `style` leaves one space when the two characters around it are not white space.
+/// A removed script leaves none (#827). A kept element is written by `push_kept_element` and adds no space: the walker reads the
+/// white space on its two sides as if the element were not there.
+///
+/// Returns what it did. A `textarea` with no `<` needs no change and is not written again.
+fn strip_raw_text_element(
+    element: &RawTextElement<'_>,
+    tag_end: usize,
+    (close_start, close_idx): (usize, usize),
+    output: &mut Option<String>,
+) -> Outcome {
+    let bytes = element.input.as_bytes();
+    let name = element.name.as_bytes();
+    let body = &element.input[tag_end..close_start];
 
-fn strip_raw_text_element(element: RawTextElement<'_>, output: &mut Option<String>) -> Option<usize> {
-    let prefix_len = element.open_tag_pattern.len();
-    if element.idx + prefix_len >= element.len
-        || !eq_ascii_insensitive(
-            &element.bytes[element.idx..element.idx + prefix_len],
-            element.open_tag_pattern,
-        )
-    {
-        return None;
-    }
-    let after_tag = element.bytes[element.idx + prefix_len];
-    if !(after_tag == b'>' || after_tag == b' ' || after_tag == b'\t' || after_tag == b'\n' || after_tag == b'\r') {
-        return None;
-    }
+    let kept = match element.content {
+        RawTextContent::Removed => false,
+        RawTextContent::RemovedUnlessStructuredData => is_json_ld_script_open_tag(&element.input[element.idx..tag_end]),
+        // ~keep A `textarea` with no `<` in it is already one text for the parser.
+        RawTextContent::Kept if !body.contains('<') => return Outcome::Unchanged,
+        RawTextContent::Kept => true,
+    };
 
-    let mut tag_end = element.idx + prefix_len;
-    while tag_end < element.len && element.bytes[tag_end] != b'>' {
-        tag_end += 1;
-    }
-    if tag_end >= element.len {
-        return None;
-    }
-    tag_end += 1;
-
-    if element.json_ld_exempt {
-        let tag_content = &element.input[element.idx..tag_end];
-        if is_json_ld_script_open_tag(tag_content) {
-            return None;
-        }
-    }
-
-    let close_idx = find_closing_tag_bytes(element.bytes, tag_end, element.close_tag_name)?;
-
-    let out = output.get_or_insert_with(|| String::with_capacity(element.len));
+    let out = output.get_or_insert_with(|| String::with_capacity(element.input.len()));
     out.push_str(&element.input[element.last..element.idx]);
-    if element.idx > 0
-        && close_idx < element.len
-        && !element.bytes[element.idx - 1].is_ascii_whitespace()
-        && !element.bytes[close_idx].is_ascii_whitespace()
+    if kept {
+        // ~keep A kept element adds no space of its own: the white space around it is the page's.
+        let attributes = &element.input[element.idx + 1 + name.len()..tag_end];
+        push_kept_element(out, element.name, element.mark, attributes, body);
+        return Outcome::Kept;
+    }
+    if element.content == RawTextContent::Removed
+        && element.idx > 0
+        && close_idx < bytes.len()
+        && !bytes[element.idx - 1].is_ascii_whitespace()
+        && !bytes[close_idx].is_ascii_whitespace()
     {
         out.push(' ');
     }
-    Some(close_idx)
+    Outcome::Removed
 }
 
-/// Strip script and style tags and their content from HTML.
+/// Write a kept raw-text element in a form the parser reads as one element with one text.
+/// `mark` is the number of its owner mark, `attributes` is the open tag after its name, with
+/// the `>`, and `body` is the content.
+///
+/// ~keep The parser has no raw-text rule: a `<p>` in the content would open an element that
+/// ~keep holds the rest of the page, so each `<` of the body is written as `&lt;`. Nothing else
+/// ~keep of the body changes, so this function changes nothing in a body that it wrote: the
+/// ~keep pass reads a repaired page as it reads the page of the author. `KeptScripts` gives the
+/// ~keep text of a script as written. The parser also closes an element only with an end tag of
+/// ~keep the same spelling, so the two tag names are written in one spelling.
+fn push_kept_element(out: &mut String, name: &str, mark: Option<usize>, attributes: &str, body: &str) {
+    out.push('<');
+    out.push_str(name);
+    push_kept_attributes(out, mark, attributes);
+    let mut rest = body;
+    while let Some(at) = memchr::memchr(b'<', rest.as_bytes()) {
+        out.push_str(&rest[..at]);
+        out.push_str(ESCAPED_LT);
+        rest = &rest[at + 1..];
+    }
+    out.push_str(rest);
+    out.push_str("</");
+    out.push_str(name);
+    out.push('>');
+}
+
+/// Write the start tag of a kept element after its name: the owner mark with the number
+/// `mark`, then `attributes`, the open tag after its name, with the `>`.
+///
+/// ~keep The parser reads only white space after the name, so a `/` or a form feed there is
+/// ~keep written as a space. The parser also ends a start tag at a `/` that stands alone
+/// ~keep between two attributes, and the rest of the tag is text of the page then. The HTML
+/// ~keep rule reads such a `/` as nothing, so it is not written: the repair of a script with no
+/// ~keep end tag has the rule (`push_without_standalone_slashes`).
+fn push_kept_attributes(out: &mut String, mark: Option<usize>, attributes: &str) {
+    if let Some(mark) = mark {
+        push_owner_mark(out, mark);
+    }
+    let attributes = match attributes.as_bytes().first() {
+        Some(b'/' | b'\x0C') => {
+            out.push(' ');
+            &attributes[1..]
+        }
+        _ => attributes,
+    };
+    push_without_standalone_slashes(out, attributes);
+}
+
+/// The raw-text elements the first pass reads, each with what happens to its content.
+const FIRST_PASS_ELEMENTS: [(&str, RawTextContent); 3] = [
+    ("script", RawTextContent::RemovedUnlessStructuredData),
+    ("style", RawTextContent::Removed),
+    ("textarea", RawTextContent::Kept),
+];
+
+/// The name of the raw-text element `FIRST_PASS_ELEMENTS[slot]` when the two passes remove
+/// it (`script`, `style`). `None` for an element that is kept.
+pub(super) fn removed_element_name(slot: usize) -> Option<&'static str> {
+    let (name, content) = FIRST_PASS_ELEMENTS[slot];
+    (content != RawTextContent::Kept).then_some(name)
+}
+
+/// Strip script and style tags and their content from HTML, and write the content of a
+/// structured data script and of a `textarea` as text.
+///
+/// ~keep This pass writes no owner mark. The pass over a repaired page is this one: the tree
+/// ~keep builder writes the marks of the first page again, and a second mark on one script
+/// ~keep would have no record.
 pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
-    let bytes = input.as_bytes();
-    let len = bytes.len();
+    FirstPass::new(input, |_| {}).run().0
+}
 
-    if len == 0 {
-        return Cow::Borrowed(input);
+/// [`strip_script_and_style_tags`], with an owner mark in the start tag of each kept script
+/// whose escaped text holds `&lt;`, and with the kept scripts that the reader of the
+/// structured data asks for the text as written.
+pub fn strip_script_and_style_tags_with_kept_scripts(input: &str) -> (Cow<'_, str>, KeptScripts) {
+    #[cfg(feature = "metadata")]
+    let kept_scripts = KeptScripts::with_marks();
+    #[cfg(not(feature = "metadata"))]
+    let kept_scripts = KeptScripts::new();
+    FirstPass::with_kept_scripts(input, kept_scripts, |_| {}).run()
+}
+
+/// [`strip_script_and_style_tags_with_kept_scripts`] for the second pass over a page:
+/// `kept_scripts` is what `KeptScripts::reserving_owner_names_of` gives, so no owner mark has a
+/// number that the cleaned page of the first pass has.
+#[cfg(feature = "metadata")]
+pub fn strip_script_and_style_tags_for_second_pass(
+    input: &str,
+    kept_scripts: KeptScripts,
+) -> (Cow<'_, str>, KeptScripts) {
+    FirstPass::with_kept_scripts(input, kept_scripts, |_| {}).run()
+}
+
+/// A read of the first pass or of the second pass that a test counts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PassRead {
+    /// A `<` of the page.
+    Markup,
+    /// A search for the end tag of a raw-text element. It can read to the end of the page.
+    EndTagSearch,
+    /// A search for the end of a comment. It can read to the end of the page.
+    CommentEndSearch,
+    /// A read of a tag to its end, with the count of the bytes it went over. It can read to
+    /// the end of the page.
+    TagRead(usize),
+    /// The count of the places where that read stopped to look at a byte: each `=` and the
+    /// `>`. A read that looks at each byte of the tag stops at each byte.
+    TagStops(usize),
+}
+
+/// The reads of one pass over one page that can go to the end of the page: the end of a
+/// comment, the end of a tag and the end tag of a raw-text element. The first pass and the
+/// second pass read a comment and a tag whole with it, so a tag in a comment or in an
+/// attribute value starts nothing in either pass.
+///
+/// ~keep A read that finds no end is not made again, so the reads of a pass are linear. A later
+/// ~keep comment has no end either, and a later start tag of the same name has no end tag
+/// ~keep either. A tag that does not end holds the rest of the page, so a later `<` is in it:
+/// ~keep it ends at its first `>`, as a tag with a quote that never ends.
+pub(super) struct PageReads<C: FnMut(PassRead)> {
+    comments_never_end: bool,
+    tags_never_end: bool,
+    no_end_tag: [bool; FIRST_PASS_ELEMENTS.len()],
+    count: C,
+}
+
+impl<C: FnMut(PassRead)> PageReads<C> {
+    pub(super) const fn new(count: C) -> Self {
+        Self {
+            comments_never_end: false,
+            tags_never_end: false,
+            no_end_tag: [false; FIRST_PASS_ELEMENTS.len()],
+            count,
+        }
     }
 
-    let mut idx = 0;
-    let mut last = 0;
-    let mut output: Option<String> = None;
-    let mut svg_depth = 0usize;
+    /// The first end tag of the raw-text element `FIRST_PASS_ELEMENTS[slot]` at or after
+    /// `from`: the position of its `<` and the position after its `>`.
+    pub(super) fn raw_text_end_tag(&mut self, bytes: &[u8], from: usize, slot: usize) -> Option<(usize, usize)> {
+        if self.no_end_tag[slot] {
+            return None;
+        }
+        self.count(PassRead::EndTagSearch);
+        let found = find_raw_text_end_tag(bytes, from, FIRST_PASS_ELEMENTS[slot].0.as_bytes());
+        // ~keep A search that stopped at the scan limit did not read the whole page and proves
+        // ~keep nothing.
+        self.no_end_tag[slot] = found.is_none() && bytes.len() - from <= MAX_CLOSING_TAG_SCAN;
+        found
+    }
 
-    while idx < len {
-        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
-            break;
+    /// Count one read of the pass.
+    pub(super) fn count(&mut self, read: PassRead) {
+        (self.count)(read);
+    }
+
+    /// The position after the comment that the `<` at `idx` starts, when it starts a comment
+    /// that ends.
+    pub(super) fn comment_end(&mut self, bytes: &[u8], idx: usize) -> Option<usize> {
+        if self.comments_never_end || !bytes[idx..].starts_with(COMMENT_OPEN) {
+            return None;
+        }
+        self.count(PassRead::CommentEndSearch);
+        // ~keep `<!-->` and `<!--->` are whole comments: the search starts in the opening.
+        let from = idx + 2;
+        let found = find_html_comment_end(bytes, from);
+        self.comments_never_end = found.is_none();
+        found
+    }
+
+    /// The position after the tag that the `<` at `idx` starts, read whole with its quoted
+    /// attribute values. Returns `None` for a `<` of the text and for a tag with no `>`.
+    pub(super) fn tag_end(&mut self, bytes: &[u8], idx: usize) -> Option<usize> {
+        if !opens_a_tag(bytes, idx) {
+            return None;
+        }
+        self.tag_end_from(bytes, idx + 1, None)
+    }
+
+    /// If the `<` at `lt` starts a raw-text element of `FIRST_PASS_ELEMENTS`, return its slot
+    /// there and the position after its start tag, read whole with its quoted attribute
+    /// values.
+    pub(super) fn raw_text_start_tag_end(&mut self, bytes: &[u8], lt: usize) -> Option<(usize, usize)> {
+        let (slot, after_name) = FIRST_PASS_ELEMENTS.iter().enumerate().find_map(|(slot, (name, _))| {
+            let after_name = raw_text_tag_name_end(bytes, lt, name.as_bytes(), TagSide::Start)?;
+            Some((slot, after_name))
+        })?;
+        let tag_end = self.tag_end_from(bytes, after_name, Some(after_name))?;
+        Some((slot, tag_end))
+    }
+
+    /// The position after the `>` that ends the tag read from `from`, a position in the tag
+    /// after its `<`. `attributes` is the position after the name of the tag, when the caller
+    /// read the name.
+    fn tag_end_from(&mut self, bytes: &[u8], from: usize, attributes: Option<usize>) -> Option<usize> {
+        if !self.tags_never_end {
+            let mut stops = 0;
+            let whole = whole_tag_end(bytes, from, attributes, &mut stops);
+            self.count(PassRead::TagRead(whole.unwrap_or(bytes.len()) - from));
+            self.count(PassRead::TagStops(stops));
+            self.tags_never_end = whole.is_none();
+            if whole.is_some() {
+                return whole;
+            }
+        }
+        memchr::memchr(b'>', &bytes[from..]).map(|offset| from + offset + 1)
+    }
+}
+
+/// The first pass over one page.
+///
+/// ~keep The pass reads markup as a tokenizer does: a comment whole, a tag to its end with its
+/// ~keep quoted attribute values, a raw-text element to its end tag. The next `<` it tries is
+/// ~keep after that, so a `<textarea>` in a comment or in an attribute value starts nothing.
+/// ~keep A bogus comment is read to its first `>`: a `<textarea>` in `<? ... >` starts nothing.
+/// ~keep The pass is linear: a search that finds no end is not made again. A later start tag
+/// ~keep of the same name has no end tag either; `PageReads` has the rule of a comment and of
+/// ~keep a tag.
+pub(super) struct FirstPass<'a, C: FnMut(PassRead)> {
+    input: &'a str,
+    last: usize,
+    output: Option<String>,
+    svg_depth: usize,
+    reads: PageReads<C>,
+    kept_scripts: KeptScripts,
+}
+
+impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
+    /// The pass that writes no owner mark.
+    pub(super) const fn new(input: &'a str, count: C) -> Self {
+        Self::with_kept_scripts(input, KeptScripts::new(), count)
+    }
+
+    const fn with_kept_scripts(input: &'a str, kept_scripts: KeptScripts, count: C) -> Self {
+        Self {
+            input,
+            last: 0,
+            output: None,
+            svg_depth: 0,
+            reads: PageReads::new(count),
+            kept_scripts,
+        }
+    }
+
+    pub(super) fn run(mut self) -> (Cow<'a, str>, KeptScripts) {
+        let bytes = self.input.as_bytes();
+        // ~keep No tag ends after the last `>` of the page: nothing after it is an element,
+        // ~keep and no search for the end of a tag starts there.
+        let last_gt = memchr::memrchr(b'>', bytes).unwrap_or(0);
+        let mut idx = 0;
+        while idx < last_gt {
+            let Some(offset) = memchr::memchr(b'<', &bytes[idx..last_gt]) else {
+                break;
+            };
+            idx = self.read_markup(idx + offset);
+        }
+        let page = match self.output {
+            Some(mut out) => {
+                out.push_str(&self.input[self.last..]);
+                Cow::Owned(out)
+            }
+            None => Cow::Borrowed(self.input),
         };
-        idx += offset;
-
-        if idx + 1 < len {
-            if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
-                idx = new_idx;
-                continue;
-            }
-
-            if svg_depth > 0 {
-                idx += 1;
-                continue;
-            }
-
-            // ~keep Check for </script or </style (closing tags first for safety)
-            if bytes[idx + 1] == b'/' && idx + 2 < len {
-                if idx + 9 <= len && eq_ascii_insensitive(&bytes[idx..idx + 9], b"</script>") {
-                    idx += 9;
-                    continue;
-                }
-
-                if idx + 8 <= len && eq_ascii_insensitive(&bytes[idx..idx + 8], b"</style>") {
-                    idx += 8;
-                    continue;
-                }
-            }
-
-            if let Some(new_pos) = strip_raw_text_element(
-                RawTextElement::new(input, idx, last, b"<script", b"script", true),
-                &mut output,
-            ) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-
-            if let Some(new_pos) = strip_raw_text_element(
-                RawTextElement::new(input, idx, last, b"<style", b"style", false),
-                &mut output,
-            ) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-        }
-
-        idx += 1;
+        (page, self.kept_scripts)
     }
 
-    if let Some(mut out) = output {
-        if last < len {
-            out.push_str(&input[last..]);
+    /// Read the markup that the `<` at `idx` starts. Returns the position of the next read.
+    fn read_markup(&mut self, idx: usize) -> usize {
+        let bytes = self.input.as_bytes();
+        self.reads.count(PassRead::Markup);
+        if let Some(after_tag) = track_svg_tag(bytes, idx, &mut self.svg_depth) {
+            return after_tag;
         }
-        Cow::Owned(out)
-    } else {
-        Cow::Borrowed(input)
+        if self.svg_depth > 0 {
+            return idx + 1;
+        }
+        if bytes[idx..].starts_with(COMMENT_OPEN) {
+            return self.reads.comment_end(bytes, idx).unwrap_or(idx + 1);
+        }
+        if let Some(after_comment) = bogus_comment_end(bytes, idx) {
+            return after_comment;
+        }
+        if let Some((slot, tag_end)) = self.reads.raw_text_start_tag_end(bytes, idx) {
+            return self.read_raw_text_element(idx, slot, tag_end);
+        }
+        self.reads.tag_end(bytes, idx).unwrap_or(idx + 1)
+    }
+
+    /// Read the raw-text element of `FIRST_PASS_ELEMENTS[slot]` whose start tag is at `idx`
+    /// and ends at `tag_end`. Returns the position of the next read.
+    fn read_raw_text_element(&mut self, idx: usize, slot: usize, tag_end: usize) -> usize {
+        let bytes = self.input.as_bytes();
+        let (name, content) = FIRST_PASS_ELEMENTS[slot];
+        let Some(close) = self.reads.raw_text_end_tag(bytes, tag_end, slot) else {
+            // ~keep The second pass reads an element with no end tag.
+            #[cfg(feature = "metadata")]
+            self.mark_script_with_no_end_tag(idx, tag_end, name, content);
+            return tag_end;
+        };
+        let element = RawTextElement {
+            input: self.input,
+            idx,
+            last: self.last,
+            name,
+            content,
+            mark: None,
+        };
+        #[cfg(feature = "metadata")]
+        let element = RawTextElement {
+            mark: self.owner_mark(&element, tag_end, close.0),
+            ..element
+        };
+        let outcome = strip_raw_text_element(&element, tag_end, close, &mut self.output);
+        if outcome != Outcome::Unchanged {
+            self.last = close.1;
+        }
+        close.1
+    }
+
+    /// The number of the owner mark of `element`, when it is a kept script whose escaped text
+    /// holds `&lt;`. `tag_end` is the end of its start tag and `body_end` is the end of its
+    /// content.
+    #[cfg(feature = "metadata")]
+    fn owner_mark(&mut self, element: &RawTextElement<'_>, tag_end: usize, body_end: usize) -> Option<usize> {
+        let is_kept_script = element.content == RawTextContent::RemovedUnlessStructuredData
+            && self.kept_scripts.marks
+            && is_json_ld_script_open_tag(&self.input[element.idx..tag_end]);
+        if !is_kept_script {
+            return None;
+        }
+        self.kept_scripts.mark(self.input, &self.input[tag_end..body_end])
+    }
+
+    /// Write the owner mark in the start tag of the first kept script with no end tag, when
+    /// the rest of the page, which is its text, holds a `<` or `&lt;`. `idx` is the `<` of the
+    /// start tag, `tag_end` is its end and `name` is the name of the element.
+    ///
+    /// ~keep The tree builder ends this script at the end of the page and writes the mark
+    /// ~keep again, so the script of the final tree has the rest of the page as its record.
+    #[cfg(feature = "metadata")]
+    fn mark_script_with_no_end_tag(&mut self, idx: usize, tag_end: usize, name: &str, content: RawTextContent) {
+        let input = self.input;
+        if content != RawTextContent::RemovedUnlessStructuredData
+            || self.kept_scripts.has_no_end_tag
+            || !is_json_ld_script_open_tag(&input[idx..tag_end])
+        {
+            return;
+        }
+        self.kept_scripts.has_no_end_tag = true;
+        let Some(mark) = self.kept_scripts.mark(input, &input[tag_end..]) else {
+            return;
+        };
+        let after_name = idx + 1 + name.len();
+        let out = self.output.get_or_insert_with(|| String::with_capacity(input.len()));
+        out.push_str(&input[self.last..after_name]);
+        push_kept_attributes(out, Some(mark), &input[after_name..tag_end]);
+        self.last = tag_end;
     }
 }
 
@@ -208,29 +497,142 @@ pub fn strip_script_and_style_tags(input: &str) -> Cow<'_, str> {
 /// ~keep the whole document for every such tag.
 pub(super) const MAX_CLOSING_TAG_SCAN: usize = 100_000_000;
 
-/// If `idx` starts a `</tag>` (or `</tag ...>`) closing tag matching `tag` (case-insensitively),
-/// return the index just past its `>`. Returns `None` when `idx` does not start such a tag.
-///
-/// Extracted from `find_closing_tag_bytes`'s inner match — identical boundary checks and
-/// closing-`>` scan, unchanged.
-fn match_closing_tag_at(bytes: &[u8], idx: usize, len: usize, tag: &[u8]) -> Option<usize> {
-    let tag_len = tag.len();
-    if idx + 2 >= len || bytes[idx + 1] != b'/' {
-        return None;
-    }
-    if idx + 2 + tag_len > len || !eq_ascii_insensitive(&bytes[idx + 2..idx + 2 + tag_len], tag) {
-        return None;
-    }
-    let after_tag = idx + 2 + tag_len;
-    if after_tag >= len || !(bytes[after_tag] == b'>' || bytes[after_tag].is_ascii_whitespace()) {
-        return None;
-    }
+/// The side of an element that a tag is on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TagSide {
+    /// `<name ...>`
+    Start,
+    /// `</name ...>`
+    End,
+}
 
-    let mut close_idx = after_tag;
-    while close_idx < len && bytes[close_idx] != b'>' {
-        close_idx += 1;
+/// If the `<` at `lt` starts the start tag of the raw-text element `name`, return the index
+/// after the `>` of the tag. A scan that skips a raw-text element reads its start tag here.
+///
+/// ~keep A `>` in a quoted attribute value does not end a start tag. A start tag with a quote
+/// ~keep that never ends ends at its first `>`. A pass reads many tags of one page: it reads
+/// ~keep them with `PageReads`, which has this rule and makes no read twice.
+fn raw_text_start_tag_end(bytes: &[u8], lt: usize, name: &[u8]) -> Option<usize> {
+    let after_name = raw_text_tag_name_end(bytes, lt, name, TagSide::Start)?;
+    let first_bracket = || memchr::memchr(b'>', &bytes[after_name..]).map(|offset| after_name + offset + 1);
+    whole_tag_end(bytes, after_name, Some(after_name), &mut 0).or_else(first_bracket)
+}
+
+/// The one rule for the name of the start tag and of the end tag of a raw-text element. If
+/// the `<` at `lt` starts a tag of `name` on `side`, return the position after the name.
+///
+/// ~keep The HTML rule: the name in any case, then tab, LF, FF, CR, space, `/` or `>`. The
+/// ~keep two passes, the scan of hidden regions and the fast converter read a tag with this
+/// ~keep function; a second copy of the rule is how they came to disagree on the form feed
+/// ~keep and the slash.
+fn raw_text_tag_name_end(bytes: &[u8], lt: usize, name: &[u8], side: TagSide) -> Option<usize> {
+    if bytes.get(lt) != Some(&b'<') {
+        return None;
     }
-    if close_idx < len { Some(close_idx + 1) } else { None }
+    let name_start = match side {
+        TagSide::Start => lt + 1,
+        TagSide::End if bytes.get(lt + 1) == Some(&b'/') => lt + 2,
+        TagSide::End => return None,
+    };
+    let after_name = name_start + name.len();
+    if !bytes.get(name_start..after_name)?.eq_ignore_ascii_case(name) {
+        return None;
+    }
+    if !matches!(
+        bytes.get(after_name)?,
+        b'\t' | b'\n' | b'\x0C' | b'\r' | b' ' | b'/' | b'>'
+    ) {
+        return None;
+    }
+    Some(after_name)
+}
+
+/// The position after the `>` that ends the tag whose name starts at `name`, the position
+/// after its `<`. Returns `None` when a value or the tag does not end.
+///
+/// ~keep One read owns the end of a tag: the first pass of the raw-text elements and the scan
+/// ~keep of the repair of a script with no end tag (`scan_markup_end`) both ask it. Two reads
+/// ~keep with a rule each ended one start tag at two places, and the text between the two
+/// ~keep ends was a record of structured data.
+pub(super) fn tag_end_from_name(bytes: &[u8], name: usize) -> Option<usize> {
+    whole_tag_end(bytes, name, None, &mut 0)
+}
+
+/// The position after the `>` that ends the tag read from `from`, a position in the tag after
+/// its `<`. `attributes` is the position after the name of the tag, when the caller read the
+/// name. Returns `None` when a value or the tag does not end. `stops` counts the places where
+/// the read stops to look at a byte.
+///
+/// ~keep The HTML rule: a quote opens a value only as the first byte of the value, after `=`
+/// ~keep and white space. A value with no quotes ends at white space or at `>`: the apostrophe
+/// ~keep of `title=it's` and the `=` and the apostrophe of `href=/search?q='tis` are bytes of
+/// ~keep the value. An `=` starts a value only after the name of an attribute: an `=` in the
+/// ~keep name of the tag, after a value or after a `/` is a byte of a name, so the quote of
+/// ~keep `<a ="x>` opens no value and the tag ends at its `>`.
+/// ~keep Outside a value only `>` and `=` change the read, so the read jumps to the next one of
+/// ~keep the two: most bytes of a page are in a tag or between two tags, and a read of each
+/// ~keep byte of each tag is a cost on every page. The name of the tag is read only at the
+/// ~keep first `=` of a tag whose caller did not read it.
+fn whole_tag_end(bytes: &[u8], from: usize, attributes: Option<usize>, stops: &mut usize) -> Option<usize> {
+    let mut idx = from;
+    let mut names = attributes;
+    loop {
+        *stops += 1;
+        idx += memchr::memchr2(b'>', b'=', bytes.get(idx..)?)?;
+        if bytes[idx] == b'>' {
+            return Some(idx + 1);
+        }
+        let names_start = *names.get_or_insert_with(|| tag_name_end(bytes, from));
+        if !ends_an_attribute_name(bytes, names_start, idx) {
+            idx += 1;
+            continue;
+        }
+        let after_equals = &bytes[idx + 1..];
+        let value = idx + 1 + after_equals.iter().position(|byte| !is_tag_white_space(*byte))?;
+        idx = match bytes[value] {
+            b'>' => return Some(value + 1),
+            quote @ (b'"' | b'\'') => value + 2 + memchr::memchr(quote, &bytes[value + 1..])?,
+            _ => value + bytes[value..].iter().copied().position(ends_an_unquoted_value)?,
+        };
+        names = Some(idx);
+    }
+}
+
+/// The position after the name of the tag read from `from`, the position after its `<`. The
+/// name of an end tag starts after its `/`.
+fn tag_name_end(bytes: &[u8], from: usize) -> usize {
+    let name = from + usize::from(bytes.get(from) == Some(&b'/'));
+    bytes
+        .get(name..)
+        .and_then(|rest| rest.iter().position(|byte| ends_a_tag_name(*byte)))
+        .map_or(bytes.len(), |offset| name + offset)
+}
+
+/// Whether the `=` at `equals` comes after the name of an attribute. `names` is the position
+/// where the names of the attributes start: after the name of the tag, or after the last
+/// value.
+///
+/// ~keep The read goes back over white space only, so a tag is read a fixed number of times.
+fn ends_an_attribute_name(bytes: &[u8], names: usize, equals: usize) -> bool {
+    bytes
+        .get(names..equals)
+        .and_then(|before| before.iter().rev().find(|byte| !is_tag_white_space(**byte)))
+        .is_some_and(|last| *last != b'/')
+}
+
+/// Whether `byte` ends the name of a tag: white space, `/` or `>`.
+const fn ends_a_tag_name(byte: u8) -> bool {
+    is_tag_white_space(byte) || matches!(byte, b'/' | b'>')
+}
+
+/// Whether `byte` is white space in a tag: tab, LF, FF, CR or space.
+const fn is_tag_white_space(byte: u8) -> bool {
+    matches!(byte, b'\t' | b'\n' | b'\x0C' | b'\r' | b' ')
+}
+
+/// Whether `byte` ends an attribute value with no quotes: white space or `>`.
+const fn ends_an_unquoted_value(byte: u8) -> bool {
+    is_tag_white_space(byte) || byte == b'>'
 }
 
 /// Find the position of the FIRST closing tag in bytes, ignoring nesting.
@@ -246,25 +648,22 @@ fn match_closing_tag_at(bytes: &[u8], idx: usize, len: usize, tag: &[u8]) -> Opt
 /// ~keep unify the two functions.
 #[inline]
 pub fn find_closing_tag_bytes(bytes: &[u8], start: usize, tag: &[u8]) -> Option<usize> {
-    let len = bytes.len();
+    find_raw_text_end_tag(bytes, start, tag).map(|(_, end)| end)
+}
+
+/// The first end tag of the raw-text element `name` at or after `start`: the position of its
+/// `<` and the position after its `>`. Both converters end a raw-text element here.
+pub fn find_raw_text_end_tag(bytes: &[u8], start: usize, name: &[u8]) -> Option<(usize, usize)> {
     let mut idx = start;
-
-    while idx < len && (idx - start) < MAX_CLOSING_TAG_SCAN {
-        if bytes[idx] != b'<' {
-            if let Some(pos) = memchr::memchr(b'<', &bytes[idx..]) {
-                idx += pos;
-            } else {
-                break;
-            }
+    while idx < bytes.len() && (idx - start) < MAX_CLOSING_TAG_SCAN {
+        idx += memchr::memchr(b'<', &bytes[idx..])?;
+        if let Some(after_name) = raw_text_tag_name_end(bytes, idx, name, TagSide::End) {
+            // ~keep An end tag with no `>` ends the search: no later end tag has one either.
+            let end = after_name + memchr::memchr(b'>', &bytes[after_name..])? + 1;
+            return Some((idx, end));
         }
-
-        if let Some(close_pos) = match_closing_tag_at(bytes, idx, len, tag) {
-            return Some(close_pos);
-        }
-
         idx += 1;
     }
-
     None
 }
 
@@ -288,12 +687,14 @@ pub(super) fn is_self_closing_tag(tag_slice: &[u8], tag_name: &[u8]) -> bool {
 /// Byte sequences delimiting the regions of an HTML document whose bytes are
 /// character data rather than markup.
 const COMMENT_OPEN: &[u8] = b"<!--";
-const COMMENT_CLOSE: &[u8] = b"-->";
 const CDATA_OPEN: &[u8] = b"<![CDATA[";
 const CDATA_CLOSE: &[u8] = b"]]>";
 
 /// Elements whose body is raw text: `<` inside them never starts a tag.
-const RAW_TEXT_ELEMENT_NAMES: [&[u8]; 2] = [b"script", b"style"];
+///
+/// ~keep The names of `FIRST_PASS_ELEMENTS`: a scan that skips a region and the first pass
+/// ~keep read the same elements as raw text.
+const RAW_TEXT_ELEMENT_NAMES: [&[u8]; 3] = [b"script", b"style", b"textarea"];
 
 /// Index just past the first occurrence of `terminator` at or after `from`,
 /// or the input length when the region is never terminated.
@@ -330,7 +731,7 @@ pub fn skip_opaque_region(bytes: &[u8], idx: usize) -> Option<usize> {
     }
 
     if bytes[idx..].starts_with(COMMENT_OPEN) {
-        return Some(find_sequence_end(bytes, idx + COMMENT_OPEN.len(), COMMENT_CLOSE));
+        return Some(find_html_comment_end(bytes, idx + COMMENT_OPEN.len()).unwrap_or(len));
     }
 
     if bytes[idx..].starts_with(CDATA_OPEN) {
@@ -338,8 +739,7 @@ pub fn skip_opaque_region(bytes: &[u8], idx: usize) -> Option<usize> {
     }
 
     for raw_text_name in RAW_TEXT_ELEMENT_NAMES {
-        if matches_tag_start(bytes, idx + 1, raw_text_name) {
-            let open_end = find_tag_end(bytes, idx + 1 + raw_text_name.len())?;
+        if let Some(open_end) = raw_text_start_tag_end(bytes, idx, raw_text_name) {
             // ~keep First-match close is the spec terminator for raw text — see
             // ~keep the doc comment on `find_closing_tag_bytes`.
             return Some(find_closing_tag_bytes(bytes, open_end, raw_text_name).unwrap_or(len));
@@ -431,11 +831,46 @@ pub fn find_closing_tag_bytes_nested(bytes: &[u8], start: usize, tag: &[u8]) -> 
     None
 }
 
-/// Compare bytes ignoring ASCII case.
-#[inline]
-pub fn eq_ascii_insensitive(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
+// ~keep Match each same-name nesting stack once; repeated hidden opens without closes
+// otherwise search the entire suffix independently (#773).
+pub(super) fn matching_tag_ends(bytes: &[u8]) -> ahash::AHashMap<usize, Option<usize>> {
+    let mut stacks: ahash::AHashMap<Vec<u8>, Vec<usize>> = ahash::AHashMap::new();
+    let mut ends = ahash::AHashMap::new();
+    let mut idx = 0;
+    let last_gt = bytes.iter().rposition(|&byte| byte == b'>').unwrap_or(0);
+    while idx < last_gt {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        if let Some(end) = skip_opaque_region(bytes, idx) {
+            idx = end;
+            continue;
+        }
+        if !opens_a_tag(bytes, idx) {
+            idx += 1;
+            continue;
+        }
+        let closing = bytes.get(idx + 1) == Some(&b'/');
+        let start = idx + if closing { 2 } else { 1 };
+        let name_len = bytes[start..]
+            .iter()
+            .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+            .count();
+        let name = bytes[start..start + name_len].to_ascii_lowercase();
+        let Some(end) = find_tag_end(bytes, start + name_len) else {
+            break;
+        };
+        let stack = stacks.entry(name.clone()).or_default();
+        if closing {
+            if let Some(open) = stack.pop() {
+                ends.insert(open, Some(end));
+            }
+        } else if !is_self_closing_tag(&bytes[idx..end], &name) {
+            ends.insert(idx, None);
+            stack.push(idx);
+        }
+        idx = end;
     }
-    a.iter().zip(b.iter()).all(|(x, y)| x.eq_ignore_ascii_case(y))
+    ends
 }

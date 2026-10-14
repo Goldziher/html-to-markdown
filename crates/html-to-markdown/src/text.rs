@@ -234,42 +234,6 @@ pub fn escape(
     Cow::Owned(dest)
 }
 
-/// Extract boundary whitespace from text (chomp).
-///
-/// Returns (prefix, suffix, `trimmed_text`) tuple.
-/// Prefix/suffix are " " if original text had leading/trailing whitespace.
-/// However, suffix is "" if the trailing whitespace is only newlines (not spaces/tabs).
-/// This prevents trailing newlines from becoming trailing spaces in the output.
-/// The trimmed text has all leading/trailing whitespace removed.
-#[must_use]
-pub fn chomp(text: &str) -> (&str, &str, &str) {
-    if text.is_empty() {
-        return ("", "", "");
-    }
-
-    let prefix = if text.starts_with(|c: char| c.is_whitespace()) {
-        " "
-    } else {
-        ""
-    };
-
-    let suffix = if text.ends_with("\n\n") || text.ends_with("\r\n\r\n") {
-        "\n\n"
-    } else if text.ends_with([' ', '\t']) {
-        " "
-    } else {
-        ""
-    };
-
-    let trimmed = if suffix == "\n\n" {
-        text.trim_end_matches("\n\n").trim_end_matches("\r\n\r\n").trim()
-    } else {
-        text.trim()
-    };
-
-    (prefix, suffix, trimmed)
-}
-
 /// Normalize whitespace by collapsing consecutive spaces and tabs.
 ///
 /// Multiple spaces and tabs are replaced with a single space.
@@ -380,7 +344,7 @@ fn normalize_whitespace_cow_slow(text: &str) -> Cow<'_, str> {
 /// ~keep re-parse.
 ///
 /// ~keep Callers MUST pass text that already has its own leading/trailing whitespace
-/// ~keep trimmed off (e.g. `chomp()`'s `core`, or `str::trim()`) rather than a raw,
+/// ~keep trimmed off (e.g. with `str::trim()`) rather than a raw,
 /// ~keep untrimmed text node. The "collapse to nothing" rule applies only to a run that
 /// ~keep sits strictly between two pieces of real content; at the text node's own edge, a
 /// ~keep trailing `\n` + spaces is not an in-Markdown line break at all -- it is folded by
@@ -719,7 +683,7 @@ pub fn decode_attribute_value_cow(value: &str) -> Cow<'_, str> {
 /// Check if a character is a unicode space character.
 ///
 /// Includes: non-breaking space, various width spaces, etc.
-const fn is_unicode_space(ch: char) -> bool {
+pub const fn is_unicode_space(ch: char) -> bool {
     matches!(
         ch,
         '\u{00A0}'
@@ -832,15 +796,6 @@ mod tests {
             escape("plain", false, false, false, false),
             std::borrow::Cow::Borrowed(_)
         ));
-    }
-
-    #[test]
-    fn test_chomp() {
-        assert_eq!(chomp("  text  "), (" ", " ", "text"));
-        assert_eq!(chomp("text"), ("", "", "text"));
-        assert_eq!(chomp(" text"), (" ", "", "text"));
-        assert_eq!(chomp("text "), ("", " ", "text"));
-        assert_eq!(chomp(""), ("", "", ""));
     }
 
     #[test]

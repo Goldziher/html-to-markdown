@@ -1,6 +1,23 @@
 use std::borrow::Cow;
 
-use super::raw_text::track_svg_tag;
+use super::raw_text::{PageReads, PassRead, opens_a_tag, removed_element_name, skip_opaque_region, track_svg_tag};
+
+/// Find `needle` in `haystack` at or after `from`, returning its start offset.
+pub(super) fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
+    if from >= haystack.len() {
+        return None;
+    }
+    memchr::memmem::find(&haystack[from..], needle).map(|off| from + off)
+}
+
+/// Find the nearest HTML comment terminator whose start is at or after `from`. ~keep
+pub fn find_html_comment_end(bytes: &[u8], from: usize) -> Option<usize> {
+    let rest = bytes.get(from..)?;
+    memchr::memchr_iter(b'>', rest).find_map(|offset| {
+        let preceding = &rest[..offset];
+        (preceding.ends_with(b"--") || preceding.ends_with(b"--!")).then_some(from + offset + 1)
+    })
+}
 
 /// Normalize bogus HTML comment endings that confuse the `tl` parser.
 pub fn normalize_bogus_comment_endings(input: &str) -> Cow<'_, str> {
@@ -14,20 +31,30 @@ pub fn normalize_bogus_comment_endings(input: &str) -> Cow<'_, str> {
     let mut idx = 0;
     let mut last = 0;
     let mut output: Option<String> = None;
+    let mut reads = PageReads::new(|_| {});
 
     while idx + 3 < len {
-        if !(bytes[idx] == b'<' && bytes[idx + 1] == b'!' && bytes[idx + 2] == b'-' && bytes[idx + 3] == b'-') {
+        if bytes[idx] != b'<' {
             idx += 1;
+            continue;
+        }
+        if !(bytes[idx] == b'<' && bytes[idx + 1] == b'!' && bytes[idx + 2] == b'-' && bytes[idx + 3] == b'-') {
+            // ~keep Comment-shaped text in a quoted tag or an opaque body is literal source (#905).
+            if opens_a_tag(bytes, idx) {
+                let Some(tag_end) = reads.tag_end(bytes, idx) else {
+                    // ~keep With no remaining `>`, neither a tag nor a comment can end (#905).
+                    break;
+                };
+                idx = skip_opaque_region(bytes, idx).unwrap_or(tag_end);
+            } else {
+                idx = skip_opaque_region(bytes, idx).unwrap_or(idx + 1);
+            }
             continue;
         }
 
         idx += 4;
 
-        // ~keep `<!-->` (zero shared dashes) and `<!--->` (one shared dash) never
-        // ~keep accumulate `consecutive_dashes >= 2` below, so the general scan can
-        // ~keep never see them as closed -- it would run to EOF looking for an
-        // ~keep unshared `-->` and swallow the rest of the document. Caught here,
-        // ~keep before that scan starts.
+        // ~keep Abrupt empty comments share the opening dashes, so a close search after the opening misses them.
         if bytes.get(idx) == Some(&b'>') {
             let out = output.get_or_insert_with(|| String::with_capacity(len));
             out.push_str(&input[last..idx - 4]);
@@ -45,30 +72,22 @@ pub fn normalize_bogus_comment_endings(input: &str) -> Cow<'_, str> {
             continue;
         }
 
-        let mut consecutive_dashes: usize = 0;
-
-        while idx < len {
-            let b = bytes[idx];
-            if b == b'-' {
-                consecutive_dashes += 1;
-                idx += 1;
-            } else if b == b'>' && consecutive_dashes >= 2 {
-                if consecutive_dashes > 2 {
-                    let out = output.get_or_insert_with(|| String::with_capacity(len));
-                    let close_start = idx - consecutive_dashes;
-                    out.push_str(&input[last..close_start]);
-                    out.push_str("-->");
-                    idx += 1;
-                    last = idx;
-                } else {
-                    idx += 1;
-                }
-                break;
-            } else {
-                consecutive_dashes = 0;
-                idx += 1;
-            }
+        let Some(end) = find_html_comment_end(bytes, idx) else {
+            break;
+        };
+        let ends_with_bang = bytes[end - 2] == b'!';
+        let dash_end = end - 1 - usize::from(ends_with_bang);
+        let mut close_start = dash_end;
+        while close_start > idx && bytes[close_start - 1] == b'-' {
+            close_start -= 1;
         }
+        if ends_with_bang || dash_end - close_start > 2 {
+            let out = output.get_or_insert_with(|| String::with_capacity(len));
+            out.push_str(&input[last..close_start]);
+            out.push_str("-->");
+            last = end;
+        }
+        idx = end;
     }
 
     match output {
@@ -230,13 +249,15 @@ fn normalize_self_closing_void(
 /// other, so `<DIV>...</DIV>` already matches.
 ///
 /// Returns `Some(new_pos)` when a name was rewritten, `None` otherwise.
-fn normalize_void_tag_case(
+fn normalize_void_tag_case<C: FnMut(PassRead)>(
     input: &str,
-    bytes: &[u8],
     idx: usize,
     last: usize,
+    last_gt: usize,
+    reads: &mut PageReads<C>,
     output: &mut Option<String>,
 ) -> Option<usize> {
+    let bytes = input.as_bytes();
     let name_start = idx + 1;
     if !bytes.get(name_start)?.is_ascii_alphabetic() {
         return None;
@@ -251,50 +272,49 @@ fn normalize_void_tag_case(
     out.push_str(&input[last..idx]);
     out.push('<');
     out.push_str(&input[name_start..name_end].to_ascii_lowercase());
-    Some(name_end)
+    // ~keep The rest of the tag is read with it: a `<` in an attribute value starts nothing.
+    // ~keep No tag ends after the last `>` of the page.
+    let whole = if idx < last_gt { reads.tag_end(bytes, idx) } else { None };
+    let end = whole.unwrap_or(name_end);
+    out.push_str(&input[name_end..end]);
+    Some(end)
 }
 
-/// Strip a raw-text `<script>` or `<style>` element in `preprocess_html`'s pass, replacing its
-/// content with an empty element (`<tag ...></tag>`) rather than removing it outright. A
-/// `<script type="application/ld+json">` open tag is left alone (its JSON-LD body must survive
-/// for metadata extraction), matching neither `TAGS` entry in that case — mirrored by the
-/// `continue` below, which moves on to the next `TAGS` entry instead of stopping the scan.
+/// Close a raw-text `<script>` or `<style>` start tag at `idx` in the second pass: the element
+/// is written as an empty element (`<tag ...></tag>`), not removed outright. A
+/// `<script type="application/ld+json">` start tag is left alone (its JSON-LD body must survive
+/// for metadata extraction).
 ///
-/// Returns `Some(new_pos)` when a tag was stripped, `None` when `idx` does not start such a tag.
+/// Returns `Some(new_pos)` when a tag was closed, `None` when `idx` does not start such a tag.
 ///
-/// Extracted from `preprocess_html`'s main scan loop — identical tag matching and JSON-LD
-/// exemption, unchanged.
-fn strip_raw_text_tag_reopen(
+/// ~keep The first pass removes each element that has an end tag, so the element here has
+/// ~keep none as a rule. It is closed at its start tag and the markup after it is written: the
+/// ~keep rule of issue 277 for a start tag with no end tag, in every spelling of the start tag.
+/// ~keep The first pass does not read a start tag in a CDATA section. This pass does, and
+/// ~keep removes the element when it has an end tag. The start tag and the end tag are read
+/// ~keep with `PageReads`, the rule of the first pass, and no search is made twice.
+fn strip_raw_text_tag_reopen<C: FnMut(PassRead)>(
     input: &str,
-    bytes: &[u8],
     idx: usize,
     last: usize,
+    reads: &mut PageReads<C>,
     output: &mut Option<String>,
 ) -> Option<usize> {
-    const TAGS: [&[u8]; 2] = [b"script", b"style"];
-
-    for tag in TAGS {
-        if matches_tag_start(bytes, idx + 1, tag) {
-            if let Some(open_end) = find_tag_end(bytes, idx + 1 + tag.len()) {
-                if tag == b"script" && is_json_ld_script_open_tag(&input[idx..open_end]) {
-                    continue;
-                }
-                let remove_end = find_closing_tag(bytes, open_end, tag).unwrap_or(open_end);
-                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
-                out.push_str(&input[last..idx]);
-                out.push_str(&input[idx..open_end]);
-                out.push_str("</");
-                if let Ok(tag_str) = str::from_utf8(tag) {
-                    out.push_str(tag_str);
-                }
-                out.push('>');
-
-                return Some(remove_end);
-            }
-        }
+    let bytes = input.as_bytes();
+    let (slot, open_end) = reads.raw_text_start_tag_end(bytes, idx)?;
+    let name = removed_element_name(slot)?;
+    if name == "script" && is_json_ld_script_open_tag(&input[idx..open_end]) {
+        return None;
     }
-
-    None
+    let remove_end = reads
+        .raw_text_end_tag(bytes, open_end, slot)
+        .map_or(open_end, |(_, end)| end);
+    let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+    out.push_str(&input[last..open_end]);
+    out.push_str("</");
+    out.push_str(name);
+    out.push('>');
+    Some(remove_end)
 }
 
 /// Strip a `<!doctype ...>` declaration at `idx`. Returns `Some(new_pos)` when found and
@@ -355,6 +375,11 @@ fn looks_like_tag_start(bytes: &[u8], idx: usize, len: usize) -> bool {
 
 /// Preprocess HTML to normalize tags and fix common issues.
 pub fn preprocess_html(input: &str) -> Cow<'_, str> {
+    second_pass(input, |_| {})
+}
+
+/// The second pass over one page, with the reads that a test counts.
+pub(super) fn second_pass<C: FnMut(PassRead)>(input: &str, count: C) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let len = bytes.len();
     if len == 0 {
@@ -365,57 +390,62 @@ pub fn preprocess_html(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
     let mut svg_depth = 0usize;
+    let mut reads = PageReads::new(count);
+    let last_gt = memchr::memrchr(b'>', bytes).unwrap_or(0);
 
     while idx < len {
-        if bytes[idx] == b'<' {
-            if let Some(new_pos) = collapse_empty_comment(input, bytes, idx, last, &mut output) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-
-            if let Some(new_pos) = normalize_self_closing_void(input, bytes, idx, last, &mut output) {
-                last = new_pos;
-                idx = new_pos;
-                continue;
-            }
-
-            if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
-                idx = new_idx;
-                continue;
-            }
-
-            if svg_depth == 0 {
-                if let Some(new_pos) = normalize_void_tag_case(input, bytes, idx, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-
-                if let Some(new_pos) = strip_raw_text_tag_reopen(input, bytes, idx, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-
-                if let Some(new_pos) = strip_doctype(input, bytes, idx, len, last, &mut output) {
-                    last = new_pos;
-                    idx = new_pos;
-                    continue;
-                }
-            }
-
-            if !looks_like_tag_start(bytes, idx, len) {
-                let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
-                out.push_str(&input[last..idx]);
-                out.push_str("&lt;");
-                idx += 1;
-                last = idx;
-                continue;
-            }
+        if bytes[idx] != b'<' {
+            idx += 1;
+            continue;
+        }
+        // ~keep No tag can terminate beyond the final `>`; do not rescan unfinished suffixes (#773).
+        if last_gt <= idx && looks_like_tag_start(bytes, idx, len) {
+            break;
+        }
+        let rewritten = collapse_empty_comment(input, bytes, idx, last, &mut output)
+            .or_else(|| normalize_self_closing_void(input, bytes, idx, last, &mut output));
+        if let Some(new_pos) = rewritten {
+            last = new_pos;
+            idx = new_pos;
+            continue;
         }
 
-        idx += 1;
+        if let Some(new_idx) = track_svg_tag(bytes, idx, &mut svg_depth) {
+            idx = new_idx;
+            continue;
+        }
+
+        let rewritten = if svg_depth == 0 {
+            normalize_void_tag_case(input, idx, last, last_gt, &mut reads, &mut output)
+                .or_else(|| strip_raw_text_tag_reopen(input, idx, last, &mut reads, &mut output))
+                .or_else(|| strip_doctype(input, bytes, idx, len, last, &mut output))
+        } else {
+            None
+        };
+        if let Some(new_pos) = rewritten {
+            last = new_pos;
+            idx = new_pos;
+            continue;
+        }
+
+        if !looks_like_tag_start(bytes, idx, len) {
+            let out = output.get_or_insert_with(|| String::with_capacity(input.len() + 4));
+            out.push_str(&input[last..idx]);
+            out.push_str("&lt;");
+            idx += 1;
+            last = idx;
+            continue;
+        }
+
+        // ~keep A comment and a tag are read whole, as the first pass reads them: a `<` in a
+        // ~keep comment or in an attribute value starts nothing. No tag ends after the last `>`
+        // ~keep of the page, and no search for the end of a tag starts there.
+        let whole = if svg_depth == 0 && idx < last_gt {
+            reads.comment_end(bytes, idx).or_else(|| reads.tag_end(bytes, idx))
+        } else {
+            None
+        };
+        idx = whole.unwrap_or(idx + 1);
     }
 
     if let Some(mut out) = output {
@@ -491,13 +521,43 @@ pub fn is_json_ld_script_open_tag(tag: &str) -> bool {
                 }
             };
 
-            let value = &tag[value_start..value_end];
-            let media_type = value.split(';').next().unwrap_or(value).trim();
-            return eq_ascii_case_insensitive(media_type.as_bytes(), b"application/ld+json");
+            // ~keep The decision reads the decoded value: `ld&#43;json` names the same type.
+            let value = crate::text::decode_attribute_value_cow(&tag[value_start..value_end]);
+            return script_type(&value) != ScriptType::Removed;
         }
         idx += 1;
     }
     false
+}
+
+/// What the `type` of a script makes of the script.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScriptType {
+    /// The two passes remove the script.
+    Removed,
+    /// The script stays in the tree and is not read as structured data.
+    KeptNotRead,
+    /// The script stays in the tree and is read as structured data.
+    StructuredData,
+}
+
+/// The one rule of the `type` of a script. `type_value` is the decoded value of the attribute.
+///
+/// ~keep The two passes, the fast converter and the reader of the metadata ask this function,
+/// ~keep so they cannot disagree. The media type is the value before the first `;`, with no
+/// ~keep white space at its two ends, in any case. A media type that only starts with the name
+/// ~keep (`application/ld+jsonx`) keeps the script in the tree, as it always did, and is not
+/// ~keep structured data.
+pub fn script_type(type_value: &str) -> ScriptType {
+    const STRUCTURED_DATA: &[u8] = b"application/ld+json";
+    let media_type = type_value.split(';').next().unwrap_or(type_value).trim().as_bytes();
+    if media_type.eq_ignore_ascii_case(STRUCTURED_DATA) {
+        ScriptType::StructuredData
+    } else if eq_ascii_case_insensitive(media_type, STRUCTURED_DATA) {
+        ScriptType::KeptNotRead
+    } else {
+        ScriptType::Removed
+    }
 }
 
 /// Case-insensitive byte comparison for ASCII.
@@ -548,48 +608,122 @@ pub fn find_tag_end(bytes: &[u8], mut idx: usize) -> Option<usize> {
     }
 }
 
-/// Find the closing tag for a given tag name.
-pub fn find_closing_tag(bytes: &[u8], mut idx: usize, tag: &[u8]) -> Option<usize> {
-    let len = bytes.len();
-    let mut depth = 1usize;
-
-    while idx < len {
-        if let Some(next) = matching_open_end(bytes, idx, tag) {
-            depth += 1;
-            idx = next;
-            continue;
-        }
-        if let Some(close) = matching_close_end(bytes, idx, tag) {
-            depth -= 1;
-            if depth == 0 {
-                return Some(close);
-            }
-            idx = close;
-            continue;
-        }
-
-        idx += 1;
-    }
-
-    None
-}
-
-fn matching_open_end(bytes: &[u8], idx: usize, tag: &[u8]) -> Option<usize> {
-    (bytes.get(idx) == Some(&b'<') && matches_tag_start(bytes, idx + 1, tag))
-        .then(|| find_tag_end(bytes, idx + 1 + tag.len()))
-        .flatten()
-}
-
-fn matching_close_end(bytes: &[u8], idx: usize, tag: &[u8]) -> Option<usize> {
-    (bytes.get(idx) == Some(&b'<') && matches_end_tag_start(bytes, idx + 1, tag))
-        .then(|| find_tag_end(bytes, idx + 2 + tag.len()))
-        .flatten()
-}
-
 /// Check if bytes match an end tag pattern.
 pub fn matches_end_tag_start(bytes: &[u8], start: usize, tag: &[u8]) -> bool {
     if start >= bytes.len() || bytes[start] != b'/' {
         return false;
     }
     matches_tag_start(bytes, start + 1, tag)
+}
+
+/// ~keep CDATA outside SVG/MathML is an HTML bogus comment, while foreign content owns its body.
+pub fn strip_html_cdata(input: &str) -> Cow<'_, str> {
+    if !input.contains("<![CDATA[") {
+        return Cow::Borrowed(input);
+    }
+    let bytes = input.as_bytes();
+    let mut cursor = 0;
+    let mut last = 0;
+    let mut foreign_depth = 0usize;
+    let mut output = None;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[cursor..]) {
+        cursor += offset;
+        if bytes[cursor..].starts_with(b"<![CDATA[") {
+            let end = cdata_end(bytes, cursor, foreign_depth == 0);
+            if foreign_depth == 0 {
+                let out = output.get_or_insert_with(|| String::with_capacity(input.len()));
+                out.push_str(&input[last..cursor]);
+                last = end;
+            }
+            cursor = end;
+            continue;
+        }
+        if let Some(end) =
+            super::raw_text::skip_opaque_region(bytes, cursor).or_else(|| skip_cdata_text_element(bytes, cursor))
+        {
+            cursor = end;
+            continue;
+        }
+        let name_start = cursor + 1 + usize::from(bytes.get(cursor + 1) == Some(&b'/'));
+        if !bytes.get(name_start).is_some_and(u8::is_ascii_alphabetic) {
+            cursor += 1;
+            continue;
+        }
+        let Some(end) = find_tag_end(bytes, cursor + 1) else {
+            break;
+        };
+        update_cdata_foreign_depth(bytes, cursor, end, &mut foreign_depth);
+        cursor = end;
+    }
+    match output {
+        Some(mut out) => {
+            out.push_str(&input[last..]);
+            Cow::Owned(out)
+        }
+        None => Cow::Borrowed(input),
+    }
+}
+
+fn skip_cdata_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    for tag in [
+        b"textarea".as_slice(),
+        b"title",
+        b"xmp",
+        b"iframe",
+        b"noembed",
+        b"noframes",
+        b"noscript",
+    ] {
+        if matches_tag_start(bytes, cursor + 1, tag) {
+            return text_element_end(bytes, cursor, tag);
+        }
+    }
+    matches_tag_start(bytes, cursor + 1, b"plaintext").then_some(bytes.len())
+}
+
+/// The index just past the element that the start tag of `tag` at `cursor` opens, when the
+/// content of the element is text: the element ends at the first end tag of its name, or at
+/// the end of the input. `None` when the start tag has no end.
+fn text_element_end(bytes: &[u8], cursor: usize, tag: &[u8]) -> Option<usize> {
+    let open_end = find_tag_end(bytes, cursor + 1 + tag.len())?;
+    Some(super::raw_text::find_closing_tag_bytes(bytes, open_end, tag).unwrap_or(bytes.len()))
+}
+
+/// The elements whose content is text and reaches the scan for the tags of kept elements as
+/// written.
+///
+/// ~keep `<title>`, `<xmp>` and `<iframe>` hold text too, but the inert-body pass takes their
+/// ~keep bodies out of the page before that scan reads it. `<plaintext>` has no end tag.
+const WRITTEN_TEXT_ELEMENTS: [&[u8]; 3] = [b"textarea", b"noembed", b"noframes"];
+
+/// If the `<` at `cursor` is the start tag of an element of [`WRITTEN_TEXT_ELEMENTS`] or of a
+/// `<plaintext>`, the index just past the element. A `<template>` or a `<noscript>` tag in
+/// its content is text and not a tag.
+pub(super) fn skip_written_text_element(bytes: &[u8], cursor: usize) -> Option<usize> {
+    if matches_tag_start(bytes, cursor + 1, b"plaintext") {
+        return Some(bytes.len());
+    }
+    WRITTEN_TEXT_ELEMENTS
+        .iter()
+        .find(|name| matches_tag_start(bytes, cursor + 1, name))
+        .and_then(|name| text_element_end(bytes, cursor, name))
+}
+
+fn update_cdata_foreign_depth(bytes: &[u8], cursor: usize, end: usize, depth: &mut usize) {
+    for tag in [b"svg".as_slice(), b"math".as_slice()] {
+        if matches_tag_start(bytes, cursor + 1, tag) && !bytes[cursor..end].ends_with(b"/>") {
+            *depth += 1;
+        } else if matches_end_tag_start(bytes, cursor + 1, tag) {
+            *depth = depth.saturating_sub(1);
+        }
+    }
+}
+
+fn cdata_end(bytes: &[u8], cursor: usize, in_html: bool) -> usize {
+    if in_html {
+        // ~keep HTML bogus comments end at the first `>`; only foreign CDATA uses `]]>`.
+        memchr::memchr(b'>', &bytes[cursor + 2..]).map_or(bytes.len(), |offset| cursor + 2 + offset + 1)
+    } else {
+        super::raw_text::skip_opaque_region(bytes, cursor).unwrap_or(bytes.len())
+    }
 }

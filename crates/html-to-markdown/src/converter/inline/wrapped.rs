@@ -185,6 +185,52 @@ fn markdown_block_prefix_len(block: &str) -> usize {
     digits_start
 }
 
+fn blank_break_content<'a>(
+    content: &'a str,
+    after_breaks: &'a str,
+    output: &str,
+    drop_at_paragraph_start: bool,
+    options: &ConversionOptions,
+) -> &'a str {
+    // ~keep Flow owners drop a leading break (#572); detached scratch buffers retain its
+    // sentinel (#504). Noncollapsible blank tails retain the old separator.
+    if drop_at_paragraph_start {
+        let marker = crate::converter::main_helpers::hard_break_marker(options);
+        if content.ends_with(marker) && content.trim_end_matches(marker).trim().is_empty() {
+            ""
+        } else {
+            after_breaks
+        }
+    } else if after_breaks.len() < content.len() && !content.ends_with('\n') {
+        // ~keep ASCII blank tails keep the detached break sentinel; NBSP keeps its old separator (#863/#843).
+        if after_breaks
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        {
+            &content[..content.len() - after_breaks.len()]
+        } else {
+            " "
+        }
+    } else if output.is_empty()
+        && content.ends_with('\n')
+        && content
+            .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+    {
+        &content[content.len() - 1..]
+    } else {
+        content
+    }
+}
+
+fn inline_break_owner(output: &String, ctx: &Context) -> Option<usize> {
+    let (address, start) = ctx
+        .inline_break_owner
+        .unwrap_or((ctx.block_output_ptr, ctx.block_content_start));
+    (std::ptr::from_ref(output) as usize == address).then_some(start)
+}
+
 fn move_leading_hard_breaks<'a>(
     output: &mut String,
     content: &'a str,
@@ -208,18 +254,17 @@ fn move_leading_hard_breaks<'a>(
         };
         after_breaks = rest;
     }
-    // ~keep A break-only wrapper separates adjacent words instead of authoring a hard break (#502).
-    if after_breaks.trim().is_empty() {
-        return content;
+    // ~keep Bare newlines carry breaks across detached wrappers until a flow owner can emit
+    // them. Its leading break is dropped, even after a structural list marker or prior block.
+    let drop_at_paragraph_start = inline_break_owner(output, ctx) == Some(output.len());
+    if after_breaks
+        .trim_end_matches(crate::converter::main_helpers::hard_break_marker(options))
+        .trim()
+        .is_empty()
+    {
+        return blank_break_content(content, after_breaks, output, drop_at_paragraph_start, options);
     }
 
-    // ~keep The bare newline is an internal sentinel from a break at the start of a detached
-    // ~keep wrapper. It becomes a hard break only when real paragraph content precedes the
-    // ~keep wrapper; hoisting it into the paragraph's own empty block buffer recreates the
-    // ~keep leading break that issue #572 drops before unwrapped text.
-    let drop_at_paragraph_start = ctx.in_paragraph
-        && output.len() == ctx.block_content_start
-        && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr;
     let mut remaining = content;
     let mut moved = false;
     loop {
@@ -256,6 +301,124 @@ fn move_leading_hard_breaks<'a>(
     remaining
 }
 
+fn emit_break_sentinel(output: &mut String, content: &str, ctx: &Context, options: &ConversionOptions) -> bool {
+    if content != "\n" {
+        return false;
+    }
+    let owner_start = inline_break_owner(output, ctx);
+    // ~keep Empty detached wrappers carry the break regardless of their delimiters. An owner
+    // drops its leading break; an existing line, including a scratch line, needs real syntax.
+    if owner_start == Some(output.len()) {
+        return true;
+    }
+    output.push_str(if output.is_empty() && owner_start.is_none() {
+        "\n"
+    } else {
+        crate::converter::main_helpers::hard_break_marker(options)
+    });
+    true
+}
+
+#[cfg(test)]
+thread_local! {
+    static BLANK_PREFIX_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn has_leading_blank_source(site: InlineSite<'_>) -> bool {
+    site.dom_ctx.children_of(site.node_handle.get_inner())
+        .and_then(|children| children.first())
+        .inspect(|_| {
+            #[cfg(test)]
+            BLANK_PREFIX_NODE_READS.with(|reads| reads.set(reads.get() + 1));
+        })
+        .and_then(|child| child.get(site.parser))
+        .is_some_and(|node| matches!(node, tl::Node::Raw(raw) if raw.as_utf8_str().starts_with(crate::converter::utility::white_space::is_collapsible)))
+}
+
+// ~keep A lone break is the #502 separator only in a block that starts its buffer. In a later
+// ~keep block and in a link label it stays the hard break the page had before #871.
+// ~keep A blank before the lone break, or a second break, makes it a hard break at every
+// ~keep position (#897): only a wrapper that holds one break and nothing else is a separator.
+// ~keep White space after the break in the wrapper's own text leaves the separator as it is.
+fn keeps_hard_break(content: &str, site: InlineSite<'_>) -> bool {
+    let marker = crate::converter::main_helpers::hard_break_marker(site.options);
+    let body = content.trim_start_matches([' ', '\t']);
+    let lone = body == "\n" || body == marker;
+    ((content.len() > marker.len() && content.ends_with(marker))
+        || (lone && (site.ctx.block_content_start != 0 || site.ctx.in_link)))
+        && !site
+            .dom_ctx
+            .children_of(site.node_handle.get_inner())
+            .and_then(|children| children.last())
+            .and_then(|child| child.get(site.parser))
+            .is_some_and(|node| {
+                matches!(node, tl::Node::Raw(raw)
+                    if raw.as_utf8_str().ends_with(crate::converter::utility::white_space::is_collapsible))
+            })
+}
+
+fn strong_separator_content<'a>(output: &str, content: &'a str, keeps_break: bool, site: InlineSite<'_>) -> &'a str {
+    let ctx = site.ctx;
+    if keeps_break
+        || !content.ends_with('\n')
+        || !content
+            .trim_end_matches(crate::converter::main_helpers::hard_break_marker(site.options))
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        || ctx.in_strong
+        || ctx.in_code
+        || ctx.in_code_block
+    {
+        return content;
+    }
+    // ~keep Italic wrappers carry rendered breaks; a leading blank prefix also belongs to the break.
+    // ~keep Other blank strong/mark wrappers retain the established separator (#504).
+    if (has_leading_blank_source(site)
+        || site
+            .dom_ctx
+            .tag_info(site.node_handle.get_inner(), site.parser)
+            .is_some_and(|tag| EMPHASIS_SIBLING_TAGS.contains(&tag.name.as_str())))
+        && site
+            .dom_ctx
+            .holds_authored_break(site.node_handle.get_inner(), site.parser)
+    {
+        return content;
+    }
+    let previous =
+        crate::converter::utility::siblings::get_previous_sibling_tag(site.node_handle, site.parser, site.dom_ctx);
+    if !previous.is_some_and(|tag| {
+        STRONG_SIBLING_TAGS.contains(&tag) && !ctx.strip_tags.contains(tag) && !ctx.preserve_tags.contains(tag)
+    }) {
+        return content;
+    }
+    let marker = if site.options.output_format == crate::options::OutputFormat::Djot {
+        String::from("*")
+    } else {
+        [site.options.strong_em_symbol; 2].iter().collect()
+    };
+    if output.ends_with(&marker) { " " } else { content }
+}
+
+// ~keep Strict blank bodies without a retained BR contribute a separator, including custom blank children.
+// ~keep Code/pre literals and nonempty BR callbacks keep their established break transport.
+fn strict_blank_separator<'a>(content: &'a str, site: InlineSite<'_>) -> &'a str {
+    if site.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && !site.ctx.in_code
+        && !site.ctx.in_code_block
+        && content.contains('\n')
+        && content
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+        && !site
+            .dom_ctx
+            .holds_authored_break(site.node_handle.get_inner(), site.parser)
+    {
+        " "
+    } else {
+        content
+    }
+}
+
 /// Emit `content` wrapped in `delimiters`, handling delimiter-run adjacency with a preceding
 /// sibling and a body that is non-empty but entirely whitespace.
 pub fn emit_wrapped_inline(
@@ -280,38 +443,50 @@ pub fn emit_wrapped_inline(
     use crate::converter::utility::siblings::get_previous_sibling_tag;
     use crate::converter::{append_inline_suffix, chomp_inline, merge_adjacent_emphasis};
 
-    let content = move_leading_hard_breaks(output, content, ctx, options);
+    let moved = move_leading_hard_breaks(output, strict_blank_separator(content, site), ctx, options);
+    // ~keep A blank wrapper after real strong markup remains a separator (#502/#504).
+    // DOM provenance plus the configured close marker excludes marker-looking prose.
+    let content = strong_separator_content(output, moved, keeps_hard_break(content, site), site);
     let (prefix, suffix, trimmed) = chomp_inline(content);
-    if content.trim().is_empty() {
+    if emit_break_sentinel(output, content, ctx, options) {
+        return;
+    }
+    // ~keep A noncollapsible blank body after an existing space keeps its character (#843).
+    // ~keep Leading whitespace or a leading break still follows the existing blank-wrapper rule.
+    let marker = crate::converter::main_helpers::hard_break_marker(options);
+    let blank_body = content.trim_end_matches(marker);
+    if output.ends_with([' ', '\t'])
+        && !content.starts_with(crate::converter::utility::white_space::is_collapsible)
+        && blank_body.chars().all(char::is_whitespace)
+        && !blank_body
+            .chars()
+            .all(crate::converter::utility::white_space::is_collapsible)
+    {
+        let body = blank_body.trim_matches(crate::converter::utility::white_space::is_collapsible);
+        output.push_str(body);
+        let breaks = &content[blank_body.len()..];
+        if breaks.is_empty() {
+            append_inline_suffix(output, suffix, !body.is_empty(), node_handle, parser, dom_ctx);
+        } else {
+            output.push_str(breaks);
+        }
+        return;
+    }
+    // ~keep A backslash hard-break suffix must not turn a blank body into literal empty marks.
+    if blank_body.trim().is_empty() {
         if content.is_empty() {
             return;
         }
-        // ~keep issue #481: a whitespace-only body (e.g. `<i> </i>`) must contribute at
-        // ~keep most one space -- `chomp_inline` above already collapsed prefix/suffix to
-        // ~keep a single representation, but the buffer can already end with a real space
-        // ~keep from a preceding sibling (e.g. `A <i> </i>B`), in which case even that one
-        // ~keep copy must be suppressed. Mirrors `text_node.rs`'s `!output.ends_with(' ')`
-        // ~keep guards, which every handler but `text_node` was originally missing.
-        // ~keep ...and at a line start it contributes nothing at all: `<p>A</p><p><i> </i>B</p>`
-        // ~keep otherwise opened its second paragraph with a stray space (issue #501's rule --
-        // ~keep leading ASCII whitespace on a line is never Markdown content). An empty buffer
-        // ~keep is a line start only when it is the block's own buffer: an enclosing wrapper
-        // ~keep builds its body into a fresh scratch `String` that is empty mid-line, and
-        // ~keep `<strong><em><br></em></strong>` lost its one space there, so the outer body
-        // ~keep came out empty and the words either side were joined (issue #504). The
-        // ~keep address test is the one `text_node.rs` uses for the same distinction; a
-        // ~keep heading or cell buffer never matches it, and those are trimmed by their
-        // ~keep builders, so a leading space pushed there is harmless.
-        let at_block_line_start = output.ends_with('\n')
-            || (output.is_empty() && std::ptr::from_ref::<String>(output) as usize == ctx.block_output_ptr);
-        if !output.ends_with(' ') && !at_block_line_start {
+        // ~keep issue #481: a whitespace-only body (e.g. `<i> </i>`) is one space at most, and
+        // ~keep none where the rule of running text owes none (after a space, at a line start).
+        if crate::converter::utility::white_space::space_is_owed_in(output, ctx) {
             output.push_str(prefix);
         }
         append_inline_suffix(output, suffix, false, node_handle, parser, dom_ctx);
         return;
     }
 
-    output.push_str(prefix);
+    crate::converter::utility::content::push_inline_prefix(output, prefix, options, ctx);
     let sibling_is_matching_tag =
         get_previous_sibling_tag(node_handle, parser, dom_ctx).is_some_and(|name| sibling_tag_names.contains(&name));
     let merged = prefix.is_empty()
@@ -373,5 +548,88 @@ pub fn emit_whitespace_only_inline_body(content: &str, output: &mut String) {
     let (prefix, _, _) = chomp_inline(content);
     if !output.ends_with(' ') {
         output.push_str(prefix);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[allow(clippy::print_stdout)]
+    fn should_bound_nested_blank_break_prefix_and_content_reads() {
+        let mut jobs = 0;
+        for depth in [4, 16, 64, 256] {
+            for newline_style in [crate::NewlineStyle::Spaces, crate::NewlineStyle::Backslash] {
+                let source = format!("<p><b>a</b>{}<br>{}b</p>", "<em>".repeat(depth), "</em>".repeat(depth));
+                let dom = tl::parse(&source, tl::ParserOptions::default()).expect("nested break nodes");
+                let nodes = dom.nodes().len();
+                assert_eq!(nodes, depth + 5);
+                super::BLANK_PREFIX_NODE_READS.with(|reads| reads.set(0));
+                crate::converter::dom_context::AUTHORED_BREAK_CACHE_STATS.with(|stats| stats.set((0, 0)));
+                crate::converter::dom_context::HOLDS_TEXT_NODE_READS.with(|reads| reads.set(0));
+                let result = crate::convert(
+                    &source,
+                    crate::ConversionOptions {
+                        tier_strategy: crate::TierStrategy::Tier2,
+                        extract_metadata: false,
+                        newline_style,
+                        max_depth: Some(1024),
+                        ..Default::default()
+                    },
+                )
+                .expect("nested breaks");
+                let prefix_reads = super::BLANK_PREFIX_NODE_READS.with(std::cell::Cell::get);
+                let content_reads = crate::converter::dom_context::HOLDS_TEXT_NODE_READS.with(std::cell::Cell::get);
+                let marker = if newline_style == crate::NewlineStyle::Spaces {
+                    "  \n"
+                } else {
+                    "\\\n"
+                };
+                assert_eq!(result.content.as_deref(), Some(format!("**a**{marker}b\n").as_str()));
+                assert_eq!(prefix_reads, depth);
+                assert_eq!(content_reads, depth);
+                let (entries, capacity) =
+                    crate::converter::dom_context::AUTHORED_BREAK_CACHE_STATS.with(std::cell::Cell::get);
+                assert_eq!(entries, depth);
+                assert!(capacity <= 2 * depth);
+                assert!(content_reads > 0 && content_reads <= 4 * nodes);
+                std::println!(
+                    "break-cost {depth} {nodes} {prefix_reads} {content_reads} {entries} {capacity} {newline_style:?}"
+                );
+                jobs += 1;
+            }
+        }
+        assert_eq!(jobs, 8);
+    }
+
+    use super::move_leading_hard_breaks;
+    use crate::converter::Context;
+    use crate::converter::context::ContextParameters;
+    use crate::converter::url_resolve::OwnPage;
+    use crate::options::ConversionOptions;
+
+    #[test]
+    fn should_drop_break_only_content_in_the_paragraphs_own_empty_buffer() {
+        let options = ConversionOptions::default();
+        let mut output = String::new();
+        let mut context = Context::new(
+            &options,
+            ContextParameters {
+                inline_collector: None,
+                #[cfg(feature = "metadata")]
+                metadata_collector: None,
+                kept_scripts: crate::converter::utility::preprocessing::KeptScripts::default(),
+                #[cfg(feature = "visitor")]
+                visitor: None,
+                structure_collector: None,
+                reference_collector: None,
+                base_url: None,
+                own_page: OwnPage::UnknownWithoutBase,
+            },
+        );
+        context.in_paragraph = true;
+        context.block_output_ptr = std::ptr::from_ref::<String>(&output) as usize;
+        let remaining = move_leading_hard_breaks(&mut output, "  \n", &context, &options);
+        assert_eq!(remaining, "");
+        assert_eq!(output, "");
     }
 }

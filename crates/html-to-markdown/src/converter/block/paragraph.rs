@@ -9,23 +9,31 @@
 
 use crate::converter::block::container::HandlerContext;
 use crate::converter::main_helpers::is_ascii_whitespace_only;
+use crate::converter::walk::{Close, Open};
 use crate::options::{ConversionOptions, NewlineStyle};
+use std::rc::Rc;
 use tl::{NodeHandle, Parser};
 
 type Context = crate::converter::Context;
 type DomContext = crate::converter::DomContext;
 
-/// Handle paragraph elements (p, div).
+/// What `close` needs from `open`.
+pub struct ParagraphEnd {
+    content_start_pos: usize,
+    block_content_start: usize,
+}
+
+/// Write what a paragraph writes before its children and list the children in `children`.
 ///
-/// Processes children with proper context, manages spacing,
-/// and handles special cases for table cells and list items.
-pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    let HandlerContext {
-        options,
-        ctx,
-        depth,
-        dom_ctx,
-    } = handler;
+/// Manages spacing, and handles special cases for table cells and list items.
+pub fn open(
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Open {
+    let HandlerContext { options, ctx, .. } = handler;
 
     let content_start_pos = output.len();
     open_paragraph(output, options, ctx);
@@ -33,15 +41,28 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         in_paragraph: true,
         block_content_start: output.len(),
         block_output_ptr: std::ptr::from_ref::<String>(output) as usize,
+        inline_break_owner: None,
         ..ctx.clone()
     };
-    walk_paragraph_children(
-        node_handle,
-        parser,
+    list_paragraph_children(node_handle, parser, handler.dom_ctx, children);
+    Open {
+        close: Close::Paragraph(ParagraphEnd {
+            content_start_pos,
+            block_content_start: p_ctx.block_content_start,
+        }),
+        scope: Some(Rc::new(p_ctx)),
+    }
+}
+
+/// Write what a paragraph writes after its children.
+pub fn close(end: &ParagraphEnd, output: &mut String, handler: HandlerContext<'_>) {
+    close_paragraph(
         output,
-        HandlerContext::new(options, &p_ctx, depth, dom_ctx),
+        handler.options,
+        handler.ctx,
+        end.block_content_start,
+        end.content_start_pos,
     );
-    close_paragraph(output, options, ctx, &p_ctx, content_start_pos);
 }
 
 fn open_paragraph(output: &mut String, options: &ConversionOptions, ctx: &Context) {
@@ -86,16 +107,17 @@ fn open_paragraph(output: &mut String, options: &ConversionOptions, ctx: &Contex
     }
 }
 
-fn walk_paragraph_children(
+/// List the children of a paragraph that the walk visits, in document order.
+fn list_paragraph_children(
     node_handle: &NodeHandle,
     parser: &Parser,
-    output: &mut String,
-    handler: HandlerContext<'_>,
+    dom_ctx: &DomContext,
+    children: &mut Vec<NodeHandle>,
 ) {
     let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
         return;
     };
-    let child_handles: std::borrow::Cow<'_, [NodeHandle]> = match handler.dom_ctx.children_of(node_handle.get_inner()) {
+    let child_handles: std::borrow::Cow<'_, [NodeHandle]> = match dom_ctx.children_of(node_handle.get_inner()) {
         Some(children) => std::borrow::Cow::Borrowed(children.as_slice()),
         None => std::borrow::Cow::Owned(tag.children().top().iter().copied().collect()),
     };
@@ -104,17 +126,7 @@ fn walk_paragraph_children(
         if should_skip_interstitial_whitespace(child_handle, index, &child_handles, parser) {
             continue;
         }
-        crate::converter::walk_node(
-            child_handle,
-            parser,
-            output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                handler.ctx,
-                handler.depth + 1,
-                handler.dom_ctx,
-            ),
-        );
+        children.push(*child_handle);
     }
 }
 
@@ -149,7 +161,7 @@ fn close_paragraph(
     output: &mut String,
     options: &ConversionOptions,
     ctx: &Context,
-    p_ctx: &Context,
+    block_content_start: usize,
     content_start_pos: usize,
 ) {
     if options.newline_style == NewlineStyle::Backslash {
@@ -157,7 +169,7 @@ fn close_paragraph(
         // ~keep markers it emitted would otherwise leave literal, visible "\" characters at
         // ~keep the end of the block (issue #464). The two-space style is left alone here:
         // ~keep its leftover marker is invisible trailing whitespace, not a visible artifact.
-        crate::converter::strip_trailing_backslash_breaks(output, p_ctx.block_content_start);
+        crate::converter::strip_trailing_backslash_breaks(output, block_content_start);
     }
 
     let has_content = output.len() > content_start_pos;

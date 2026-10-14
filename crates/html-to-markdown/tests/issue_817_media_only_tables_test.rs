@@ -20,11 +20,11 @@ fn markdown(html: &str, tier_strategy: TierStrategy) -> String {
 #[test]
 fn should_keep_media_links_in_tables_without_text_headers() {
     for (element, link) in [
-        ("<video src=\"/v.mp4\"></video>", "[/v.mp4](/v.mp4)"),
-        ("<audio src=\"/a.mp3\"></audio>", "[/a.mp3](/a.mp3)"),
-        ("<iframe src=\"/f.html\"></iframe>", "[/f.html](/f.html)"),
-        ("<video><source src=\"/v.mp4\"></video>", "[/v.mp4](/v.mp4)"),
-        ("<audio><source src=\"/a.mp3\"></audio>", "[/a.mp3](/a.mp3)"),
+        ("<video src=\"/v.mp4\"></video>", "[video](/v.mp4)"),
+        ("<audio src=\"/a.mp3\"></audio>", "[audio](/a.mp3)"),
+        ("<iframe src=\"/f.html\"></iframe>", "[iframe](/f.html)"),
+        ("<video><source src=\"/v.mp4\"></video>", "[video](/v.mp4)"),
+        ("<audio><source src=\"/a.mp3\"></audio>", "[audio](/a.mp3)"),
     ] {
         let html = format!("<table><tr><td>{element}</td></tr></table>");
         let expected = format!("| {link} |\n| {} |\n", "-".repeat(link.len()));
@@ -40,7 +40,7 @@ fn should_keep_inline_svg_in_a_table_without_text_headers() {
     let html = format!("<table><tr><td>{element}</td></tr></table>");
     for tier in [TierStrategy::Tier1, TierStrategy::Tier2, TierStrategy::Auto] {
         let image = markdown(element, tier).trim_end().to_owned();
-        assert!(image.starts_with("![SVG Image](data:image/svg+xml;base64,"));
+        assert!(image.starts_with("![](data:image/svg+xml;base64,"));
         let expected = format!("| {image} |\n| {} |\n", "-".repeat(image.len()));
         assert_eq!(markdown(&html, tier), expected, "{tier:?}");
     }

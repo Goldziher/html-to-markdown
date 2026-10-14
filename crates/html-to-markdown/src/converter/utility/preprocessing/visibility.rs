@@ -1,7 +1,12 @@
 use std::borrow::Cow;
 
-use super::markup::{find_tag_end, matches_tag_start};
-use super::raw_text::{find_closing_tag_bytes_nested, is_self_closing_tag, skip_opaque_region};
+use super::head_scan::body_start;
+use super::kept::{OpenKept, TagStep};
+use super::markup::{find_html_comment_end, find_subslice, find_tag_end, matches_tag_start, skip_written_text_element};
+use super::raw_text::{
+    find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
+};
+use crate::options::HiddenContent;
 
 /// Sanitize malformed markdown-like URLs in HTML attributes.
 ///
@@ -48,14 +53,7 @@ pub fn sanitize_markdown_url(url: &str) -> Cow<'_, str> {
 /// Scans for opening tags matching either condition, finds their matching
 /// closing tag, and removes the entire element (tag + content, so nested
 /// content never leaks out). Self-closing tags are also removed.
-/// Find `needle` in `haystack` at or after `from`, returning its start offset.
-fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    if from >= haystack.len() {
-        return None;
-    }
-    memchr::memmem::find(&haystack[from..], needle).map(|off| from + off)
-}
-
+///
 /// If `<` at `idx` (with `next`/`rest` already read) opens a real HTML comment (`<!--`) or a
 /// CDATA section (`<![CDATA[`), return the index just past its terminator (or `len` if
 /// unterminated). Returns `None` for anything else, in which case `idx` is unaffected.
@@ -69,7 +67,7 @@ fn skip_real_comment_or_cdata(bytes: &[u8], idx: usize, len: usize, next: u8, re
     // ~keep like a bogus comment. Stripping that would delete the `-->` closing the real
     // ~keep comment, leaving it unterminated and swallowing the rest of the document.
     if next == b'!' && rest.starts_with(b"--") {
-        return Some(find_subslice(bytes, idx + 4, b"-->").map_or(len, |end| end + 3));
+        return Some(find_html_comment_end(bytes, idx + 4).unwrap_or(len));
     }
     // ~keep Likewise CDATA: its interior is character data, not markup.
     if next == b'!' && rest.starts_with(b"[CDATA[") {
@@ -82,7 +80,7 @@ fn skip_real_comment_or_cdata(bytes: &[u8], idx: usize, len: usize, next: u8, re
 /// starts a "bogus comment" per the HTML5 tokenizer.
 ///
 /// Extracted from `strip_bogus_comments`'s main scan loop — identical classification, unchanged.
-fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest: &[u8]) -> bool {
+pub(super) fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest: &[u8]) -> bool {
     if next == b'?' {
         return true;
     }
@@ -97,6 +95,13 @@ fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest:
         return idx + 2 >= len || !bytes[idx + 2].is_ascii_alphabetic();
     }
     false
+}
+
+/// The position after the bogus comment that the `<` at `idx` starts.
+pub(super) fn after_bogus_comment(bytes: &[u8], idx: usize) -> usize {
+    // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
+    // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
+    memchr::memchr(b'>', &bytes[idx + 1..]).map_or(bytes.len(), |off| idx + 1 + off + 1)
 }
 
 fn has_bogus_comment_candidate(bytes: &[u8]) -> bool {
@@ -170,18 +175,14 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
             // ~keep Skip a real tag wholesale so a `<?`/`<!` sitting inside a quoted
             // ~keep attribute value is never seen as a bogus comment of its own.
             if next.is_ascii_alphabetic() {
-                if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
-                    idx = tag_end;
-                    continue;
-                }
+                idx = find_tag_end(bytes, idx + 1).unwrap_or(len);
+                continue;
             }
             idx += 1;
             continue;
         }
 
-        // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
-        // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
-        let end = memchr::memchr(b'>', &bytes[idx + 1..]).map_or(len, |off| idx + 1 + off + 1);
+        let end = after_bogus_comment(bytes, idx);
         let out = output.get_or_insert_with(|| String::with_capacity(len));
         out.push_str(&input[last..idx]);
         last = end;
@@ -200,23 +201,26 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
 /// Compute the end index of the hidden element starting at `idx` whose opening tag spans
 /// `idx..tag_end` — either just past the opening tag itself (self-closing) or past its matching
 /// closing tag.
-///
-/// Extracted from `strip_hidden_elements`'s main scan loop — identical tag-name scan and
-/// self-closing/closing-tag dispatch, unchanged.
-fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> usize {
+fn hidden_element_remove_end(
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> usize {
     let name_start = idx + 1;
-    let mut name_end = name_start;
-    while name_end < len && !bytes[name_end].is_ascii_whitespace() && bytes[name_end] != b'>' && bytes[name_end] != b'/'
-    {
-        name_end += 1;
+    let name_len = bytes[name_start..]
+        .iter()
+        .take_while(|byte| !byte.is_ascii_whitespace() && !matches!(byte, b'>' | b'/'))
+        .count();
+    let name = &bytes[name_start..name_start + name_len];
+    if is_self_closing_tag(&bytes[idx..tag_end], name) {
+        return tag_end;
     }
-    let tag_name = &bytes[name_start..name_end];
-
-    if is_self_closing_tag(&bytes[idx..tag_end], tag_name) {
-        tag_end
-    } else {
-        find_closing_tag_bytes_nested(bytes, tag_end, tag_name).unwrap_or(tag_end)
+    if let Some(end) = ends.get_or_insert_with(|| matching_tag_ends(bytes)).get(&idx) {
+        return end.unwrap_or(tag_end);
     }
+    // ~keep Preserve the legacy scan of tag-looking text inside an unrelated quoted attribute.
+    find_closing_tag_bytes_nested(bytes, tag_end, name).unwrap_or(tag_end)
 }
 
 /// Where the removal of the element whose open tag spans `idx..tag_end` ends, or `None` when
@@ -224,22 +228,97 @@ fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usiz
 ///
 /// The `hidden` attribute and a definitive `display`/`visibility` declaration remove the
 /// subtree outright. `font-size: 0` must preserve images and descendants that restore a readable size.
-fn hidden_element_removal_end(input: &str, bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> Option<usize> {
+fn hidden_element_removal_end(
+    input: &str,
+    bytes: &[u8],
+    idx: usize,
+    tag_end: usize,
+    ends: &mut Option<ahash::AHashMap<usize, Option<usize>>>,
+) -> Option<usize> {
     let tag_slice = &input[idx..tag_end];
     if tag_has_hidden_attribute(tag_slice) {
-        return Some(hidden_element_remove_end(bytes, idx, tag_end, len));
+        return Some(hidden_element_remove_end(bytes, idx, tag_end, ends));
     }
     match hidden_style_reason(tag_slice)? {
-        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, len)),
+        HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, ends)),
         HiddenStyleReason::FontSizeZero => {
             if matches_tag_start(bytes, idx + 1, b"img") {
                 return None;
             }
-            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, len);
+            let remove_end = hidden_element_remove_end(bytes, idx, tag_end, ends);
             // ~keep Scan past the element's own open tag so its `font-size: 0` is not re-read.
             let subtree = input.get(tag_end..remove_end).unwrap_or("");
             (!region_restores_visible_content(subtree)).then_some(remove_end)
         }
+    }
+}
+
+/// What [`find_tag_end`] returns from every position of a page, computed in one pass.
+///
+/// `find_tag_end` walks from a start over quoted values to the next `>`. Its result depends only
+/// on the first quote or `>` at or after the start, so one answer for each of those bytes is the
+/// answer for every start. The answers are filled from the end of the page: a `>` ends the tag
+/// after itself, and a quote has the answer of the byte after its partner.
+struct TagEnds {
+    positions: Vec<usize>,
+    ends: Vec<Option<usize>>,
+}
+
+impl TagEnds {
+    fn new(bytes: &[u8]) -> Self {
+        let positions: Vec<usize> = memchr::memchr3_iter(b'"', b'\'', b'>', bytes).collect();
+        let mut ends = vec![None; positions.len()];
+        let (mut next_double, mut next_single) = (None, None);
+        for index in (0..positions.len()).rev() {
+            let position = positions[index];
+            let next_same: &mut Option<usize> = match bytes[position] {
+                b'>' => {
+                    ends[index] = Some(position + 1);
+                    continue;
+                }
+                b'"' => &mut next_double,
+                _ => &mut next_single,
+            };
+            let end_after_partner = (*next_same).and_then(|partner| ends.get(partner + 1).copied().flatten());
+            ends[index] = end_after_partner;
+            *next_same = Some(index);
+        }
+        Self { positions, ends }
+    }
+
+    /// The result of `find_tag_end(bytes, from)`.
+    fn tag_end(&self, from: usize) -> Option<usize> {
+        let index = self.positions.partition_point(|&position| position < from);
+        self.ends.get(index).copied().flatten()
+    }
+}
+
+/// The tag ends of one page for a scan that asks at many tag starts.
+///
+/// ~keep A tag start with no end makes `find_tag_end` read to the end of the page: no `>` is
+/// ~keep left, or a quote before it has no partner. A page with many such starts made a scan
+/// ~keep that asks at each of them quadratic (#765). After the first scan that fails, the ends
+/// ~keep come from a table that reads the page once.
+pub(super) struct TagEndScan<'a> {
+    bytes: &'a [u8],
+    table: Option<TagEnds>,
+}
+
+impl<'a> TagEndScan<'a> {
+    pub(super) const fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, table: None }
+    }
+
+    /// The result of `find_tag_end(bytes, from)`.
+    pub(super) fn tag_end(&mut self, from: usize) -> Option<usize> {
+        if let Some(table) = &self.table {
+            return table.tag_end(from);
+        }
+        let tag_end = find_tag_end(self.bytes, from);
+        if tag_end.is_none() {
+            self.table = Some(TagEnds::new(self.bytes));
+        }
+        tag_end
     }
 }
 
@@ -257,16 +336,12 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         return Cow::Borrowed(input);
     }
 
-    // ~keep DoS guard: a run of unterminated `<` (no `>` anywhere in the rest of the
-    // ~keep document) makes `find_tag_end` scan to EOF on every single one, turning this
-    // ~keep loop quadratic. Once no `>` remains past `idx`, `find_tag_end` is guaranteed
-    // ~keep to fail regardless of quoting, so `last_gt` lets every remaining iteration
-    // ~keep skip the call in O(1) instead of re-scanning to the end each time.
-    let last_gt = bytes.iter().rposition(|&b| b == b'>');
+    let mut tag_ends = TagEndScan::new(bytes);
 
     let mut idx = 0;
     let mut last = 0;
     let mut output: Option<String> = None;
+    let mut ends = None;
 
     while idx < len {
         let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
@@ -278,15 +353,20 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         // ~keep `find_tag_end` scan. Without this, a run like `<<<<<` treats every `<` as a
         // ~keep candidate tag start, and each failing scan re-walks the same suffix.
         let starts_tag_name = idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic();
-        if starts_tag_name && last_gt.is_some_and(|gt| gt > idx) {
-            if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
-                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, len) {
+        if starts_tag_name {
+            if let Some(tag_end) = tag_ends.tag_end(idx + 1) {
+                if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, &mut ends) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
                     out.push_str(&input[last..idx]);
                     last = remove_end;
                     idx = remove_end;
                     continue;
                 }
+                // ~keep The tag is read once, as a whole. A `<` inside it is part of an attribute,
+                // ~keep not a tag start, and a scan from each one read the same tag again, so a
+                // ~keep page with many tag starts before one `>` took quadratic time (#765).
+                idx = tag_end;
+                continue;
             }
         }
         idx += 1;
@@ -300,6 +380,129 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(input)
     }
+}
+
+/// Remove the start and end tags of the `<template>` and `<noscript>` elements whose content
+/// the caller keeps, so that the content converts where it is written.
+///
+/// [`HiddenContent::Reachable`] removes the tags of a declarative shadow root, which a browser
+/// renders in its host element. [`HiddenContent::All`] removes the tags of every `<template>` and
+/// `<noscript>`. An element whose tags stay is dropped by the walk, as before. Inside `<head>` no
+/// tag is removed: what the two elements hold there is metadata (`<link>`, `<meta>`, `<style>`),
+/// and removing the tags would make it the metadata of the document. [`body_start`] says where
+/// the head ends.
+///
+/// The two tags of one element are removed together or not at all: an end tag is removed only
+/// when the start tag that it closes was removed.
+///
+/// ~keep A start tag that is written as self-closing opens an element all the same: the
+/// ~keep inert-body pass and the tree builder read `<template/>` as `<template>`.
+///
+/// ~keep A removed start tag can be the tag that starts the body: the first `<template>` of a
+/// ~keep fragment, or a `<noscript>` after the end tag of the head. With nothing in its place the
+/// ~keep tree builder starts the body at a later tag and puts a `<title>` before that tag in the
+/// ~keep head, and a narrower choice, which keeps the tag, writes that title as text. So
+/// ~keep [`BODY_START`] is written for that tag.
+///
+/// ~keep The tags are removed before the parse, not skipped in the walk, so that every reader
+/// ~keep of the tree sees the content: a row in a `<template>` that is a child of a `<table>` is
+/// ~keep a row of that table, which a walk that descends into the template cannot give.
+///
+/// `excluded` holds where the start tags that the caller excludes start in `input`, in the
+/// order of the page. An element whose tags this pass would remove is removed whole when its
+/// start tag is one of them: [`OpenKept`] says where it ends.
+pub fn unwrap_kept_inert_elements<'a>(
+    input: &'a str,
+    hidden_content: HiddenContent,
+    excluded: &[usize],
+) -> Cow<'a, str> {
+    if hidden_content == HiddenContent::Drop {
+        return Cow::Borrowed(input);
+    }
+    let bytes = input.as_bytes();
+    let mut tag_ends = TagEndScan::new(bytes);
+    let Some(body_start) = body_start(input, &mut tag_ends) else {
+        return Cow::Borrowed(input);
+    };
+    let mut open = OpenKept::default();
+    let mut output: Option<String> = None;
+    let mut last = 0;
+    let mut idx = body_start;
+
+    while idx < bytes.len() {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        let is_end_tag = bytes.get(idx + 1) == Some(&b'/');
+        let name_start = idx + 1 + usize::from(is_end_tag);
+        let is_template = matches_tag_start(bytes, name_start, b"template");
+        let is_noscript = matches_tag_start(bytes, name_start, b"noscript");
+        let is_tag = opens_a_tag(bytes, idx);
+        let tag_end = if is_tag { tag_ends.tag_end(idx + 1) } else { None };
+        if !is_template && !is_noscript {
+            // ~keep A comment, a raw-text body, the text of a text element and a quoted attribute
+            // ~keep value can hold text that looks like one of the two tags. Step over each as
+            // ~keep one unit.
+            // ~keep A raw-text element starts with a tag that ends. For a tag start with no end
+            // ~keep the raw-text scan would read to the end of the input and find nothing.
+            let unit_end = if is_tag && tag_end.is_none() {
+                None
+            } else {
+                skip_opaque_region(bytes, idx)
+                    .or_else(|| skip_written_text_element(bytes, idx))
+                    .or(tag_end)
+            };
+            idx = unit_end.unwrap_or(idx + 1);
+            continue;
+        }
+        let Some(tag_end) = tag_end else {
+            break;
+        };
+        // ~keep Text that starts the body is before its first tag, so only a tag is at the start.
+        let starts_body = idx == body_start;
+        let kind = usize::from(is_noscript);
+        let step = if is_end_tag {
+            open.end(kind)
+        } else {
+            let remove =
+                hidden_content == HiddenContent::All || (is_template && tag_declares_shadow_root(&input[idx..tag_end]));
+            open.start(kind, remove, excluded.binary_search(&idx).is_ok())
+        };
+        match step {
+            TagStep::Stays => {}
+            TagStep::Removed => {
+                let out = output.get_or_insert_with(|| String::with_capacity(bytes.len()));
+                out.push_str(&input[last..idx]);
+                out.push_str(if starts_body { BODY_START } else { "" });
+                last = tag_end;
+            }
+            TagStep::ExcludedEnds => last = tag_end,
+        }
+        idx = tag_end;
+    }
+
+    match output {
+        Some(mut out) => {
+            out.push_str(if open.in_excluded() { "" } else { &input[last..] });
+            Cow::Owned(out)
+        }
+        None => Cow::Borrowed(input),
+    }
+}
+
+/// What [`unwrap_kept_inert_elements`] writes for the removed tag that started the body.
+///
+/// ~keep The tree builder starts the body at this end tag and makes no element for it, and the
+/// ~keep first parse discards it. A `<body>` start tag would make the page one that wrote its
+/// ~keep body, and a `<header>` in such a body is the page header.
+const BODY_START: &str = "</body>";
+
+/// Whether the start tag of a `<template>` declares a shadow root: `shadowrootmode` is `open` or
+/// `closed`, the two values for which a browser attaches one.
+fn tag_declares_shadow_root(tag: &str) -> bool {
+    extract_attribute_value(tag, "shadowrootmode")
+        .is_some_and(|mode| mode.eq_ignore_ascii_case("open") || mode.eq_ignore_ascii_case("closed"))
 }
 
 /// Consume an optional `=value` following an attribute name, starting at `i` (already past the
@@ -472,7 +675,14 @@ fn css_length_is_zero(value: &str) -> bool {
 /// input is handled defensively — extra whitespace around `:` and `;`, mixed casing, and a
 /// trailing `!important` (with or without a preceding space) are all tolerated.
 pub fn hidden_style_reason(tag: &str) -> Option<HiddenStyleReason> {
-    let style_value = extract_attribute_value(tag, "style")?;
+    style_value_hidden_reason(extract_attribute_value(tag, "style")?)
+}
+
+/// As [`hidden_style_reason`], for the value of a `style` attribute.
+///
+/// ~keep An inline `<svg>` reads its `display` and `visibility` attributes through this function,
+/// ~keep so text in a graphic and text outside one are hidden by the same decision.
+pub fn style_value_hidden_reason(style_value: &str) -> Option<HiddenStyleReason> {
     let (display_hides, visibility_hides, font_size_zero) = scan_visibility_declarations(style_value);
     if display_hides || visibility_hides {
         return Some(HiddenStyleReason::Definitive);
@@ -503,6 +713,7 @@ fn region_restores_visible_content(region: &str) -> bool {
     let bytes = region.as_bytes();
     let len = bytes.len();
     let mut idx = 0;
+    let mut ends = None;
     while idx < len {
         if let Some(end) = skip_opaque_region(bytes, idx) {
             idx = end;
@@ -512,7 +723,7 @@ fn region_restores_visible_content(region: &str) -> bool {
             if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
                 let tag = &region[idx..tag_end];
                 if tag_has_hidden_attribute(tag) || hidden_style_reason(tag) == Some(HiddenStyleReason::Definitive) {
-                    idx = hidden_element_remove_end(bytes, idx, tag_end, len);
+                    idx = hidden_element_remove_end(bytes, idx, tag_end, &mut ends);
                     continue;
                 }
                 if tag_sets_non_zero_font_size(tag) || matches_tag_start(bytes, idx + 1, b"img") {
@@ -618,4 +829,168 @@ fn scan_attribute_value<'a>(bytes: &[u8], tag: &'a str, start: usize) -> (&'a st
         end += 1;
     }
     (&tag[val_start..end], end)
+}
+
+#[cfg(test)]
+mod tag_ends_tests {
+    use super::{HiddenContent, TagEnds, find_tag_end, unwrap_kept_inert_elements};
+
+    #[test]
+    fn should_step_over_a_run_of_raw_text_tag_starts_with_no_end_in_linear_time() {
+        // ~keep The quote before the last `>` has no partner, so no tag of the run ends. The scan
+        // ~keep for the end of a raw-text element reads the rest of the input for each start.
+        let timed = |name: &str| {
+            let page = format!("{}\">", format!("<{name} ").repeat(1_600_000 / (name.len() + 2)));
+            let started = std::time::Instant::now();
+            let unwrapped = unwrap_kept_inert_elements(&page, HiddenContent::All, &[]);
+            assert_eq!(unwrapped, page, "no template and no noscript: nothing is removed");
+            started.elapsed()
+        };
+        let plain = timed("a");
+        for name in ["script", "style"] {
+            let raw_text = timed(name);
+            // ~keep A quadratic scan reads 160 GB here. The bound is a multiple of a page of the
+            // ~keep same size with an ordinary tag, so a loaded host moves both sides.
+            assert!(
+                raw_text < plain * 50 + std::time::Duration::from_secs(5),
+                "{name} took {raw_text:?}, an ordinary tag took {plain:?}"
+            );
+        }
+    }
+
+    /// The pieces of the generated pages: the text, and for a tag of the two elements its
+    /// element and whether it is a start tag.
+    type Piece = (&'static str, Option<(usize, bool)>);
+    const PIECES: [Piece; 10] = [
+        ("<head>", None),
+        ("</head>", None),
+        ("<title>", None),
+        ("</title>", None),
+        ("<p>", None),
+        ("<template>", Some((0, true))),
+        (r#"<TEMPLATE shadowrootmode="open">"#, Some((0, true))),
+        ("</template>", Some((0, false))),
+        (r#"<noscript class="a">"#, Some((1, true))),
+        ("</NOSCRIPT>", Some((1, false))),
+    ];
+
+    /// Which pieces of `page` the scan removed. A comment with the position follows each piece.
+    ///
+    /// ~keep The scan writes `</body>` for the removed tag that started the body: once, and for
+    /// ~keep the first tag that it removes.
+    fn removed_pieces(pieces: &[Piece], page: &str, choice: HiddenContent) -> Vec<bool> {
+        let unwrapped = unwrap_kept_inert_elements(page, choice, &[]);
+        if let Some(at) = unwrapped.find("</body>") {
+            assert!(page.starts_with(&unwrapped[..at]), "{page} {choice:?}");
+            assert_eq!(unwrapped.matches("</body>").count(), 1, "{page} {choice:?}");
+        }
+        let mut rest: &str = &unwrapped;
+        let removed = pieces
+            .iter()
+            .enumerate()
+            .map(|(position, (text, _))| {
+                let kept = rest.strip_prefix(text);
+                rest = kept
+                    .or_else(|| rest.strip_prefix("</body>"))
+                    .unwrap_or(rest)
+                    .strip_prefix(&format!("<!--{position}-->"))
+                    .unwrap_or_else(|| panic!("{page} {choice:?}: {unwrapped} is not the page without some tags"));
+                kept.is_none()
+            })
+            .collect();
+        assert_eq!(rest, "", "{page} {choice:?}");
+        removed
+    }
+
+    /// Check one page under one choice, and give the count of its elements with two tags and
+    /// the count of those whose tags the scan removed.
+    ///
+    /// ~keep The pairs come from a count of start and end tags for each element, which knows
+    /// ~keep nothing of the head. A page with a tag of the head or with a `<title>` can have a
+    /// ~keep head, with or without the `<head>` tag.
+    fn check_the_pairs(pieces: &[Piece], page: &str, choice: HiddenContent) -> (usize, usize) {
+        let has_head = pieces
+            .iter()
+            .any(|(text, _)| matches!(*text, "<head>" | "</head>" | "<title>"));
+        let removed = removed_pieces(pieces, page, choice);
+        let mut open: [Vec<usize>; 2] = [Vec::new(), Vec::new()];
+        let (mut pairs, mut removed_pairs) = (0, 0);
+        for (position, (text, tag)) in pieces.iter().enumerate() {
+            let Some((element, is_start)) = *tag else {
+                assert!(!removed[position], "{page} {choice:?}: {text} is removed");
+                continue;
+            };
+            if is_start {
+                open[element].push(position);
+                let kept_by_choice = choice == HiddenContent::All || text.contains("shadowrootmode");
+                assert!(kept_by_choice || !removed[position], "{page} {choice:?}: {text}");
+                assert!(
+                    has_head || removed[position] == kept_by_choice,
+                    "{page} {choice:?}: {text}"
+                );
+            } else if let Some(start) = open[element].pop() {
+                pairs += 1;
+                removed_pairs += usize::from(removed[position]);
+                assert_eq!(
+                    removed[start], removed[position],
+                    "{page} {choice:?}: the tags at {start} and {position} are one element"
+                );
+            } else {
+                assert!(!removed[position], "{page} {choice:?}: {text} closes nothing");
+            }
+        }
+        (pairs, removed_pairs)
+    }
+
+    #[test]
+    fn should_remove_the_two_tags_of_an_element_together_or_not_at_all() {
+        // ~keep Every page of up to five pieces.
+        let (mut pairs, mut removed_pairs) = (0, 0);
+        for len in 0..=5u32 {
+            for mut code in 0..PIECES.len().pow(len) {
+                let mut pieces = Vec::new();
+                let mut page = String::new();
+                for position in 0..len {
+                    let piece = PIECES[code % PIECES.len()];
+                    code /= PIECES.len();
+                    pieces.push(piece);
+                    page.extend([piece.0, "<!--", &position.to_string(), "-->"]);
+                }
+                assert_eq!(unwrap_kept_inert_elements(&page, HiddenContent::Drop, &[]), page);
+                for choice in [HiddenContent::Reachable, HiddenContent::All] {
+                    let (in_page, removed_in_page) = check_the_pairs(&pieces, &page, choice);
+                    pairs += in_page;
+                    removed_pairs += removed_in_page;
+                }
+            }
+        }
+        assert!(
+            pairs > 20_000 && removed_pairs > 5_000,
+            "{pairs} pairs, {removed_pairs} removed"
+        );
+    }
+
+    #[test]
+    fn should_give_the_tag_end_that_a_scan_from_each_byte_gives() {
+        // ~keep Every page of up to eight bytes over the bytes that the scan tells apart.
+        let alphabet = [b'"', b'\'', b'>', b'a'];
+        let mut compared = 0;
+        for len in 0..=8u32 {
+            for mut code in 0..4usize.pow(len) {
+                let page: Vec<u8> = (0..len)
+                    .map(|_| {
+                        let byte = alphabet[code % 4];
+                        code /= 4;
+                        byte
+                    })
+                    .collect();
+                let table = TagEnds::new(&page);
+                for from in 0..=page.len() + 1 {
+                    assert_eq!(table.tag_end(from), find_tag_end(&page, from), "{page:?} from {from}");
+                    compared += 1;
+                }
+            }
+        }
+        assert!(compared > 500_000, "compared only {compared} scans");
+    }
 }

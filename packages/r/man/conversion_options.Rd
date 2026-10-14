@@ -16,6 +16,8 @@ conversion_options(
   escape_ascii = NULL,
   code_language = NULL,
   autolinks = NULL,
+  expand_abbreviations = NULL,
+  include_blockquote_citations = NULL,
   default_title = NULL,
   br_in_tables = NULL,
   compact_tables = NULL,
@@ -38,6 +40,7 @@ conversion_options(
   preserve_tags = NULL,
   skip_images = NULL,
   inline_data_media = NULL,
+  hidden_content = NULL,
   url_escape_style = NULL,
   link_style = NULL,
   output_format = NULL,
@@ -76,6 +79,10 @@ conversion_options(
 \item{code_language}{Default language annotation for fenced code blocks that have no language hint}
 
 \item{autolinks}{Automatically convert bare URLs into Markdown autolinks}
+
+\item{expand_abbreviations}{Append the title of an \verb{<abbr>} in parentheses (default \code{true})}
+
+\item{include_blockquote_citations}{Append the \code{cite} URL after a blockquote (default \code{true})}
 
 \item{default_title}{Emit a default title when no \verb{<title>} tag is present}
 
@@ -120,6 +127,8 @@ conversion_options(
 \item{skip_images}{Skip conversion of \verb{<img>} elements (omit images from output)}
 
 \item{inline_data_media}{What the output shows for an image or embedded media element whose address is an inline}
+
+\item{hidden_content}{Which text that a browser does not show at first the output holds: none of it}
 
 \item{url_escape_style}{URL encoding strategy for link and image destinations}
 

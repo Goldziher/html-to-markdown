@@ -349,7 +349,7 @@ fn should_collect_inline_svg_once_when_a_media_only_table_renders() {
     );
 
     let image = concat!(
-        "![SVG Image](data:image/svg+xml;base64,",
+        "![glyph](data:image/svg+xml;base64,",
         "PHN2ZyBhcmlhLWxhYmVsPSJnbHlwaCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4",
         "8cmVjdCBoZWlnaHQ9IjEiIHdpZHRoPSIxIiAvPjwvc3ZnPg==)"
     );

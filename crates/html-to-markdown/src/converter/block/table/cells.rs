@@ -9,11 +9,15 @@ use crate::converter::block::container::HandlerContext;
 use crate::converter::utility::content::normalized_tag_name;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::Range;
 
-use super::cell::{cell_text_content, collect_table_cells, convert_table_cell, emit_cell_text, get_colspan_rowspan};
+use super::cell::{
+    cell_text_content, collect_table_cells, convert_table_cell, emit_cell_text, get_colspan_rowspan, render_cell_text,
+};
 
 /// Maximum allowed table columns to prevent unbounded memory usage.
 const MAX_TABLE_COLS: usize = 1000;
+const MAX_CELL_WIDTH: usize = 200;
 
 /// Rendered markdown of each cell visited by the column-width pre-pass, keyed by DOM node id.
 ///
@@ -37,18 +41,97 @@ impl CellTextCache {
         }
     }
 
-    fn store(&mut self, node_id: u32, text: String) {
+    pub(super) const fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub(super) fn store(&mut self, node_id: u32, text: String) {
         if self.enabled {
             self.entries.insert(node_id, text);
         }
     }
 
-    fn take(&mut self, node_id: u32) -> Option<String> {
+    pub(super) fn take(&mut self, node_id: u32) -> Option<String> {
         if self.enabled {
             self.entries.remove(&node_id)
         } else {
             None
         }
+    }
+}
+
+// ~keep Widths must reflect the emission walk, while the existing visitor preview and quiet
+// ~keep width walk retain their callback order. Record generated padding instead of parsing pipes (#904).
+#[derive(Default)]
+pub struct RenderedWidths {
+    widths: Vec<usize>,
+    edits: Vec<WidthEdit>,
+}
+
+enum WidthEdit {
+    Cell {
+        padding: Range<usize>,
+        column: usize,
+        text_len: usize,
+    },
+    Separator {
+        padding: Range<usize>,
+        columns: usize,
+    },
+}
+
+impl RenderedWidths {
+    fn record_cell(&mut self, padding: Range<usize>, column: usize, text_len: usize) {
+        if column >= MAX_TABLE_COLS {
+            return;
+        }
+        if column >= self.widths.len() {
+            self.widths.resize(column + 1, 0);
+        }
+        self.widths[column] = self.widths[column].max(text_len.min(MAX_CELL_WIDTH));
+        self.edits.push(WidthEdit::Cell {
+            padding,
+            column,
+            text_len,
+        });
+    }
+
+    fn commit_row(&mut self, first_edit: usize, output_start: usize) {
+        for edit in &mut self.edits[first_edit..] {
+            let padding = match edit {
+                WidthEdit::Cell { padding, .. } | WidthEdit::Separator { padding, .. } => padding,
+            };
+            padding.start += output_start;
+            padding.end += output_start;
+        }
+    }
+
+    pub fn repad(self, output: &mut String, output_start: usize, options: &crate::options::ConversionOptions) {
+        if self.edits.is_empty() {
+            return;
+        }
+        let original = output.split_off(output_start);
+        output.reserve(original.len());
+        let mut copied = 0;
+        // ~keep Ranges come from ASCII padding boundaries at emission, in output order;
+        // ~keep cell text and callback-owned row output are copied verbatim, including literal pipes.
+        for edit in self.edits {
+            let padding = match &edit {
+                WidthEdit::Cell { padding, .. } | WidthEdit::Separator { padding, .. } => padding,
+            };
+            output.push_str(&original[copied..padding.start - output_start]);
+            copied = padding.end - output_start;
+            match edit {
+                WidthEdit::Cell { column, text_len, .. } => {
+                    let width = self.widths.get(column).copied().unwrap_or(0);
+                    output.extend(std::iter::repeat_n(' ', width.saturating_sub(text_len)));
+                }
+                WidthEdit::Separator { columns, .. } => {
+                    emit_header_separator(output, options, columns, &self.widths);
+                }
+            }
+        }
+        output.push_str(&original[copied..]);
     }
 }
 
@@ -72,6 +155,9 @@ pub struct RowEnv<'p> {
 /// Extracted from `append_layout_row`'s per-cell loop body — identical cell-name check,
 /// inline-image handling, and whitespace trim, unchanged.
 fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, env: RowEnv<'_>, depth: usize) {
+    if env.ctx.excluded_node_ids.contains(&cell_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(env.parser) else {
         return;
     };
@@ -93,6 +179,12 @@ fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, 
         convert_as_inline: true,
         in_layout_cell: true,
         cell_allow_inline_images,
+        in_cell_of_inputs: super::scanner::cell_holds_only_inputs(
+            *cell_handle,
+            env.parser,
+            env.dom_ctx,
+            env.options.br_in_tables,
+        ),
         ..env.ctx.clone()
     };
     let cell_children = cell_tag.children();
@@ -125,6 +217,9 @@ fn append_layout_cell_text(cell_handle: &tl::NodeHandle, row_text: &mut String, 
 /// * `depth` - Current recursion depth (the row's own depth; cell content is walked at `depth + 1`)
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub fn append_layout_row(row_handle: &tl::NodeHandle, output: &mut String, env: RowEnv<'_>, depth: usize) {
+    if env.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(row_tag)) = row_handle.get(env.parser) else {
         return;
     };
@@ -134,13 +229,22 @@ pub fn append_layout_row(row_handle: &tl::NodeHandle, output: &mut String, env: 
         append_layout_cell_text(cell_handle, &mut row_text, env, depth);
     }
 
+    append_layout_text(output, &row_text, env.options, env.ctx);
+}
+
+pub(super) fn append_layout_text(
+    output: &mut String,
+    row_text: &str,
+    options: &crate::options::ConversionOptions,
+    ctx: &super::super::super::Context,
+) {
     let trimmed = row_text.trim();
     if !trimmed.is_empty() {
         if !output.is_empty() && !output.ends_with('\n') {
             output.push('\n');
         }
-        let marker = layout_row_bullet(env.options, env.ctx);
-        let formatted = strip_leading_bullet(trimmed, env.options);
+        let marker = layout_row_bullet(options, ctx);
+        let formatted = strip_leading_bullet(trimmed, options);
         output.push(marker);
         output.push(' ');
         output.push_str(formatted);
@@ -224,7 +328,7 @@ pub fn collect_row_cell_widths(
     depth: usize,
 ) {
     let mut cells = Vec::new();
-    collect_table_cells(node_handle, env.parser, env.dom_ctx, &mut cells);
+    collect_table_cells(node_handle, env.parser, env.dom_ctx, env.ctx, &mut cells);
 
     let mut col = 0usize;
     let mut cell_iter = cells.iter();
@@ -237,7 +341,6 @@ pub fn collect_row_cell_widths(
         };
 
         let text = cell_text_content(cell_handle, env.parser, env.options, env.ctx, env.dom_ctx, depth + 1);
-        const MAX_CELL_WIDTH: usize = 200;
         let width = text.chars().count().min(MAX_CELL_WIDTH);
         cell_cache.store(cell_handle.get_inner(), text);
 
@@ -272,10 +375,27 @@ fn emit_row_cell(
     row_text: &mut String,
     env: RowEnv<'_>,
     emission: CellEmission,
-    cell_cache: &mut CellTextCache,
-    deferred_tables: Option<&mut Vec<String>>,
+    render: &mut RowRender<'_>,
+    is_single_cell_row: bool,
 ) {
-    if let Some(text) = cell_cache.take(cell_handle.get_inner()) {
+    let deferred_tables = is_single_cell_row.then_some(&mut *render.deferred_tables);
+    if let Some(widths) = render.rendered_widths.as_deref_mut() {
+        let text = render.cell_cache.take(cell_handle.get_inner()).unwrap_or_else(|| {
+            render_cell_text(
+                cell_handle,
+                env.parser,
+                HandlerContext::new(env.options, env.ctx, emission.depth, env.dom_ctx),
+                deferred_tables,
+            )
+        });
+        let text_len = text.chars().count();
+        let padding_start = row_text.len() + 1 + text.len();
+        emit_cell_text(cell_handle, env.parser, row_text, &text, emission.col_width);
+        let old_padding = emission.col_width.unwrap_or(0).saturating_sub(text_len);
+        widths.record_cell(padding_start..padding_start + old_padding, emission.column, text_len);
+        return;
+    }
+    if let Some(text) = render.cell_cache.take(cell_handle.get_inner()) {
         emit_cell_text(cell_handle, env.parser, row_text, &text, emission.col_width);
     } else {
         convert_table_cell(
@@ -293,6 +413,7 @@ fn emit_row_cell(
 struct CellEmission {
     col_width: Option<usize>,
     depth: usize,
+    column: usize,
 }
 
 /// Minimum separator dash count per column (matches `---`).
@@ -312,6 +433,7 @@ fn emit_rowspan_continuation(
     rowspan_tracker: &mut [Option<usize>],
     col_widths: &[usize],
     row_text: &mut String,
+    rendered_widths: Option<&mut RenderedWidths>,
 ) -> bool {
     if *col_index >= total_cols {
         return false;
@@ -324,6 +446,7 @@ fn emit_rowspan_continuation(
     }
 
     let width = col_widths.get(*col_index).copied();
+    let padding_start = row_text.len() + 1;
     row_text.push(' ');
     if let Some(w) = width {
         for _ in 0..w {
@@ -331,6 +454,9 @@ fn emit_rowspan_continuation(
         }
     }
     row_text.push_str(" |");
+    if let Some(widths) = rendered_widths {
+        widths.record_cell(padding_start..padding_start + width.unwrap_or(0), *col_index, 0);
+    }
     *remaining_rows -= 1;
     if *remaining_rows == 0 {
         rowspan_tracker[*col_index] = None;
@@ -376,10 +502,20 @@ fn emit_rowspan_continuation(
 /// cyclomatic-complexity gate.
 #[cfg(feature = "visitor")]
 fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit: RowVisit<'_>) -> Option<bool> {
-    use crate::visitor::{NodeContext, NodeType, VisitResult};
-
-    let visitor_handle = visit.env.ctx.visitor.as_ref()?;
+    visit.env.ctx.visitor.as_ref()?;
     let cell_contents = visitor_cell_contents(visit);
+    run_row_visitor_with_contents(node_handle, output, visit, &cell_contents)
+}
+
+#[cfg(feature = "visitor")]
+pub(super) fn run_row_visitor_with_contents(
+    node_handle: &tl::NodeHandle,
+    output: &mut String,
+    visit: RowVisit<'_>,
+    cell_contents: &[String],
+) -> Option<bool> {
+    use crate::visitor::{NodeContext, NodeType, VisitResult};
+    let visitor_handle = visit.env.ctx.visitor.as_ref()?;
     let tl::Node::Tag(tag) = node_handle.get(visit.env.parser)? else {
         return None;
     };
@@ -396,7 +532,7 @@ fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit
 
     let visit_result = {
         let mut visitor = visitor_handle.lock().expect("visitor mutex poisoned");
-        visitor.visit_table_row(&node_ctx, &cell_contents, visit.is_header)
+        visitor.visit_table_row(&node_ctx, cell_contents, visit.is_header)
     };
 
     match visit_result {
@@ -423,12 +559,12 @@ fn run_row_visitor_hook(node_handle: &tl::NodeHandle, output: &mut String, visit
 
 #[cfg(feature = "visitor")]
 #[derive(Clone, Copy)]
-struct RowVisit<'a> {
-    env: RowEnv<'a>,
-    cells: &'a [tl::NodeHandle],
-    row_index: usize,
-    is_header: bool,
-    depth: usize,
+pub(super) struct RowVisit<'a> {
+    pub(super) env: RowEnv<'a>,
+    pub(super) cells: &'a [tl::NodeHandle],
+    pub(super) row_index: usize,
+    pub(super) is_header: bool,
+    pub(super) depth: usize,
 }
 
 #[cfg(feature = "visitor")]
@@ -464,17 +600,13 @@ fn visitor_cell_text(
 ) -> String {
     let mut text = String::new();
     if let Some(tl::Node::Tag(tag)) = cell_handle.get(env.parser) {
+        let cell_ctx = collect_ctx.for_cell(*cell_handle, env.parser, env.dom_ctx, env.options.br_in_tables);
         for child_handle in tag.children().top().iter() {
             super::super::super::walk_node(
                 child_handle,
                 env.parser,
                 &mut text,
-                crate::converter::block::container::HandlerContext::new(
-                    env.options,
-                    collect_ctx,
-                    depth + 1,
-                    env.dom_ctx,
-                ),
+                crate::converter::block::container::HandlerContext::new(env.options, &cell_ctx, depth + 1, env.dom_ctx),
             );
         }
     }
@@ -492,7 +624,7 @@ pub fn convert_table_row(
     let mut row_text = String::with_capacity(256);
     let mut cells = Vec::new();
 
-    collect_table_cells(node_handle, env.parser, env.dom_ctx, &mut cells);
+    collect_table_cells(node_handle, env.parser, env.dom_ctx, env.ctx, &mut cells);
     // ~keep A nested table may only be deferred out of a cell that shares its row with no
     // ~keep other cell -- pulling it out of a row with a sibling would leave that sibling's
     // ~keep column position undefined (issue #469 locks the sibling-cell shape to the
@@ -512,19 +644,21 @@ pub fn convert_table_row(
     #[cfg(feature = "visitor")]
     let visitor_output_start = output.len();
     #[cfg(feature = "visitor")]
-    if let Some(early_return) = run_row_visitor_hook(
-        node_handle,
-        output,
-        RowVisit {
-            env,
-            cells: &cells,
-            row_index: render.row_index,
-            is_header: render.is_header,
-            depth: render.depth,
-        },
-    ) {
-        *render.has_content |= output.len() > visitor_output_start;
-        return early_return;
+    if !render.visitor_is_complete {
+        if let Some(early_return) = run_row_visitor_hook(
+            node_handle,
+            output,
+            RowVisit {
+                env,
+                cells: &cells,
+                row_index: render.row_index,
+                is_header: render.is_header,
+                depth: render.depth,
+            },
+        ) {
+            *render.has_content |= output.len() > visitor_output_start;
+            return early_return;
+        }
     }
 
     // ~keep Build the per-cell context once for the entire row.  Tier-2 hot-spot
@@ -536,20 +670,48 @@ pub fn convert_table_row(
     };
 
     let row_env = RowEnv { ctx: &cell_ctx, ..env };
+    let first_width_edit = render.rendered_widths.as_ref().map_or(0, |widths| widths.edits.len());
     let mut filled_cols = render_row_cells(&cells, &mut row_text, row_env, render, is_single_cell_row);
     // ~keep Empty emitted cells contain only padding and delimiters; a literal content pipe is escaped.
     *render.has_content |= row_text.chars().any(|ch| ch != '|' && !ch.is_whitespace());
-    pad_row(&mut row_text, &mut filled_cols, render.total_cols, render.col_widths);
-    output.push('|');
-    output.push_str(&row_text);
-    output.push('\n');
-    if render.row_index == 0 {
-        emit_header_separator(output, env.options, render.header_cols, render.col_widths);
-    }
+    pad_row(
+        &mut row_text,
+        &mut filled_cols,
+        render.total_cols,
+        render.col_widths,
+        render.rendered_widths.as_deref_mut(),
+    );
+    append_rendered_row(output, &row_text, env.options, render, first_width_edit);
     true
 }
 
+fn append_rendered_row(
+    output: &mut String,
+    row_text: &str,
+    options: &crate::options::ConversionOptions,
+    render: &mut RowRender<'_>,
+    first_width_edit: usize,
+) {
+    if let Some(widths) = render.rendered_widths.as_deref_mut() {
+        widths.commit_row(first_width_edit, output.len() + 1);
+    }
+    output.push('|');
+    output.push_str(row_text);
+    output.push('\n');
+    if render.row_index == 0 {
+        let separator_start = output.len();
+        emit_header_separator(output, options, render.header_cols, render.col_widths);
+        if let Some(widths) = render.rendered_widths.as_deref_mut() {
+            widths.edits.push(WidthEdit::Separator {
+                padding: separator_start..output.len(),
+                columns: render.header_cols,
+            });
+        }
+    }
+}
+
 pub struct RowRender<'a> {
+    pub visitor_is_complete: bool,
     pub row_index: usize,
     pub has_content: &'a mut bool,
     pub has_span: bool,
@@ -561,6 +723,7 @@ pub struct RowRender<'a> {
     pub col_widths: &'a [usize],
     pub cell_cache: &'a mut CellTextCache,
     pub deferred_tables: &'a mut Vec<String>,
+    pub rendered_widths: Option<&'a mut RenderedWidths>,
 }
 
 fn render_row_cells(
@@ -572,7 +735,6 @@ fn render_row_cells(
 ) -> usize {
     if !render.has_span {
         for (cell_index, cell_handle) in cells.iter().enumerate() {
-            let deferred = is_single_cell_row.then_some(&mut *render.deferred_tables);
             emit_row_cell(
                 cell_handle,
                 row_text,
@@ -580,9 +742,10 @@ fn render_row_cells(
                 CellEmission {
                     col_width: render.col_widths.get(cell_index).copied(),
                     depth: render.depth + 1,
+                    column: cell_index,
                 },
-                render.cell_cache,
-                deferred,
+                render,
+                is_single_cell_row,
             );
         }
         return cells.len();
@@ -606,13 +769,13 @@ fn render_spanned_row(
             render.rowspan_tracker,
             render.col_widths,
             row_text,
+            render.rendered_widths.as_deref_mut(),
         ) {
             continue;
         }
         let Some(cell_handle) = cell_iter.next() else {
             break;
         };
-        let deferred = is_single_cell_row.then_some(&mut *render.deferred_tables);
         emit_row_cell(
             cell_handle,
             row_text,
@@ -620,9 +783,10 @@ fn render_spanned_row(
             CellEmission {
                 col_width: render.col_widths.get(col_index).copied(),
                 depth: render.depth + 1,
+                column: col_index,
             },
-            render.cell_cache,
-            deferred,
+            render,
+            is_single_cell_row,
         );
         let (colspan, rowspan) = get_colspan_rowspan(cell_handle, env.parser);
         if rowspan > 1 && col_index < render.total_cols {
@@ -635,14 +799,24 @@ fn render_spanned_row(
 
 /// ~keep Ragged rows must still declare the widest row's column count or GFM rejects the table
 /// ~keep and renderers can discard cells beyond the delimiter row (issue #13).
-fn pad_row(row_text: &mut String, filled_cols: &mut usize, total_cols: usize, col_widths: &[usize]) {
+fn pad_row(
+    row_text: &mut String,
+    filled_cols: &mut usize,
+    total_cols: usize,
+    col_widths: &[usize],
+    mut rendered_widths: Option<&mut RenderedWidths>,
+) {
     while *filled_cols < total_cols {
         let width = col_widths.get(*filled_cols).copied();
+        let padding_start = row_text.len() + 1;
         row_text.push(' ');
         if let Some(width) = width {
             row_text.extend(std::iter::repeat_n(' ', width));
         }
         row_text.push_str(" |");
+        if let Some(widths) = rendered_widths.as_deref_mut() {
+            widths.record_cell(padding_start..padding_start + width.unwrap_or(0), *filled_cols, 0);
+        }
         *filled_cols += 1;
     }
 }
@@ -670,4 +844,26 @@ fn emit_header_separator(
         output.push(' ');
     }
     output.push_str("|\n");
+}
+
+#[cfg(test)]
+mod width_tests {
+    use super::{MAX_CELL_WIDTH, MAX_TABLE_COLS, RenderedWidths};
+
+    #[test]
+    fn should_limit_recorded_widths_and_padding_to_supported_columns() {
+        let mut widths = RenderedWidths::default();
+        widths.record_cell(0..0, MAX_TABLE_COLS - 1, MAX_CELL_WIDTH + 1);
+        assert_eq!(widths.widths.len(), MAX_TABLE_COLS);
+        assert_eq!(widths.widths[MAX_TABLE_COLS - 1], MAX_CELL_WIDTH);
+        assert_eq!(widths.edits.len(), 1);
+
+        widths.record_cell(0..0, MAX_TABLE_COLS, 1);
+        assert_eq!(widths.widths.len(), MAX_TABLE_COLS);
+        assert_eq!(widths.edits.len(), 1);
+
+        widths.record_cell(0..0, usize::MAX, 1);
+        assert_eq!(widths.widths.len(), MAX_TABLE_COLS);
+        assert_eq!(widths.edits.len(), 1);
+    }
 }

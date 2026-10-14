@@ -199,6 +199,7 @@ call_func(
   foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar,
   foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar, foo, bar);
 
+
 // 매우 긴 함수 인수를 사용해야하는 경우, 가독성을 위해 개행
 call_func(
   bang,
@@ -375,6 +376,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
+
 class MinimalPublisher(Node):
 
     def __init__(self):
@@ -391,6 +393,7 @@ class MinimalPublisher(Node):
         self.get_logger().info('Publishing: "%s"' % msg.data)
         self.i += 1
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -403,6 +406,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -453,13 +457,13 @@ self.i는 메시지에 넣어
 발행할 숫자겠죠?
 
 ```
-노드 클래스 내부에 있는
-	def timer_callback(self):
-       msg = String()
-       msg.data = 'Hello World: %d' % self.i
-       self.publisher_.publish(msg)
-       self.get_logger().info('Publishing: "%s"' % msg.data)
-       self.i += 1
+ 노드 클래스 내부에 있는
+ 	def timer_callback(self):
+        msg = String()
+        msg.data = 'Hello World: %d' % self.i
+        self.publisher_.publish(msg)
+        self.get_logger().info('Publishing: "%s"' % msg.data)
+        self.i += 1
 ```
 
 def timer_callback은 메시지 형식을 msg라는 변수에 저장하고, data에다가 string을
@@ -486,6 +490,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -546,6 +551,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
+
 class MinimalSubscriber(Node):
 
     def __init__(self):
@@ -560,6 +566,7 @@ class MinimalSubscriber(Node):
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%s"' % msg.data)
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -572,6 +579,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_subscriber.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
@@ -667,7 +675,7 @@ alias ros_study="humble; source ~/ros_study/install/local_setup.bash; echo \"ros
    
    
    
-QoS는 이론 설명을 제외했으나, Quality of Service의 약자로 데이터를 주고받을 때 약속에 대한 내용입니다.
+ QoS는 이론 설명을 제외했으나, Quality of Service의 약자로 데이터를 주고받을 때 약속에 대한 내용입니다.
 실제 로봇을 다룰 때 정말 중요한 내용 중 하나입니다.  
    
 두 파일 모두 이렇게 수정하시면 됩니다. 수정된 부분만 적으면
@@ -679,6 +687,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 from rclpy.qos import QoSProfile
+
 
 class my_publisher(Node):
 
@@ -781,6 +790,7 @@ from rclpy.node import Node
 
 from rclpy.qos import QoSProfile
 
+
 class my_publisher(Node):
 
     def __init__(self):
@@ -797,6 +807,7 @@ class my_publisher(Node):
         self.publisher_.publish()
         self.get_logger().info()
 
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -809,6 +820,7 @@ def main(args=None):
     # when the garbage collector destroys the node object)
     minimal_publisher.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

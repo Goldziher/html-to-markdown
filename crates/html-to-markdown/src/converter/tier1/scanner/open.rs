@@ -7,7 +7,7 @@
 /// so raw-source slicing would diverge from Tier-2).
 ///
 /// Mirrors Tier-2's `media/svg.rs::handle_svg`:
-/// - Walks children for a `<title>` tag → alt text.  Default: "SVG Image".
+/// - Takes the alt text from `graphic_text`, the function Tier-2 uses.
 /// - Calls `serialize_element` on the root SVG node.
 /// - Base64-encodes (STANDARD engine) the serialized bytes.
 /// - Emits `![{title}](data:image/svg+xml;base64,{b64})`.
@@ -31,6 +31,14 @@ fn emit_svg_from_slice(
         return Ok(());
     }
 
+    // ~keep Tier-2 removes a hidden element before it parses, also inside a graphic. The slice
+    // ~keep still holds it, and its text would be read as text of the graphic.
+    if holds_hidden_element(svg_slice) {
+        return Err(BailReason::HiddenElement {
+            offset: svg_start_offset,
+        });
+    }
+
     use crate::converter::media::svg::serialize_element;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
@@ -50,7 +58,10 @@ fn emit_svg_from_slice(
     let Some(handle) = find_svg_handle(&dom) else {
         return Ok(());
     };
-    let title = svg_title(handle, parser);
+    let Some(tl::Node::Tag(svg)) = handle.get(parser) else {
+        return Ok(());
+    };
+    let title = crate::converter::media::svg::graphic_text(svg, parser, options.hidden_content);
 
     let svg_html = serialize_element(&handle, parser);
     let base64_svg = STANDARD.encode(svg_html.as_bytes());
@@ -75,6 +86,30 @@ fn emit_svg_from_slice(
     Ok(())
 }
 
+/// Whether a tag inside the `<svg>` of `svg_slice` is hidden by its attribute or its style.
+///
+/// ~keep Each search starts where the last tag ended, so the scan reads the slice once.
+fn holds_hidden_element(svg_slice: &str) -> bool {
+    use crate::converter::utility::preprocessing::{find_tag_end, tag_has_hidden_attribute, tag_has_hidden_style};
+
+    let mut from = 1;
+    while let Some(start) = svg_slice
+        .get(from..)
+        .and_then(|rest| rest.find('<'))
+        .map(|at| from + at)
+    {
+        let end = find_tag_end(svg_slice.as_bytes(), start + 1)
+            .unwrap_or(svg_slice.len())
+            .max(start + 1);
+        let tag = &svg_slice[start..end];
+        if tag_has_hidden_attribute(tag) || tag_has_hidden_style(tag) {
+            return true;
+        }
+        from = end;
+    }
+    false
+}
+
 fn find_svg_handle(dom: &tl::VDom<'_>) -> Option<tl::NodeHandle> {
     dom.nodes().iter().enumerate().find_map(|(index, node)| {
         let tl::Node::Tag(tag) = node else { return None };
@@ -86,73 +121,6 @@ fn find_svg_handle(dom: &tl::VDom<'_>) -> Option<tl::NodeHandle> {
     })
 }
 
-fn svg_title(handle: tl::NodeHandle, parser: &tl::Parser<'_>) -> String {
-    let Some(tl::Node::Tag(svg)) = handle.get(parser) else {
-        return String::from("SVG Image");
-    };
-    svg.children()
-        .top()
-        .iter()
-        .filter_map(|child| child.get(parser).and_then(tl::Node::as_tag))
-        .find(|tag| tag.name().as_utf8_str().as_ref().eq_ignore_ascii_case("title"))
-        .map_or_else(
-            || String::from("SVG Image"),
-            |title| {
-                let text = title
-                    .children()
-                    .top()
-                    .iter()
-                    .filter_map(|child| child.get(parser).and_then(tl::Node::as_raw))
-                    .map(|raw| raw.as_utf8_str())
-                    .collect::<String>();
-                let trimmed = text.trim();
-                if trimmed.is_empty() {
-                    String::from("SVG Image")
-                } else {
-                    trimmed.to_owned()
-                }
-            },
-        )
-}
-
-/// Skip the body of a raw-text element (script/style/textarea/iframe/…).
-///
-/// `open_end` is the byte index immediately after the tag's `>`.  `tag_name`
-/// is the lowercased open-tag name.  Returns the byte index after the
-/// matching `</tag>` close, or `None` if no matching close tag exists in the
-/// remainder of the input.
-///
-/// Mirrors the prescan's STRIP_CONTENT_TAGS handling: content is discarded,
-/// only the position advances.  Matches Tier-2's behaviour byte-for-byte
-/// because Tier-2 sees this content already stripped by the prescan.
-fn find_raw_text_close(bytes: &[u8], open_end: usize, tag_name: &[u8]) -> Option<usize> {
-    let len = bytes.len();
-    let mut idx = open_end;
-    while idx < len {
-        match memchr3(b'<', b'<', b'<', &bytes[idx..]) {
-            Some(off) => idx += off,
-            None => return None,
-        }
-        if idx + 2 < len && bytes[idx + 1] == b'/' {
-            let after_slash = idx + 2;
-            if after_slash + tag_name.len() <= len
-                && bytes[after_slash..after_slash + tag_name.len()].eq_ignore_ascii_case(tag_name)
-            {
-                let post_name = after_slash + tag_name.len();
-                if matches!(bytes.get(post_name), Some(b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r')) {
-                    return find_tag_end(bytes, post_name);
-                }
-            }
-        }
-        idx += 1;
-    }
-    None
-}
-
-fn find_tag_end(bytes: &[u8], start: usize) -> Option<usize> {
-    memchr::memchr(b'>', &bytes[start..]).map(|offset| start + offset + 1)
-}
-
 #[inline]
 const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReason> {
     match spec.kind {
@@ -161,8 +129,12 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
         // is only `<script>`/`<style>`.  The seven genuine `TagKind::RawText` kinds
         // (title / xmp / textarea / iframe / noscript / noembed / noframes) fall
         // through to here, and this is the bail that keeps Tier-1 from emitting their
-        // text content incorrectly.  See the sibling note above `find_raw_text_close`.
+        // text content incorrectly.
         TagKind::RawText(_) => Err(BailReason::Classifier),
+
+        // ~keep Tier-2 writes the link of an `<audio>` or `<video>` (the address, the `title`,
+        // the `<source>` children). Tier-1 has no such rule, so it hands the page over.
+        TagKind::Media => Err(BailReason::Classifier),
 
         // ~keep `Ignored` tags (head/meta/link/script/style) are now handled inline
         // by the main scan loop (see the dispatch above `bail_unsupported`).
@@ -184,8 +156,8 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
 // content-bearing containers with no formatting beyond block separation) all
 // render through a handler that pushes a leading and/or trailing `"\n\n"`.
 // The names below are the ones that still fall through to Tier-2's `_ =>` arm
-// (`block::unknown::handle`) or, for `html`/`body`,
-// `block::container::handle_structural_container` -- both of which just walk
+// (`block::unknown::open`) or, for `html`/`body`,
+// `block::container::open_children` -- both of which just walk
 // children with NO separator of their own, and deliberately so:
 // `colgroup`/`col` are table-internal metadata (never render visible content
 // of their own), `base` is void metadata, and `html`/`body` are document
@@ -197,6 +169,11 @@ const fn bail_unsupported(spec: &TagSpec, _offset: usize) -> Result<(), BailReas
 // get semantic-handler separator behaviour like `<div>`.
 fn block_container_is_passthrough(name_lower: &[u8]) -> bool {
     matches!(name_lower, b"colgroup" | b"col" | b"base" | b"html" | b"body")
+}
+
+// ~keep Plain extraction walks form children without a block boundary; HTML paragraph closing still uses TagSpec.
+fn is_transparent_plain_form(name_lower: &[u8], options: &ConversionOptions) -> bool {
+    name_lower == b"form" && options.output_format == crate::options::OutputFormat::Plain
 }
 
 fn emit_open(
@@ -211,11 +188,48 @@ fn emit_open(
     emit_open_kind(state, spec, name_lower, attrs, table_probes, options)
 }
 
-fn prepare_open_state(
-    state: &mut Tier1State,
+const fn is_block_open_kind(spec: &TagSpec) -> bool {
+    matches!(
+        spec.kind,
+        TagKind::Block
+            | TagKind::Paragraph
+            | TagKind::Heading(_)
+            | TagKind::Blockquote
+            | TagKind::Pre
+            | TagKind::List(_)
+            | TagKind::Table
+            | TagKind::Summary
+            | TagKind::DefinitionTerm
+            | TagKind::DefinitionDescription
+    )
+}
+
+fn validate_code_open(state: &Tier1State, spec: &TagSpec, is_link_block: bool) -> Result<(), BailReason> {
+    // ~keep In code (`<pre>`, `<code>`, `<kbd>`, `<samp>`) Tier-2 writes a link label as it did
+    // ~keep before the rules of running text. This scanner trims the label, so it leaves the
+    // ~keep page to Tier-2. A block inside pre writes the same lines in both converters.
+    let in_code = state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE);
+    if in_code && matches!(spec.kind, TagKind::Link) {
+        return Err(BailReason::Classifier);
+    }
+    // ~keep A block can close or reconstruct code-like elements in the HTML tree (#842).
+    // ~keep The scanner's source stack cannot reproduce that DOM, so leave it to Tier-2.
+    // ~keep Headings and cells fold block boundaries inline; their existing code-span paths agree.
+    if is_link_block
+        && in_code
+        && !state.escape_ctx.intersects(EscapeCtx::PRE | EscapeCtx::HEADING)
+        && !state.in_table_cell()
+    {
+        return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
+/// Hand the page to Tier-2 at a link or a form group that opens in code.
+fn hand_over_link_or_form_group_in_code(
+    state: &Tier1State,
     spec: &TagSpec,
     name_lower: &[u8],
-    options: &ConversionOptions,
 ) -> Result<(), BailReason> {
     // ~keep Links in inline code need split spans; code-block links must stay literal (#813).
     if matches!(spec.kind, TagKind::Link) && state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
@@ -227,6 +241,24 @@ fn prepare_open_state(
         && !state.escape_ctx.contains(EscapeCtx::PRE)
     {
         return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
+fn prepare_open_state(
+    state: &mut Tier1State,
+    spec: &TagSpec,
+    name_lower: &[u8],
+    options: &ConversionOptions,
+) -> Result<(), BailReason> {
+    hand_over_link_or_form_group_in_code(state, spec, name_lower)?;
+    if std::mem::take(&mut state.last_closed_list)
+        && matches!(spec.kind, TagKind::Pre)
+        && options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && !state.in_table_cell()
+    {
+        state.ensure_blank_line();
+        push_list_item_continuation_lines(state, "<!-- -->\n\n");
     }
     state.last_closed_custom_element = false;
     state.last_emitted_was_img = false;
@@ -240,18 +272,27 @@ fn prepare_open_state(
     {
         return Err(BailReason::InlineMarkerNotReproduced);
     }
-    let is_link_block = matches!(
-        spec.kind,
-        TagKind::Block
-            | TagKind::Paragraph
-            | TagKind::Heading(_)
-            | TagKind::Blockquote
-            | TagKind::Pre
-            | TagKind::List(_)
-            | TagKind::Table
-            | TagKind::Summary
-    );
+    if matches!(
+        name_lower,
+        b"select" | b"option" | b"optgroup" | b"datalist" | b"button"
+    ) {
+        return Err(BailReason::FormControl);
+    }
+    let is_link_block = is_block_open_kind(spec);
     if is_link_block && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link)) {
+        return Err(BailReason::Classifier);
+    }
+    validate_code_open(state, spec, is_link_block)?;
+    // ~keep A block inside marks inside a heading (`<h2>one<b><p>y</p></b>two</h2>`): Tier-2
+    // ~keep writes the block boundary as one space after the closing marks (issue #751). This
+    // ~keep scanner closes the marks before it knows what follows, so it leaves the page to Tier-2.
+    let in_marks = |frame: &OpenTag| {
+        matches!(
+            frame.spec.kind,
+            TagKind::Strong | TagKind::Emphasis | TagKind::Strikethrough | TagKind::Inserted
+        )
+    };
+    if is_link_block && state.escape_ctx.contains(EscapeCtx::HEADING) && state.stack.iter().any(in_marks) {
         return Err(BailReason::Classifier);
     }
     Ok(())
@@ -285,7 +326,7 @@ fn emit_open_kind(
         TagKind::Strong => open_strong(state)?,
         TagKind::Emphasis => open_emphasis(state)?,
         TagKind::Strikethrough => open_marker(state, "~~")?,
-        TagKind::Inserted => open_marker(state, "==")?,
+        TagKind::Inserted => {}
         TagKind::Code if !state.escape_ctx.contains(EscapeCtx::PRE) && !state.escape_ctx.contains(EscapeCtx::CODE) => {}
         TagKind::Code if state.pre_lang.is_none() && state.escape_ctx.contains(EscapeCtx::PRE) => {
             if let Some(lang) = extract_language_from_class(attrs) {
@@ -312,16 +353,38 @@ fn emit_open_kind(
         // `close_table_cell`'s `replace('\n', ' ')` step, this becomes a 3-space
         // run between sibling divs — matching Tier-2's lists_timeline cell
         // layout `[link]   [other-link]`.  Without this, Tier-1 emits 1 space.
-        TagKind::Block => open_block_container(state, name_lower, options.br_in_tables),
+        TagKind::Block => open_block_container(state, name_lower, options),
         TagKind::Summary => open_summary_container(state, options.br_in_tables)?,
         TagKind::Figcaption => open_figcaption(state),
-        // ~keep Button: no leading separator (matches Tier-2 handle_button which
-        // does nothing on open).  Close-side `\n\n` is emitted by close_button.
-        TagKind::Button => {}
+        TagKind::LineEndControl => open_line_end_control(state)?,
         TagKind::Inline => {}
         _ => {}
     }
 
+    Ok(())
+}
+
+/// ~keep A control that ends its line: nothing on open. `close_line_end_control` writes the
+/// ~keep space before its text and the `\n\n` after it, as Tier-2 `write_line_end_control`
+/// ~keep does. In a line that goes on after the control, Tier-2 reads the text that follows it
+/// ~keep instead. In code Tier-2 writes neither.
+fn open_line_end_control(state: &Tier1State) -> Result<(), BailReason> {
+    if state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
+        return Err(BailReason::FormControl);
+    }
+    let in_inline_container = state.stack.iter().any(|frame| {
+        matches!(
+            frame.spec.kind,
+            TagKind::Heading(_) | TagKind::Summary | TagKind::Figcaption | TagKind::Link | TagKind::TableCaption
+        )
+    });
+    let in_inline_element = state
+        .stack
+        .last()
+        .is_some_and(|parent| crate::converter::form::spacing::line_goes_on_in(Some(parent.spec)));
+    if in_inline_container || in_inline_element {
+        return Err(BailReason::FormControl);
+    }
     Ok(())
 }
 
@@ -364,12 +427,15 @@ fn open_marker(state: &mut Tier1State, marker: &str) -> Result<(), BailReason> {
     Ok(())
 }
 
-fn open_block_container(state: &mut Tier1State, name_lower: &[u8], br_in_tables: bool) {
-    if block_container_is_passthrough(name_lower) {
+fn open_block_container(state: &mut Tier1State, name_lower: &[u8], options: &ConversionOptions) {
+    if block_container_is_passthrough(name_lower)
+        || is_transparent_plain_form(name_lower, options)
+        || start_line_in_pre(state, name_lower)
+    {
         return;
     }
     if state.in_table_cell() {
-        break_cell_before_block(state, br_in_tables);
+        break_cell_before_block(state, options.br_in_tables);
         return;
     }
     let output = state.cell_or_output_mut();
@@ -427,6 +493,13 @@ fn emit_tier1_table_cell_break(state: &mut Tier1State, br_in_tables: bool) {
 }
 
 fn open_paragraph(state: &mut Tier1State, br_in_tables: bool) {
+    // ~keep A paragraph in a heading's code span is transparent: no synthetic code whitespace.
+    if state.escape_ctx.contains(EscapeCtx::CODE | EscapeCtx::HEADING)
+        && !state.escape_ctx.contains(EscapeCtx::PRE)
+        && !state.in_table_cell()
+    {
+        return;
+    }
     // ~keep When inside a table cell, treat `<p>` as a transparent container.
     // Tier-2's paragraph.rs writes the cell break (`<br>` under `br_in_tables`,
     // a space otherwise) when `in_table_cell` and there is already cell content

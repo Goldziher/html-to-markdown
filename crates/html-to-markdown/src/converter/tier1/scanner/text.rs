@@ -2,8 +2,13 @@
 struct UpcomingTextSibling {
     is_list: bool,
     is_img: bool,
-    is_span: bool,
     is_inline: bool,
+    /// Comments follow the text, and an inline element opens after them.
+    inline_follows_comments: bool,
+    /// The content of that inline element starts with a block.
+    inline_starts_with_block: bool,
+    /// The text ends with a line end and the text after the tag starts with a zero-width space.
+    line_end_meets_zero_width_space: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -16,9 +21,8 @@ struct TextFlush<'a> {
 }
 
 const UNICODE_WS_ENTITIES: &[&str] = &[
-    "&#12;", "&#x0c;", "&#x0C;", "&#xC;", "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;",
-    "&emsp;", "&#8195;", "&#x2003;", "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;",
-    "&#12288;", "&#x3000;",
+    "&nbsp;", "&#160;", "&#xa0;", "&#xA0;", "&ensp;", "&#8194;", "&#x2002;", "&emsp;", "&#8195;", "&#x2003;",
+    "&thinsp;", "&#8201;", "&#x2009;", "&hairsp;", "&#8202;", "&#x200a;", "&#x200A;", "&#12288;", "&#x3000;",
 ];
 
 fn handle_structural_text(state: &mut Tier1State, raw: &str, br_in_tables: bool) -> Result<bool, BailReason> {
@@ -77,7 +81,7 @@ fn normalize_unicode_whitespace(raw: &str, verbatim: bool) -> std::borrow::Cow<'
 }
 
 const fn is_non_ascii_whitespace(character: char) -> bool {
-    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r')
+    character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r' | '\u{c}')
 }
 
 #[derive(Clone, Copy)]
@@ -127,16 +131,17 @@ fn handle_adjacent_image_whitespace(
 fn text_position(state: &mut Tier1State, raw: &str) -> TextPosition {
     let in_summary = state.in_summary();
     let active_len = state.cell_or_output_mut().len();
+    // ~keep A link label is not such a start: the white space it starts with is written into the
+    // ~keep label, as the full converter writes it into its label buffer, and `close_link` gives
+    // ~keep the label to the edge rule of both converters (issue #845).
     let at_inline_frame_start = state.stack.last().is_some_and(|frame| {
         frame.content_start >= active_len
-            && (matches!(
-                frame.spec.kind,
-                TagKind::Link | TagKind::Strong | TagKind::Emphasis | TagKind::Code
-            ) || (in_summary
-                && matches!(
-                    frame.spec.kind,
-                    TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
-                )))
+            && (matches!(frame.spec.kind, TagKind::Strong | TagKind::Emphasis | TagKind::Code)
+                || (in_summary
+                    && matches!(
+                        frame.spec.kind,
+                        TagKind::Inline | TagKind::Block | TagKind::Paragraph | TagKind::Heading(_)
+                    )))
     });
     let active = state.cell_or_output_mut();
     let block_edge = active.is_empty()
@@ -276,15 +281,14 @@ fn trim_leading_text_run<'a>(
         );
     let in_link_frame = matches!(state.stack.last().map(|frame| frame.spec.kind), Some(TagKind::Link));
     let after_line_end = follows_line_end(state);
-    let bare_inline_after_space = bare_inline_follows_space(state);
+    // ~keep White space after a space is the same run of white space, whatever lies between
+    // ~keep the two: an element that wrote nothing is no word. Mirrors Tier-2's `skip_prefix`.
+    let after_space = state.cell_or_output_mut().ends_with(' ');
     let should_trim = !in_pre
         && !in_code
-        && (!state.in_table_cell() || in_link_frame)
-        && (at_inline_frame_start
-            || block_separator_after
-            || document_start_strip
-            || after_line_end
-            || bare_inline_after_space);
+        && (after_space
+            || ((!state.in_table_cell() || in_link_frame)
+                && (at_inline_frame_start || block_separator_after || document_start_strip || after_line_end)));
     if !should_trim {
         return std::borrow::Cow::Borrowed(raw);
     }
@@ -312,23 +316,7 @@ fn follows_block_separator(active: &str) -> bool {
 }
 
 fn follows_line_end(state: &mut Tier1State) -> bool {
-    let active_len = state.cell_or_output_mut().len();
-    let opens_own_buffer = state
-        .stack
-        .iter()
-        .rev()
-        .take_while(|frame| frame.content_start >= active_len)
-        .any(|frame| frame.children_in_own_buffer);
-    !opens_own_buffer && state.cell_or_output_mut().ends_with('\n')
-}
-
-fn bare_inline_follows_space(state: &mut Tier1State) -> bool {
-    let buffer_len = state.cell_or_output_mut().len();
-    let at_bare_inline_start = matches!(
-        state.stack.last(),
-        Some(frame) if frame.content_start >= buffer_len && matches!(frame.spec.kind, TagKind::Inline)
-    );
-    at_bare_inline_start && state.cell_or_output_mut().ends_with(' ')
+    state.cell_or_output_mut().ends_with('\n')
 }
 
 fn emit_verbatim_text(
@@ -373,7 +361,7 @@ fn prepare_normal_text<'a>(
     raw: &'a str,
     inside_inline: bool,
     base_offset: usize,
-    next_tag_is_span: bool,
+    next: NextElement,
 ) -> Result<PreparedText<'a>, BailReason> {
     let in_cell = state.in_table_cell();
     let (decoded, predecoded) = if !inside_inline && !in_cell && raw.contains('&') {
@@ -384,7 +372,7 @@ fn prepare_normal_text<'a>(
         (std::borrow::Cow::Borrowed(raw), false)
     };
     let transformed = if !inside_inline && !in_cell {
-        chomp_normal_text(state, decoded.as_ref(), next_tag_is_span)
+        chomp_normal_text(state, decoded.as_ref(), next)
     } else {
         None
     };
@@ -400,7 +388,7 @@ fn prepare_normal_text<'a>(
     })
 }
 
-fn chomp_normal_text(state: &Tier1State, raw: &str, next_tag_is_span: bool) -> Option<(String, bool)> {
+fn chomp_normal_text(state: &Tier1State, raw: &str, next: NextElement) -> Option<(String, bool)> {
     let trim_chars: &[char] = &['\n', '\r', ' ', '\t'];
     let after_leading = raw.trim_start_matches(trim_chars);
     let leading_len = raw.len() - after_leading.len();
@@ -414,14 +402,14 @@ fn chomp_normal_text(state: &Tier1State, raw: &str, next_tag_is_span: bool) -> O
         return None;
     }
     let prefix = if leading_len > 0 { " " } else { "" };
-    let (suffix, ends_in_newline_join) = trailing_text_suffix(state, trailing, next_tag_is_span);
+    let (suffix, ends_in_newline_join) = trailing_text_suffix(state, trailing, next);
     Some((
         format!("{prefix}{}{suffix}", &raw[leading_len..trimmed_len]),
         ends_in_newline_join,
     ))
 }
 
-fn trailing_text_suffix<'a>(state: &Tier1State, trailing: &'a str, next_tag_is_span: bool) -> (&'a str, bool) {
+fn trailing_text_suffix<'a>(state: &Tier1State, trailing: &'a str, next: NextElement) -> (&'a str, bool) {
     if contains_blank_line(trailing.as_bytes()) {
         return ("\n\n", false);
     }
@@ -429,7 +417,7 @@ fn trailing_text_suffix<'a>(state: &Tier1State, trailing: &'a str, next_tag_is_s
         return (" ", false);
     }
     if trailing.bytes().any(|byte| matches!(byte, b'\n' | b'\r')) {
-        let join = trailing_single_newline_join(state, next_tag_is_span);
+        let join = trailing_single_newline_join(state, next);
         return (join, join == "\n");
     }
     (trailing, false)
@@ -598,6 +586,52 @@ fn escape_emitted_text(dest: &mut String, context: EmittedTextContext) {
     }
 }
 
+/// The source text `raw` without the line end at its end, when `raw` has other content too.
+///
+/// ~keep A line end beside a zero-width space is no white space: the two parts are one word.
+/// ~keep Mirrors Tier-2's `without_line_end_before_zero_width_space`, which reads decoded text:
+/// ~keep a character reference to white space counts here as that white space.
+fn without_line_end_at_zero_width_space(raw: &str) -> &str {
+    crate::converter::utility::content::without_trailing_line_end_in_source(raw).unwrap_or(raw)
+}
+
+/// Hand the page to Tier-2 at white space text beside an image in a code span.
+///
+/// ~keep Tier-2 keeps white space beside an image in a code span as the source has it. The
+/// ~keep rules of `flush_text` are the rules for running text, so Tier-2 takes that page.
+const fn hand_over_white_space_at_image_in_code_span(
+    in_code_span: bool,
+    position: TextPosition,
+    history: WhitespaceHistory,
+    upcoming: UpcomingTextSibling,
+) -> Result<(), BailReason> {
+    if in_code_span && position.whitespace_only && (history.after_img || upcoming.is_img) {
+        return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
+/// Whether the source text `raw` is text of the element around it: not white space only.
+///
+/// ~keep The question of `DomContext::holds_text`, asked of the same decoded text. The close of
+/// ~keep an element reads the count of such texts to tell whether the element holds text.
+fn is_text_of_an_element(raw: &str) -> bool {
+    use crate::converter::utility::white_space::{TextClass, classify_text};
+    let decoded = crate::text::decode_html_entities_cow(raw);
+    !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
+}
+
+/// What was written before this text, read once: the two flags are clear for the next text.
+const fn take_whitespace_history(state: &mut Tier1State) -> WhitespaceHistory {
+    let history = WhitespaceHistory {
+        after_custom_element: state.last_closed_custom_element,
+        after_img: state.last_emitted_was_img,
+    };
+    state.last_closed_custom_element = false;
+    state.last_emitted_was_img = false;
+    history
+}
+
 fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), BailReason> {
     let TextFlush {
         raw,
@@ -609,30 +643,31 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
     if raw.is_empty() {
         return Ok(());
     }
-
-    let history = WhitespaceHistory {
-        after_custom_element: state.last_closed_custom_element,
-        after_img: state.last_emitted_was_img,
-    };
-    state.last_closed_custom_element = false;
-    state.last_emitted_was_img = false;
+    state.text_count += usize::from(is_text_of_an_element(raw));
+    let history = take_whitespace_history(state);
 
     if handle_structural_text(state, raw, br_in_tables)? {
         return Ok(());
     }
 
+    if !crate::converter::utility::white_space::is_blank(raw) {
+        state.last_closed_list = false;
+    }
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
 
+    let raw = if upcoming.line_end_meets_zero_width_space && !in_pre && !in_code {
+        without_line_end_at_zero_width_space(raw)
+    } else {
+        raw
+    };
+
+    hand_over_unicode_space_after_space(state, raw, base_offset)?;
     let normalized_whitespace = normalize_unicode_whitespace(raw, in_pre || in_code);
     let raw = normalized_whitespace.as_ref();
 
     let position = text_position(state, raw);
-    // ~keep Tier-2 keeps white space beside an image in a code span as the source has it. The
-    // ~keep rules below are the rules for running text, so Tier-2 takes that page.
-    if in_code && !in_pre && position.whitespace_only && (history.after_img || upcoming.is_img) {
-        return Err(BailReason::Classifier);
-    }
+    hand_over_white_space_at_image_in_code_span(in_code && !in_pre, position, history, upcoming)?;
     if handle_whitespace_text(state, raw, in_pre, position, history, upcoming) {
         return Ok(());
     }
@@ -649,7 +684,11 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
     let inside_inline = state.in_table_cell()
         || state.in_summary()
         || state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link));
-    let prepared = prepare_normal_text(state, raw, inside_inline, base_offset, upcoming.is_span)?;
+    let next = NextElement::new(
+        upcoming.is_inline || upcoming.inline_follows_comments,
+        upcoming.inline_starts_with_block,
+    );
+    let prepared = prepare_normal_text(state, raw, inside_inline, base_offset, next)?;
     if prepared.text.is_empty() {
         return Ok(());
     }
@@ -668,6 +707,5 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
             next_tag_is_inline: upcoming.is_inline,
             ends_in_newline_join,
         },
-    )?;
-    Ok(())
+    )
 }

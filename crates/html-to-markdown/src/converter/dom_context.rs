@@ -4,11 +4,12 @@
 //! and provides O(1) access to node relationships via precomputed maps.
 
 use std::cell::{OnceCell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::converter::main_helpers::is_inline_element;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::utility::escaping::is_block_level_name;
+use crate::converter::utility::white_space::{TextClass, classify_text};
 use crate::text;
 
 /// Cached information about an HTML tag element.
@@ -46,6 +47,17 @@ impl TableContentSummary {
         self.has_header |= other.has_header;
         self.has_caption |= other.has_caption;
     }
+
+    /// Whether the scan counted nothing.
+    pub(crate) const fn is_empty(&self) -> bool {
+        !self.has_text && self.link_count == 0 && !self.has_header && !self.has_caption
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LineEndOwner {
+    Code,
+    Del,
 }
 
 /// DOM context that provides efficient access to parent/child relationships and text content.
@@ -54,17 +66,62 @@ impl TableContentSummary {
 /// via precomputed maps.
 pub struct DomContext {
     pub(crate) parent_map: Vec<Option<u32>>,
+    pub(crate) literal_pre_map: Vec<bool>,
+    pub(crate) line_end_owner_map: Vec<Option<LineEndOwner>>,
     pub(crate) children_map: Vec<Option<Vec<tl::NodeHandle>>>,
     pub(crate) sibling_index_map: Vec<Option<usize>>,
     pub(crate) root_children: Vec<tl::NodeHandle>,
     pub(crate) node_map: Vec<Option<tl::NodeHandle>>,
     pub(crate) tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
-    pub(crate) prev_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) prev_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
+    pub(crate) following_content_map: Vec<crate::converter::utility::siblings::FollowingContent>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
+    pub(crate) datalist_content_cache: RefCell<HashMap<u32, bool>>,
+    /// For each element that [`DomContext::holds_text`] read: whether it holds text.
+    pub(crate) holds_text_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) silent_heading_images: RefCell<HashSet<u32>>,
+    pub(crate) blank_passthrough_renders: RefCell<HashSet<u32>>,
+    pub(crate) authored_break_cache: RefCell<HashMap<u32, bool>>,
+    pub(crate) omitted_break_owners: RefCell<HashSet<u32>>,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The nodes that `DomContext::holds_text` and `DomContext::holds_content` read on this thread.
+    pub(crate) static HOLDS_TEXT_NODE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static AUTHORED_BREAK_CACHE_STATS: std::cell::Cell<(usize,usize)> = const { std::cell::Cell::new((0,0)) };
+    /// Actual emitted bytes examined by observed passthrough registration. ~keep
+    pub(crate) static FONT_RENDER_BYTE_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Number of actual observed font registration guards, including length rejections. ~keep
+    pub(crate) static FONT_RENDER_GUARD_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Maximum actual sparse observed-font entries and reserved capacity during this test. ~keep
+    pub(crate) static FONT_RENDER_SET_STATS: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+#[cfg(test)]
+fn count_node_read() {
+    HOLDS_TEXT_NODE_READS.with(|total| total.set(total.get() + 1));
+}
+
+#[cfg(not(test))]
+const fn count_node_read() {}
+
+/// What one node is to a walk of [`DomContext::holds`].
+enum Held {
+    /// The node is what the walk looks for.
+    Yes,
+    /// The node is not.
+    No,
+    /// The node is an element: the walk reads its nodes.
+    Inside,
+}
+
+/// The answer that a walk recorded for the element `id`.
+fn recorded(record: &RefCell<HashMap<u32, bool>>, id: u32) -> Option<bool> {
+    record.borrow().get(&id).copied()
 }
 
 impl DomContext {
@@ -73,15 +130,18 @@ impl DomContext {
         if self.parent_map.len() <= idx {
             let new_len = idx + 1;
             self.parent_map.resize(new_len, None);
+            self.literal_pre_map.resize(new_len, false);
+            self.line_end_owner_map.resize(new_len, None);
             self.children_map.resize_with(new_len, || None);
             self.sibling_index_map.resize_with(new_len, || None);
             self.node_map.resize(new_len, None);
             self.tag_info_map.resize_with(new_len, OnceCell::new);
-            self.prev_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
             self.prev_tag_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
+            self.following_content_map
+                .resize(new_len, crate::converter::utility::siblings::FollowingContent::Absent);
         }
     }
 
@@ -126,45 +186,6 @@ impl DomContext {
     pub(crate) fn next_tag_name<'a>(&'a self, node_handle: tl::NodeHandle, parser: &'a tl::Parser) -> Option<&'a str> {
         let next_id = self.next_tag_id(node_handle.get_inner(), parser)?;
         self.tag_info(next_id, parser).map(|info| info.name.as_str())
-    }
-
-    pub(crate) fn previous_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
-        let id = node_handle.get_inner();
-        self.prev_inline_like_map.get(id as usize).is_some_and(|cell| {
-            *cell.get_or_init(|| {
-                let parent = self.parent_of(id);
-                let siblings = if let Some(parent_id) = parent {
-                    if let Some(children) = self.children_of(parent_id) {
-                        children
-                    } else {
-                        return false;
-                    }
-                } else {
-                    &self.root_children
-                };
-
-                let Some(position) = self
-                    .sibling_index(id)
-                    .or_else(|| siblings.iter().position(|handle| handle.get_inner() == id))
-                else {
-                    return false;
-                };
-
-                for sibling in siblings.iter().take(position).rev() {
-                    if let Some(info) = self.tag_info(sibling.get_inner(), parser) {
-                        return info.is_inline_like;
-                    }
-                    if let Some(tl::Node::Raw(raw)) = sibling.get(parser) {
-                        if raw.as_utf8_str().trim().is_empty() {
-                            continue;
-                        }
-                        return false;
-                    }
-                }
-
-                false
-            })
-        })
     }
 
     pub(crate) fn next_inline_like(&self, node_handle: tl::NodeHandle, parser: &tl::Parser) -> bool {
@@ -339,6 +360,242 @@ impl DomContext {
         text
     }
 
+    /// Whether the element `id` holds text: a text node in it, at any depth, has a character that
+    /// is not collapsible white space ([`classify_text`]). A comment is no text, and an element
+    /// with no text node (an image, a `<br>`) holds none.
+    ///
+    /// ~keep The walk reads the nodes in the order of the document and stops at the first text.
+    /// ~keep It records the answer of each element that it leaves or stops in, so no node is read
+    /// ~keep twice in one conversion: the texts after `n` nested elements ask `n` times, and
+    /// ~keep without the record each of them reads the elements below it again.
+    /// ~keep A loop rather than recursion: nested elements are attacker-controlled depth.
+    pub(crate) fn holds_text(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.holds(id, parser, &self.holds_text_cache, |node, _| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// Whether the element `id` holds content: text other than code/del-owned line ends, literal pre content,
+    /// or a void element
+    /// that can write Markdown outside a table cell (a break, a rule or an image), at any depth.
+    /// A comment is no content, and an element with
+    /// neither in it is none: `<span><b></b></span>` and `<span><span><!-- c --></span></span>`
+    /// hold none, and `<span><br></span>` holds content.
+    ///
+    /// ~keep A void element writes output with no content of its own (a `<br>`, an image): the
+    /// ~keep element around it is not empty.
+    /// ~keep The walk is that of [`DomContext::holds_text`], with a record that lives for this
+    /// ~keep one question. The caller asks only for an element that holds no text, right before a
+    /// ~keep text that starts with a Unicode space. Such a text is text, so no element that is
+    /// ~keep asked about holds another one that is asked about: no node is read for two questions.
+    pub(crate) fn holds_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                let parent = self.parent_tag_name(child, parser);
+                let owner = self.line_end_owner_map.get(child as usize).copied().flatten();
+                let line_ends_only = match owner {
+                    Some(LineEndOwner::Code) => decoded.trim_matches('\n').is_empty(),
+                    // ~keep Nested CR-only spans retain their existing boundary; only authored line ends collapse (#868).
+                    Some(LineEndOwner::Del) => {
+                        decoded.trim_matches(['\n', '\r']).is_empty()
+                            && (parent == Some("del") || decoded.contains('\n'))
+                    }
+                    None => false,
+                };
+                if line_ends_only && !self.literal_pre_map.get(child as usize).copied().unwrap_or(false) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) if self.writes_void_content(child, parser) => Held::Yes,
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    pub(crate) fn begin_passthrough_render(
+        &self,
+        id: u32,
+        output_len: usize,
+        handler: crate::converter::block::container::HandlerContext<'_>,
+    ) -> Option<usize> {
+        let ctx = handler.ctx;
+        #[cfg(feature = "visitor")]
+        let observer_suppressed = ctx.skip_visitor_hooks && ctx.has_observer();
+        #[cfg(not(feature = "visitor"))]
+        let observer_suppressed = false;
+        (!observer_suppressed
+            && !ctx.code_element_is_transparent()
+            && !ctx.in_code_block
+            && handler.options.whitespace_mode != crate::WhitespaceMode::Strict)
+            .then(|| {
+                self.blank_passthrough_renders.borrow_mut().remove(&id);
+                output_len
+            })
+    }
+
+    pub(crate) fn record_blank_passthrough_render(&self, id: u32, written: &str) {
+        #[cfg(test)]
+        FONT_RENDER_GUARD_CALLS.with(|calls| calls.set(calls.get() + 1));
+        let blank = written.is_empty()
+            || (written.len() == 1 && {
+                #[cfg(test)]
+                FONT_RENDER_BYTE_READS.with(|reads| reads.set(reads.get() + 1));
+                matches!(written.as_bytes()[0], b' ' | b'\t')
+            });
+        if blank {
+            let mut fonts = self.blank_passthrough_renders.borrow_mut();
+            fonts.insert(id);
+            #[cfg(test)]
+            FONT_RENDER_SET_STATS.with(|stats| {
+                let (entries, capacity) = stats.get();
+                stats.set((entries.max(fonts.len()), capacity.max(fonts.capacity())));
+            });
+        }
+    }
+
+    pub(crate) fn holds_authored_break(&self, id: u32, parser: &tl::Parser) -> bool {
+        let found = self.holds(id, parser, &self.authored_break_cache, |node, child| match node {
+            tl::Node::Tag(_) if self.tag_info(child, parser).is_some_and(|info| info.name == "br") => {
+                if recorded(&self.authored_break_cache, child) == Some(false) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Raw(_) | tl::Node::Comment(_) => Held::No,
+        });
+        #[cfg(test)]
+        AUTHORED_BREAK_CACHE_STATS.with(|stats| {
+            let cache = self.authored_break_cache.borrow();
+            let (entries, capacity) = stats.get();
+            stats.set((entries.max(cache.len()), capacity.max(cache.capacity())));
+        });
+        found
+    }
+
+    // ~keep Strict wrappers must not transport BRs in omitted subtrees or space-only callbacks.
+    // ~keep Later renders can retain them; status changes invalidate ancestors, preserving siblings.
+    // ~keep Ordinary negative query memo entries are not omissions and survive retaining renders.
+    pub(crate) fn record_absent_breaks(&self, id: u32, skipped: bool) {
+        let changed = if skipped {
+            self.omitted_break_owners.borrow_mut().insert(id)
+        } else {
+            self.omitted_break_owners.borrow_mut().remove(&id)
+        };
+        if !changed {
+            return;
+        }
+        let mut cache = self.authored_break_cache.borrow_mut();
+        if skipped {
+            cache.insert(id, false);
+        } else {
+            cache.remove(&id);
+        }
+        let mut parent = self.parent_of(id);
+        while let Some(id) = parent {
+            cache.remove(&id);
+            parent = self.parent_of(id);
+        }
+    }
+
+    /// ~keep Code/del can render an empty line end, and a break can render whitespace; neither is a blank passthrough element.
+    pub(crate) fn passthrough_boundary_has_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        let record = RefCell::new(HashMap::new());
+        self.holds(id, parser, &record, |node, child| match node {
+            tl::Node::Raw(raw) => {
+                let raw = raw.as_utf8_str();
+                let decoded = text::decode_html_entities_cow(raw.as_ref());
+                if matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_)) {
+                    Held::No
+                } else {
+                    Held::Yes
+                }
+            }
+            tl::Node::Tag(_)
+                if self.writes_void_content(child, parser)
+                    || self
+                        .tag_info(child, parser)
+                        .is_some_and(|info| matches!(info.name.as_str(), "code" | "del" | "pre")) =>
+            {
+                Held::Yes
+            }
+            tl::Node::Tag(_) => Held::Inside,
+            tl::Node::Comment(_) => Held::No,
+        })
+    }
+
+    /// ~keep Silent void descendants do not separate the line end from a following NBSP (#868).
+    /// ~keep That boundary rule skips table cells, whose checkboxes can write their state.
+    fn writes_void_content(&self, id: u32, parser: &tl::Parser) -> bool {
+        self.tag_info(id, parser).is_some_and(|info| match info.name.as_str() {
+            "br" | "hr" => true,
+            "img" => !self.silent_heading_images.borrow().contains(&id),
+            _ => false,
+        })
+    }
+
+    /// Whether a node in the element `id` is held, as `held` answers for each node, with the
+    /// answers of `record`.
+    fn holds(
+        &self,
+        id: u32,
+        parser: &tl::Parser,
+        record: &RefCell<HashMap<u32, bool>>,
+        held: impl Fn(&tl::Node, u32) -> Held,
+    ) -> bool {
+        if let Some(known) = recorded(record, id) {
+            return known;
+        }
+        let mut open = vec![(id, 0_usize)];
+        while let Some((element, position)) = open.last_mut() {
+            let child = self
+                .children_of(*element)
+                .and_then(|children| children.get(*position))
+                .copied();
+            *position += 1;
+            let Some(child) = child else {
+                record.borrow_mut().insert(*element, false);
+                open.pop();
+                continue;
+            };
+            count_node_read();
+            let found = match child.get(parser).map(|node| held(node, child.get_inner())) {
+                Some(Held::Yes) => true,
+                Some(Held::Inside) => {
+                    let known = recorded(record, child.get_inner());
+                    if known.is_none() {
+                        open.push((child.get_inner(), 0));
+                    }
+                    known.unwrap_or(false)
+                }
+                Some(Held::No) | None => false,
+            };
+            if found {
+                for (element, _) in &open {
+                    record.borrow_mut().insert(*element, true);
+                }
+                return true;
+            }
+        }
+        false
+    }
+
     /// Get the parent tag name for a given node ID.
     ///
     /// Returns a borrow into the cached [`TagInfo`] for the parent element,
@@ -382,3 +639,6 @@ impl DomContext {
         self.table_content_summary_cache.borrow_mut().insert(table_id, summary);
     }
 }
+
+#[cfg(test)]
+mod tests;

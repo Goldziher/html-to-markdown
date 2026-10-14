@@ -12,6 +12,38 @@ fn cli() -> Command {
     Command::new(env!("CARGO_BIN_EXE_html-to-markdown"))
 }
 
+#[test]
+fn should_omit_the_abbreviation_title_with_the_flag() {
+    let html = "<p><abbr title=\"last-in, first-out\">LIFO</abbr></p>";
+    cli()
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("LIFO (last-in, first-out)\n");
+    cli()
+        .arg("--no-expand-abbreviations")
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("LIFO\n");
+}
+
+#[test]
+fn should_omit_the_blockquote_citation_with_the_flag() {
+    let html = "<blockquote cite=\"https://example.com/src\"><p>quoted words</p></blockquote>";
+    cli()
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("https://example.com/src"));
+    cli()
+        .arg("--no-blockquote-citations")
+        .write_stdin(html)
+        .assert()
+        .success()
+        .stdout("> quoted words\n");
+}
+
 // A well-known 1x1 transparent PNG, 70 bytes when base64-decoded.
 const TINY_PNG_DATA_URI: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
@@ -75,6 +107,48 @@ fn should_reject_invalid_inline_data_media_value() {
     cli()
         .arg("--inline-data-media")
         .arg("strip")
+        .write_stdin("<p>Test</p>")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
+fn should_drop_a_hidden_element_by_default() {
+    cli()
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n");
+}
+
+#[test]
+fn should_keep_a_hidden_element_when_hidden_content_is_reachable() {
+    cli()
+        .arg("--hidden-content")
+        .arg("reachable")
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n\ntab two body\n");
+}
+
+#[test]
+fn should_keep_template_content_when_hidden_content_is_all() {
+    cli()
+        .arg("--hidden-content")
+        .arg("all")
+        .write_stdin("<p>visible</p><div hidden>tab two body</div><template><p>row</p></template>")
+        .assert()
+        .success()
+        .stdout("visible\n\ntab two body\n\nrow\n");
+}
+
+#[test]
+fn should_reject_invalid_hidden_content_value() {
+    cli()
+        .arg("--hidden-content")
+        .arg("keep")
         .write_stdin("<p>Test</p>")
         .assert()
         .failure()

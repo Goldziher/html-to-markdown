@@ -4,26 +4,24 @@
 //! - **head**: Document metadata container; processes script[type="application/ld+json"]
 //! - **script**: Script elements; extracts JSON-LD structured data when appropriate
 //! - **style**: CSS stylesheet elements; skipped in conversion
-//! - **math**: `MathML` elements with serialization and HTML comments for preservation
+//! - **math**: Visible text of `MathML` elements
 
 use crate::converter::block::container::HandlerContext;
-use crate::converter::media::svg::serialize_element;
-use crate::options::ConversionOptions;
 #[cfg(feature = "metadata")]
-use crate::text::decode_attribute_value_cow;
+use crate::converter::utility::preprocessing::{KeptScripts, ScriptType, script_type};
+use crate::options::ConversionOptions;
 use crate::text::escape;
 use tl::{NodeHandle, Parser};
 
 type Context = crate::converter::Context;
 type DomContext = crate::converter::DomContext;
 
-/// Handles metadata elements: head, script, style, math.
+/// Handles metadata elements: script, style, math. `open_head` handles head.
 ///
 /// Processes various metadata-related elements:
-/// - head: Scans for structured data in script[type="application/ld+json"]
 /// - script: Extracts JSON-LD for structured data collection
 /// - style: Skipped (CSS not relevant in markdown)
-/// - math: Preserves `MathML` as HTML comments with text content
+/// - math: Outputs visible `MathML` text
 pub fn handle(
     tag_name: &str,
     node_handle: &NodeHandle,
@@ -32,9 +30,6 @@ pub fn handle(
     handler: HandlerContext<'_>,
 ) {
     match tag_name {
-        "head" => {
-            handle_head(node_handle, parser, output, handler);
-        }
         "script" => {
             handle_script(node_handle, parser, output, handler.ctx);
         }
@@ -53,52 +48,47 @@ pub fn handle(
     }
 }
 
+/// True for the name (lower case) of a child of `head` that makes the converter write the
+/// content of that `head`: a head with no end tag holds the body of the page.
+pub fn is_body_content_in_head(name: &str) -> bool {
+    matches!(name, "body" | "main" | "article" | "section" | "div" | "p")
+}
+
 /// Handle head element.
 ///
 /// Head elements contain metadata. We process them to extract structured data from
 /// nested script[type="application/ld+json"] elements if metadata collection is enabled.
-fn handle_head(node_handle: &NodeHandle, parser: &Parser, output: &mut String, handler: HandlerContext<'_>) {
-    use crate::converter::walk_node;
-
-    let Some(node) = node_handle.get(parser) else { return };
-
-    let tag = match node {
-        tl::Node::Tag(tag) => tag,
-        _ => return,
+///
+/// A head that holds body content gives its children to the walk in `children`.
+pub fn open_head(
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
     };
 
-    let children = tag.children();
-    let has_body_like = children.top().iter().any(|child_handle| {
+    let tag_children = tag.children();
+    let has_body_like = tag_children.top().iter().any(|child_handle| {
         if let Some(child_name) = handler.dom_ctx.tag_name_for(*child_handle, parser) {
-            matches!(
-                child_name.as_ref(),
-                "body" | "main" | "article" | "section" | "div" | "p"
-            )
+            is_body_content_in_head(child_name.as_ref())
         } else {
             false
         }
     });
 
     #[cfg(feature = "metadata")]
-    if handler.ctx.metadata_wants_structured_data {
-        collect_json_ld_from_children(&children, parser, handler);
+    if handler.ctx.metadata_wants.structured_data {
+        collect_json_ld_from_children(&tag_children, parser, handler);
     }
 
-    if has_body_like {
-        for child_handle in children.top().iter() {
-            walk_node(
-                child_handle,
-                parser,
-                output,
-                crate::converter::block::container::HandlerContext::new(
-                    handler.options,
-                    handler.ctx,
-                    handler.depth + 1,
-                    handler.dom_ctx,
-                ),
-            );
-        }
+    if !has_body_like {
+        return None;
     }
+    children.extend(tag_children.top().iter().copied());
+    Some(crate::converter::walk::Open::children_only())
 }
 
 #[cfg(feature = "metadata")]
@@ -117,35 +107,27 @@ fn collect_json_ld_from_children(children: &tl::Children, parser: &Parser, handl
         if child_name.as_ref() != "script" {
             continue;
         }
-        if let Some(json) = json_ld_from_tag(child_tag, parser, handler.ctx) {
+        if let Some(json) = json_ld_from_tag(child_handle.get_inner(), child_tag, parser, &handler.ctx.kept_scripts) {
             collector.borrow_mut().add_json_ld(json);
         }
     }
 }
 
+/// The structured data of a script, as the page has it. `node` is the id of the script.
+///
+/// ~keep The tree holds the text of a kept script with the escape of the first pass.
+/// ~keep `KeptScripts` takes it back for the node that had the owner mark of the script; this
+/// ~keep function decodes nothing, so a character reference of the JSON stays as written.
+/// ~keep A script with no end tag whose bytes the repair kept has those bytes in the tree by now
+/// ~keep (`restore_inert_bodies`), and no owner mark of the first pass: it reads as the tree has it.
 #[cfg(feature = "metadata")]
-fn json_ld_from_tag(tag: &tl::HTMLTag<'_>, parser: &Parser, ctx: &Context) -> Option<String> {
-    let type_attr = tag.attributes().get("type").flatten()?;
-    let type_value = type_attr.as_utf8_str();
-    let media_type = type_value
-        .split(';')
-        .next()
-        .unwrap_or_else(|| type_value.as_ref())
-        .trim();
-    if !media_type.eq_ignore_ascii_case("application/ld+json") {
+fn json_ld_from_tag(node: u32, tag: &tl::HTMLTag<'_>, parser: &Parser, kept_scripts: &KeptScripts) -> Option<String> {
+    let type_value = crate::converter::utility::attributes::decoded_attribute(tag, "type")?;
+    if script_type(&type_value) != ScriptType::StructuredData {
         return None;
     }
-    let body = tag.inner_text(parser);
-    let original = tag
-        .children()
-        .top()
-        .iter()
-        .any(|handle| usize::try_from(handle.get_inner()).is_ok_and(|id| ctx.literal_body_ids.contains(&id)));
-    let json = if original {
-        body.trim().to_owned()
-    } else {
-        decode_attribute_value_cow(body.trim()).into_owned()
-    };
+    let text = tag.inner_text(parser);
+    let json = kept_scripts.as_written(node, text.trim()).to_owned();
     (!json.is_empty()).then_some(json)
 }
 
@@ -163,9 +145,9 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
     };
 
     #[cfg(feature = "metadata")]
-    if ctx.metadata_wants_structured_data
+    if ctx.metadata_wants.structured_data
         && let Some(collector) = ctx.metadata_collector.as_ref()
-        && let Some(json) = json_ld_from_tag(tag, parser, ctx)
+        && let Some(json) = json_ld_from_tag(node_handle.get_inner(), tag, parser, &ctx.kept_scripts)
     {
         collector.borrow_mut().add_json_ld(json);
     }
@@ -173,7 +155,7 @@ fn handle_script(node_handle: &NodeHandle, parser: &Parser, _output: &mut String
 
 /// Handle math element.
 ///
-/// `MathML` elements are serialized to HTML and wrapped in a comment to preserve them.
+/// `MathML` elements contribute their visible text.
 /// The text content of the element is also output as plain text.
 fn handle_math(
     node_handle: &NodeHandle,
@@ -190,8 +172,6 @@ fn handle_math(
     if text_content.is_empty() {
         return;
     }
-
-    let math_html = serialize_element(node_handle, parser);
 
     let escaped_text = escape(
         &text_content,
@@ -218,12 +198,27 @@ fn handle_math(
         output.push_str("\n\n");
     }
 
-    output.push_str("<!-- MathML: ");
-    output.push_str(&math_html);
-    output.push_str(" --> ");
     output.push_str(&escaped_text);
 
     if is_display_block && !ctx.in_paragraph && !ctx.convert_as_inline {
         output.push_str("\n\n");
+    }
+}
+
+#[cfg(all(test, feature = "metadata"))]
+mod tests {
+    use super::json_ld_from_tag;
+    use crate::converter::utility::preprocessing::strip_script_and_style_tags_with_kept_scripts;
+
+    /// A script with no owner mark gives the text of the tree, and nothing is decoded: a
+    /// reference of the author stays as written.
+    #[test]
+    fn a_script_with_no_owner_mark_gives_its_text_with_nothing_decoded() {
+        let (_, kept_scripts) = strip_script_and_style_tags_with_kept_scripts("");
+        let page = r#"<script type="application/ld+json">{"a":"&lt;"}</script>"#;
+        let dom = tl::parse(page, tl::ParserOptions::default()).expect("the page");
+        let tag = dom.nodes()[0].as_tag().expect("the script");
+        let json = json_ld_from_tag(0, tag, dom.parser(), &kept_scripts);
+        assert_eq!(json.as_deref(), Some(r#"{"a":"&lt;"}"#));
     }
 }

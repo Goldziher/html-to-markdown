@@ -109,17 +109,11 @@ fn should_keep_a_row_holding_only_an_entity_space_out_of_the_repair_path() {
 }
 
 #[test]
-fn should_leave_content_after_an_unclosed_cell_inside_that_cell() {
-    // ~keep This `<tr>`'s only child is a `<td>` (itself never closed), so the row-context
-    // ~keep gate does not fire: `td` is a valid child of `<tr>`, and the misnesting here is
-    // ~keep an unclosed `<td>`, not a misplaced element inside `<tr>`. Fixing this needs a
-    // ~keep separate unclosed-`<td>` rule -- a different defect. Pinned so a future change
-    // ~keep shows up as a visible diff instead of silently altering behavior.
+fn should_end_a_cell_with_no_end_tag_at_the_end_of_its_table() {
+    // ~keep The end tag of the table ends the open cell and its row, as the HTML tree builder
+    // ~keep says, so the paragraph follows the table (issue #772). Before, it was text of the cell.
     let html = "<table><tr><td>Before</td></tr><tr><td></table><p>Visible footer</p>";
-    assert_eq!(
-        content(html),
-        "| Before         |\n| -------------- |\n| Visible footer |\n"
-    );
+    assert_eq!(content(html), "| Before |\n| ------ |\n|        |\n\nVisible footer\n");
 }
 
 #[test]

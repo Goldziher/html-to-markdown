@@ -82,12 +82,19 @@ pub fn collect_table_cells(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) {
     cells.clear();
+    if ctx.excluded_node_ids.contains(&node_handle.get_inner()) {
+        return;
+    }
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         let children = tag.children();
         for child_handle in children.top().iter() {
+            if ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+                continue;
+            }
             if let Some(cell_name) = dom_ctx.tag_name_for(*child_handle, parser) {
                 if matches!(cell_name.as_ref(), "th" | "td" | "cell") {
                     cells.push(*child_handle);
@@ -176,11 +183,13 @@ fn render_cell_content(
         return;
     };
     let children = tag.children();
-    let has_tag_child = children
+    // ~keep A comment splits the text of the cell in two nodes. The walk writes each of them
+    // ~keep with the rules of running text, as Tier-1 does; the shortcut is for one text alone.
+    let has_tag_or_comment_child = children
         .top()
         .iter()
-        .any(|child_handle| matches!(child_handle.get(parser), Some(tl::Node::Tag(_))));
-    if !has_tag_child {
+        .any(|child_handle| matches!(child_handle.get(parser), Some(tl::Node::Tag(_) | tl::Node::Comment(_))));
+    if !has_tag_or_comment_child {
         let raw = handler.dom_ctx.text_content(*node_handle, parser);
         let normalized = if handler.options.whitespace_mode == crate::options::WhitespaceMode::Normalized {
             crate::text::normalize_cell_whitespace_cow(raw.as_str())
@@ -190,6 +199,10 @@ fn render_cell_content(
         *text = escape_cell_text(normalized.as_ref(), handler.options);
         return;
     }
+    let cell_ctx = handler
+        .ctx
+        .for_cell(*node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
+    let handler = HandlerContext::new(handler.options, &cell_ctx, handler.depth, handler.dom_ctx);
     let mut table_ends = Vec::new();
     for child_handle in children.top().iter() {
         render_cell_child(child_handle, parser, text, handler, deferred_tables);
@@ -234,6 +247,7 @@ pub fn nested_table_width_text(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     br_in_tables: bool,
 ) -> String {
     let mut text = String::with_capacity(64);
@@ -241,6 +255,9 @@ pub fn nested_table_width_text(
     let mut cell_gap = false;
     let mut stack = vec![*node_handle];
     while let Some(handle) = stack.pop() {
+        if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+            continue;
+        }
         match handle.get(parser) {
             Some(tl::Node::Raw(bytes)) => {
                 let raw = bytes.as_utf8_str();
@@ -335,7 +352,7 @@ fn render_cell_child(
     text.push_str(&nested);
 }
 
-fn finalize_cell_text(mut text: String, options: &crate::options::ConversionOptions) -> String {
+pub(super) fn finalize_cell_text(mut text: String, options: &crate::options::ConversionOptions) -> String {
     trim_in_place(&mut text);
     // ~keep Final invariant: a rendered cell never contains a newline, in any mode. This used
     // ~keep to be gated on `!br_in_tables`, which is what let issues #456 and #457 reach the

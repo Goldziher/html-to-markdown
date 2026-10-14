@@ -39,6 +39,10 @@ options from language-native types. Prefer \code{\link{ConversionOptionsBuilder}
 
 \item{\code{autolinks}}{Optional override for \code{\link[ConversionOptions:autolinks]{ConversionOptions::autolinks}}.}
 
+\item{\code{expand_abbreviations}}{Optional override for \code{\link[ConversionOptions:expand_abbreviations]{ConversionOptions::expand_abbreviations}}.}
+
+\item{\code{include_blockquote_citations}}{Optional override for \code{\link[ConversionOptions:include_blockquote_citations]{ConversionOptions::include_blockquote_citations}}.}
+
 \item{\code{default_title}}{Optional override for \code{\link[ConversionOptions:default_title]{ConversionOptions::default_title}}.}
 
 \item{\code{br_in_tables}}{Optional override for \code{\link[ConversionOptions:br_in_tables]{ConversionOptions::br_in_tables}}.}
@@ -82,6 +86,8 @@ options from language-native types. Prefer \code{\link{ConversionOptionsBuilder}
 \item{\code{skip_images}}{Optional override for \code{\link[ConversionOptions:skip_images]{ConversionOptions::skip_images}}.}
 
 \item{\code{inline_data_media}}{Optional override for \code{\link[ConversionOptions:inline_data_media]{ConversionOptions::inline_data_media}}.}
+
+\item{\code{hidden_content}}{Optional override for \code{\link[ConversionOptions:hidden_content]{ConversionOptions::hidden_content}}.}
 
 \item{\code{url_escape_style}}{Optional override for \code{\link[ConversionOptions:url_escape_style]{ConversionOptions::url_escape_style}}.}
 

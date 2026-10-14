@@ -42,7 +42,7 @@ struct GraphicData<'a> {
 pub fn handle_graphic(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
     let data = graphic_data(tag, &handler);
     #[cfg(feature = "metadata")]
-    let metadata = handler.context.metadata_wants_images.then(|| graphic_metadata(tag));
+    let metadata = handler.context.metadata_wants.images.then(|| graphic_metadata(tag));
     let rendered = render_graphic(tag, &data, &handler);
     if !handler.options.skip_images {
         if let Some(graphic_text) = rendered {

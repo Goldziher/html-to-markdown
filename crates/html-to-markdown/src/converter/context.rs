@@ -17,6 +17,14 @@ use crate::converter::reference_collector::ReferenceCollectorHandle;
 use crate::options::InlineDataMedia;
 use crate::types::structure_collector::StructureCollectorHandle;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static INLINE_BUFFER_LINE_SEARCH_CALLS: Cell<usize> = const { Cell::new(0) };
+    pub(crate) static INLINE_BUFFER_CONTEXT_CALLS: Cell<usize> = const { Cell::new(0) };
+    pub(crate) static INLINE_BUFFER_TAIL_CHAR_READS: Cell<usize> = const { Cell::new(0) };
+    pub(crate) static INLINE_BUFFER_COLUMN_CHAR_READS: Cell<usize> = const { Cell::new(0) };
+}
+
 /// Handle type for inline image collector when feature is enabled.
 #[cfg(feature = "inline-images")]
 pub type InlineCollectorHandle = Rc<RefCell<InlineImageCollector>>;
@@ -32,20 +40,27 @@ pub struct ContextParameters {
     pub inline_collector: Option<InlineCollectorHandle>,
     #[cfg(feature = "metadata")]
     pub metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
+    /// The kept scripts of the page, from the first pass, with the node of each script that
+    /// had an owner mark. Only a build with `metadata` reads them: the reader of the structured
+    /// data asks for them.
+    pub kept_scripts: crate::converter::utility::preprocessing::KeptScripts,
     #[cfg(feature = "visitor")]
     pub visitor: Option<crate::visitor::VisitorHandle>,
     pub structure_collector: Option<StructureCollectorHandle>,
     pub reference_collector: Option<ReferenceCollectorHandle>,
     pub base_url: Option<Rc<url::Url>>,
+    pub own_page: crate::converter::url_resolve::OwnPage,
 }
 
+/// The kinds of metadata the collector asks for, read once when the context is made.
 #[cfg(feature = "metadata")]
-struct MetadataPreferences {
-    document: bool,
-    headers: bool,
-    links: bool,
-    images: bool,
-    structured_data: bool,
+#[derive(Clone, Copy, Default)]
+pub struct MetadataPreferences {
+    pub(crate) document: bool,
+    pub(crate) headers: bool,
+    pub(crate) links: bool,
+    pub(crate) images: bool,
+    pub(crate) structured_data: bool,
 }
 
 #[cfg(feature = "metadata")]
@@ -97,6 +112,19 @@ pub(super) struct InlineCodeLink {
     pub(super) markdown: String,
 }
 
+/// ~keep Transactional rendered edges distinguish formatted punctuation from delimiter bytes.
+#[derive(Clone, Copy, Default)]
+pub struct MediaBoundaryState {
+    /// ~keep A default player label owes separation from the next emitted word.
+    pub pending: bool,
+    /// ~keep The first surviving child edge, before a wrapper adds its Markdown delimiters.
+    pub first_edge: Option<char>,
+    /// ~keep The last surviving child edge ignores a wrapper's closing delimiters.
+    pub last_edge: Option<char>,
+    /// ~keep Leading media needs a separator; media after ordinary text must not separate that text from its parent.
+    pub first_is_media: bool,
+}
+
 /// Conversion context that tracks state during HTML to Markdown conversion.
 ///
 /// This context is passed through the recursive tree walker and maintains information
@@ -108,7 +136,7 @@ pub struct Context {
     /// Are we inside a `<pre>` code BLOCK specifically, as opposed to an inline code SPAN
     /// (`<code>`/`<kbd>`/`<samp>` outside a `<pre>`)?
     ///
-    /// Set only by `handle_pre` (`handlers/code_block.rs`); `handle_code` and
+    /// Set only by `handle_pre` (`handlers/code_block.rs`); `open_code` and
     /// `inline::code::handle` never set it themselves, so it propagates unchanged through
     /// their `..ctx.clone()` spread into any code nested inside a `<pre>`. `line_break.rs`
     /// needs this distinction that `in_code` alone cannot make: a `<br>` inside a code
@@ -118,6 +146,8 @@ pub struct Context {
     pub(crate) in_code_block: bool,
     /// ~keep Link ranges refer to the raw inline-code buffer, before delimiters are emitted (#813).
     pub(super) inline_code_links: Option<Rc<RefCell<Vec<InlineCodeLink>>>>,
+    /// ~keep Only a link label shares rendered media boundaries; each recursive walk saves its parent state.
+    pub(crate) media_boundary: Option<Rc<Cell<MediaBoundaryState>>>,
     /// Output offsets of real `<br>` nodes while a table-cell `<pre>` is collected. ~keep
     pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<Vec<usize>>>>,
     /// Current list item counter for ordered lists.
@@ -133,6 +163,12 @@ pub struct Context {
     pub(crate) in_table_cell: bool,
     /// ~keep Deferred single-cell tables keep their surrounding cell context but render as blocks.
     pub(crate) allow_nested_table_markup: bool,
+    /// Are we inside a table cell (td/th) that holds only inputs and white space? A checkbox
+    /// writes its state there. [`Self::for_cell`] decides it where the cell opens.
+    pub(crate) in_cell_of_inputs: bool,
+    /// Are we inside the element that writes an option list: the outermost `<select>`,
+    /// `<datalist>` or `<option>`? An option there is a word of that list.
+    pub(crate) in_option_list: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -239,7 +275,7 @@ pub struct Context {
     /// layout-table cell (its tag name is in `keep_inline_images_in`).
     pub(crate) cell_allow_inline_images: bool,
     /// Whether inline images should remain markdown inside the current `<a>` link label
-    /// ("a" is in `keep_inline_images_in`). Set once per `handle_link` call and carried
+    /// ("a" is in `keep_inline_images_in`). Set once per `open_link` call and carried
     /// unchanged into both the block-label and inline-label branches, so the option means
     /// the same thing whether or not the anchor happens to contain a block child (#492).
     pub(crate) link_allow_inline_images: bool,
@@ -269,7 +305,12 @@ pub struct Context {
     /// paragraphs, as Google Docs exports) puts a genuine, buffer-sharing paragraph body
     /// at non-zero `inline_depth`.
     pub(crate) block_output_ptr: usize,
-    /// Shared flag: true until the first non-whitespace text content is emitted.
+    /// ~keep Inline wrappers transport leading breaks through scratch strings to this flow
+    /// buffer; its start excludes structural list markers and is independent of text trimming.
+    pub(crate) inline_break_owner: Option<(usize, usize)>,
+    /// Shared flag: true until the first node writes content that is not white space. The node
+    /// is text, or an element that writes content of its own (an image, a graphic, a form
+    /// control). `convert_node` clears the flag for every kind of node (issue #762).
     ///
     /// ~keep `block_content_start` cannot answer "is this text node at the very start of a
     /// ~keep fresh block" on its own: it is a byte offset compared against `output.len()`,
@@ -300,14 +341,14 @@ pub struct Context {
     pub(crate) keep_inline_images_in: Rc<HashSet<String>>,
     /// Node IDs matching `exclude_selectors` — these nodes and all descendants are dropped.
     pub(crate) excluded_node_ids: Rc<HashSet<u32>>,
-    // ~keep Restored raw nodes own literal source bytes; JSON-LD must not decode another entity layer.
-    #[cfg(feature = "metadata")]
-    pub(crate) literal_body_ids: Rc<HashSet<usize>>,
     /// Shared flag set when the guarded DOM walk reaches its effective depth limit.
     pub(crate) depth_limit_reached: Rc<Cell<bool>>,
     /// Shared flag set when `inline_data_media` replaced or dropped an element. A link reads it to
     /// tell a label emptied by that option from an empty one.
     pub(crate) inline_data_replaced: Rc<Cell<bool>>,
+    pub(crate) button_wrote: Rc<Cell<bool>>,
+    pub(crate) task_checkbox: Option<tl::NodeHandle>,
+    pub(crate) task_checkbox_ancestors: Rc<HashSet<u32>>,
     #[cfg(feature = "inline-images")]
     /// Shared collector for inline images when enabled.
     pub(crate) inline_collector: Option<InlineCollectorHandle>,
@@ -315,21 +356,18 @@ pub struct Context {
     /// Shared collector for metadata when enabled.
     pub(crate) metadata_collector: Option<crate::metadata::MetadataCollectorHandle>,
     #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_document: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_headers: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_links: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_images: bool,
-    #[cfg(feature = "metadata")]
-    pub(crate) metadata_wants_structured_data: bool,
+    /// The kinds of metadata the collector asks for; all false without a collector.
+    pub(crate) metadata_wants: MetadataPreferences,
     #[cfg(feature = "visitor")]
     /// Optional visitor for custom HTML traversal callbacks.
     pub(crate) visitor: Option<crate::visitor::VisitorHandle>,
     #[cfg(feature = "visitor")]
     /// Stores the first visitor error encountered during traversal.
     pub(crate) visitor_error: Rc<RefCell<Option<String>>>,
+    #[cfg(feature = "visitor")]
+    /// When `true`, the visitor of this context is not the visitor of the caller: the walk is
+    /// one that [`Self::unobserved_outside_code`] started, and nothing it writes or calls is seen.
+    pub(crate) is_unobserved: bool,
     /// Optional structure collector for building a [`crate::types::DocumentStructure`].
     ///
     /// Populated when `options.include_document_structure == true`.
@@ -364,9 +402,25 @@ pub struct Context {
     /// `None` when `options.base_url` is unset -- every resolution call becomes a
     /// no-op then, so output is byte-identical to before this option existed.
     pub(crate) base_url: Option<Rc<url::Url>>,
+    /// The address of the page, as far as it is known. A link asks it whether it points into
+    /// the page (see `converter::url_resolve::OwnPage`).
+    pub(crate) own_page: Rc<crate::converter::url_resolve::OwnPage>,
+    /// The kept scripts of the page. The reader of the structured data asks it for the text
+    /// of a script as written (see `KeptScripts`).
+    #[cfg(feature = "metadata")]
+    pub(crate) kept_scripts: Rc<crate::converter::utility::preprocessing::KeptScripts>,
+    /// The spare vectors of the Markdown walk, shared by every walk of the conversion.
+    pub(crate) walk_spares: Rc<crate::converter::main::WalkSpares>,
 }
 
 impl Context {
+    pub(crate) fn with_inline_break_owner(&self, output: &String) -> Self {
+        Self {
+            inline_break_owner: Some((std::ptr::from_ref(output) as usize, output.len())),
+            ..self.clone()
+        }
+    }
+
     /// Set the pre-computed set of node IDs that match `exclude_selectors`.
     ///
     /// Called in `convert_html_impl` after DOM parsing, before the walk starts.
@@ -385,20 +439,15 @@ impl Context {
             #[cfg(feature = "metadata")]
             metadata_collector: parameters.metadata_collector,
             #[cfg(feature = "metadata")]
-            metadata_wants_document: metadata.document,
-            #[cfg(feature = "metadata")]
-            metadata_wants_headers: metadata.headers,
-            #[cfg(feature = "metadata")]
-            metadata_wants_links: metadata.links,
-            #[cfg(feature = "metadata")]
-            metadata_wants_images: metadata.images,
-            #[cfg(feature = "metadata")]
-            metadata_wants_structured_data: metadata.structured_data,
+            metadata_wants: metadata,
             #[cfg(feature = "visitor")]
             visitor: parameters.visitor,
             structure_collector: parameters.structure_collector,
             reference_collector: parameters.reference_collector,
             base_url: parameters.base_url,
+            own_page: Rc::new(parameters.own_page),
+            #[cfg(feature = "metadata")]
+            kept_scripts: Rc::new(parameters.kept_scripts),
             ..Self::default()
         };
         context.at_fresh_block_start.set(true);
@@ -407,6 +456,7 @@ impl Context {
         Rc::make_mut(&mut context.keep_inline_images_in).extend(options.keep_inline_images_in.iter().cloned());
         context
     }
+
     /// Whether the current output buffer is written between inline markers: an inline wrapper's
     /// (`inline_depth`, a link's brackets included), a summary's or caption's (`text_in_markers`)
     /// or a marker-only wrapper's (`in_marker_span`). A rule written there is text, since the
@@ -424,22 +474,156 @@ impl Context {
     /// ~keep After only indent or a list item's marker, the list's first marker starts an item
     /// ~keep where that line ends, as it would with no wrapper.
     pub(crate) fn inline_buffer(&self, output: &str, opens_with_marker: bool) -> Self {
+        self.inline_buffer_with_columns(output, opens_with_marker, true)
+    }
+
+    // ~keep Raw children cannot render list items; marker and hard-break state remain live.
+    pub(crate) fn inline_text_buffer(&self, output: &str) -> Self {
+        self.inline_buffer_with_columns(output, false, false)
+    }
+
+    fn inline_buffer_with_columns(&self, output: &str, opens_with_marker: bool, needs_column: bool) -> Self {
+        #[cfg(test)]
+        INLINE_BUFFER_CONTEXT_CALLS.with(|calls| calls.set(calls.get() + 1));
+        // ~keep Bare list markers end in ASCII space. A final non-whitespace character proves
+        // ~keep this detached buffer follows text, so its column cannot be consumed by a list (#862).
+        if self.in_marker_span
+            || opens_with_marker
+            || output.chars().next_back().is_some_and(|last| !last.is_whitespace())
+            || line_cannot_end_in_bare_marker(output)
+        {
+            return Self {
+                in_marker_span: true,
+                inline_buffer_after_hard_break: if output.is_empty() {
+                    self.inline_buffer_after_hard_break
+                } else {
+                    crate::converter::utility::escaping::ends_with_hard_break(output)
+                },
+                ..self.clone()
+            };
+        }
+        #[cfg(test)]
+        INLINE_BUFFER_LINE_SEARCH_CALLS.with(|calls| calls.set(calls.get() + 1));
         let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
         let line_holds_text =
             !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(output);
         let (indent_length, indent_column) = crate::converter::utility::escaping::leading_indent(line);
         Self {
             in_marker_span: self.in_marker_span || opens_with_marker || line_holds_text,
-            inline_buffer_column: if output.is_empty() {
+            inline_buffer_column: if output.is_empty() || !needs_column {
                 self.inline_buffer_column
             } else {
-                Some(indent_column + line[indent_length..].chars().count())
+                let characters = line[indent_length..].chars().count();
+                #[cfg(test)]
+                INLINE_BUFFER_COLUMN_CHAR_READS.with(|reads| reads.set(reads.get() + characters));
+                Some(indent_column + characters)
             },
             inline_buffer_after_hard_break: if output.is_empty() {
                 self.inline_buffer_after_hard_break
             } else {
                 crate::converter::utility::escaping::ends_with_hard_break(output)
             },
+            ..self.clone()
+        }
+    }
+
+    /// The context for the children of the table cell `cell_handle`: `self` with the answer to
+    /// "does this cell hold only inputs" for that cell.
+    ///
+    /// ~keep Each walk of a cell's children takes its context from here, so the cell is read one
+    /// ~keep time for each walk and not one time for each control in it. A row shares one context
+    /// ~keep between its cells: this copies it only for a cell whose answer differs.
+    pub(crate) fn for_cell(
+        &self,
+        cell_handle: tl::NodeHandle,
+        parser: &tl::Parser,
+        dom_ctx: &crate::converter::DomContext,
+        br_in_tables: bool,
+    ) -> std::borrow::Cow<'_, Self> {
+        let in_cell_of_inputs =
+            crate::converter::block::table::scanner::cell_holds_only_inputs(cell_handle, parser, dom_ctx, br_in_tables);
+        if in_cell_of_inputs == self.in_cell_of_inputs {
+            std::borrow::Cow::Borrowed(self)
+        } else {
+            std::borrow::Cow::Owned(Self {
+                in_cell_of_inputs,
+                ..self.clone()
+            })
+        }
+    }
+
+    /// Whether the visitor of the caller sees this walk.
+    ///
+    /// ~keep A link in code asks what its content writes outside code only when this holds. In
+    /// ~keep an unobserved walk no answer reaches the caller's visitor, so no link there starts
+    /// ~keep an unobserved walk of its own: a link in `<code>` in a link in `<code>` cost twice
+    /// ~keep the walks at each level before.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn has_observer(&self) -> bool {
+        self.visitor.is_some() && !self.is_unobserved
+    }
+
+    /// Whether a `code`, `kbd` or `samp` element writes its content and nothing of its own in
+    /// this walk: it starts no code and adds no code marks.
+    ///
+    /// ~keep A code element in code is such an element. An unobserved walk answers what the
+    /// ~keep content of a link in code writes outside code, so it stays outside code to its end,
+    /// ~keep and a code element in it is still an element in code. When the element started code,
+    /// ~keep an image in it wrote nothing and the link lost its call. When the element wrote code
+    /// ~keep marks, a line break or a space in it was a label and the link got a call.
+    #[cfg(feature = "visitor")]
+    pub(crate) const fn code_element_is_transparent(&self) -> bool {
+        self.in_code || self.is_unobserved
+    }
+
+    /// Whether a `code`, `kbd` or `samp` element writes its content and nothing of its own in
+    /// this walk: a code element in code is such an element.
+    #[cfg(not(feature = "visitor"))]
+    pub(crate) const fn code_element_is_transparent(&self) -> bool {
+        self.in_code
+    }
+
+    /// A copy of this context that writes as outside code and that nothing observes: its visitor
+    /// continues at every call and records nothing, it has no collector, and it shares no flag,
+    /// counter or list state with this context.
+    ///
+    /// ~keep A link in code asks its content what that content writes outside code. The answer
+    /// ~keep comes from the normal traversal with this copy, so every rule of the traversal holds
+    /// ~keep for the answer: a stripped tag, an excluded node, a preset, skipped images. The copy
+    /// ~keep keeps a visitor because the traversal applies a preset only when it has none.
+    #[cfg(feature = "visitor")]
+    pub(crate) fn unobserved_outside_code(&self) -> Self {
+        #[derive(Debug)]
+        struct ContinuesEverywhere;
+        impl crate::visitor::HtmlVisitor for ContinuesEverywhere {}
+
+        Self {
+            in_code: false,
+            in_code_block: false,
+            pre_cell_break_offsets: None,
+            previous_marker: crate::converter::list::utils::PreviousMarker::default(),
+            last_list: crate::converter::list::utils::LastList::default(),
+            item_lines: crate::converter::list::utils::ItemLineScan::default(),
+            first_writer: None,
+            djot_rule_like_text: None,
+            at_fresh_block_start: Rc::new(Cell::new(self.at_fresh_block_start.get())),
+            depth_limit_reached: Rc::new(Cell::new(self.depth_limit_reached.get())),
+            inline_data_replaced: Rc::new(Cell::new(false)),
+            media_boundary: self
+                .media_boundary
+                .as_ref()
+                .map(|_| Rc::new(Cell::new(Default::default()))),
+            #[cfg(feature = "inline-images")]
+            inline_collector: None,
+            #[cfg(feature = "metadata")]
+            metadata_collector: None,
+            visitor: self.visitor.as_ref().map(|_| -> crate::visitor::VisitorHandle {
+                std::sync::Arc::new(std::sync::Mutex::new(ContinuesEverywhere))
+            }),
+            visitor_error: Rc::new(RefCell::new(None)),
+            is_unobserved: true,
+            structure_collector: None,
+            reference_collector: None,
             ..self.clone()
         }
     }
@@ -483,5 +667,114 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
+    }
+}
+
+// ~keep This is only a necessary suffix check: an adjacent non-whitespace character rules
+// ~keep out a bullet token. An ordered token cannot have text adjoining its ASCII digit run.
+// ~keep Ambiguous tails still
+// ~keep use the whole-line classifier, including stacked bare markers and Unicode blanks (#862).
+fn line_cannot_end_in_bare_marker(output: &str) -> bool {
+    let mut tail = output.trim_end_matches([' ', '\t']).chars().rev().inspect(|_| {
+        #[cfg(test)]
+        INLINE_BUFFER_TAIL_CHAR_READS.with(|reads| reads.set(reads.get() + 1));
+    });
+    let Some(last) = tail.next() else {
+        return false;
+    };
+    if last.is_whitespace() {
+        return false;
+    }
+    match last {
+        '-' | '*' | '+' => tail.next().is_some_and(|previous| !previous.is_whitespace()),
+        '.' | ')' => {
+            if tail.next().is_some_and(|previous| previous.is_ascii_digit()) {
+                tail.find(|previous| !previous.is_ascii_digit())
+                    .is_some_and(|previous| !previous.is_whitespace())
+            } else {
+                true
+            }
+        }
+        _ => true,
+    }
+}
+
+#[cfg(test)]
+mod inline_buffer_tests {
+    use super::{Context, ContextParameters};
+
+    fn context() -> Context {
+        Context::new(
+            &crate::ConversionOptions::default(),
+            ContextParameters {
+                inline_collector: None,
+                #[cfg(feature = "metadata")]
+                metadata_collector: None,
+                kept_scripts: crate::converter::utility::preprocessing::KeptScripts::default(),
+                #[cfg(feature = "visitor")]
+                visitor: None,
+                structure_collector: None,
+                reference_collector: None,
+                base_url: None,
+                own_page: crate::converter::url_resolve::OwnPage::UnknownWithoutBase,
+            },
+        )
+    }
+
+    #[test]
+    fn should_preserve_live_columns_and_marker_state_after_output_mutations() {
+        let ctx = context();
+        let mut output = String::new();
+        for prefix in [
+            "",
+            "\t",
+            "- ",
+            "* ",
+            "1. ",
+            "1. - ",
+            "text ",
+            "text* ",
+            "text. ",
+            "x- ",
+            "x+ ",
+            "x) ",
+            "x1. ",
+            "雪12) ",
+            "x 1. ",
+            "1. - 2. ",
+            "\u{2000}1. ",
+            "1234567890123456. ",
+            "1) ",
+            "- + ",
+            "\u{2000}* ",
+        ] {
+            for suffix in ["", "x", ".", "雪", "\u{a0}", "\u{2000}", "\u{2028}", "\r", "\n"] {
+                output.clear();
+                output.push_str(prefix);
+                output.push_str("discard");
+                output.truncate(prefix.len());
+                output.push_str(suffix);
+                output.insert_str(0, "inserted\n");
+                for opens_with_marker in [false, true] {
+                    let child = ctx.inline_buffer(&output, opens_with_marker);
+                    let line = &output[output.rfind('\n').map_or(0, |pos| pos + 1)..];
+                    let holds_text =
+                        !line.trim().is_empty() && !crate::converter::list::utils::line_is_bare_list_marker(&output);
+                    assert_eq!(child.in_marker_span, opens_with_marker || holds_text, "{output:?}");
+                    assert_eq!(
+                        child.inline_buffer_after_hard_break,
+                        crate::converter::utility::escaping::ends_with_hard_break(&output),
+                        "{output:?}"
+                    );
+                    if !child.in_marker_text() {
+                        let (indent_length, indent_column) = crate::converter::utility::escaping::leading_indent(line);
+                        assert_eq!(
+                            child.inline_buffer_column,
+                            Some(indent_column + line[indent_length..].chars().count())
+                        );
+                    }
+                }
+            }
+        }
     }
 }

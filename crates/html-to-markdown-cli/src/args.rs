@@ -5,9 +5,9 @@
 #![allow(clippy::struct_excessive_bools)]
 
 use crate::validators::{
-    CliCodeBlockStyle, CliHeadingStyle, CliHighlightStyle, CliInlineDataMedia, CliLinkStyle, CliListIndentType,
-    CliNewlineStyle, CliOutputFormat, CliPreprocessingPreset, CliTierStrategy, CliUrlEscapeStyle, CliWhitespaceMode,
-    validate_bullets, validate_strong_em_symbol,
+    CliCodeBlockStyle, CliHeadingStyle, CliHiddenContent, CliHighlightStyle, CliInlineDataMedia, CliLinkStyle,
+    CliListIndentType, CliNewlineStyle, CliOutputFormat, CliPreprocessingPreset, CliTierStrategy, CliUrlEscapeStyle,
+    CliWhitespaceMode, validate_bullets, validate_strong_em_symbol,
 };
 #[cfg(feature = "mcp")]
 use clap::Subcommand;
@@ -232,6 +232,22 @@ pub struct ConversionArgs {
     #[arg(long = "no-autolinks")]
     #[arg(help_heading = "Links")]
     pub no_autolinks: bool,
+
+    /// Disable abbreviation expansion
+    ///
+    /// By default, the title of an `<abbr>` follows its text in parentheses.
+    /// Pass this flag to output the text only.
+    #[arg(long = "no-expand-abbreviations")]
+    #[arg(help_heading = "Text Formatting")]
+    pub no_expand_abbreviations: bool,
+
+    /// Disable blockquote citations
+    ///
+    /// By default, the `cite` URL of a `<blockquote>` follows the quote.
+    /// Pass this flag to output the quote only.
+    #[arg(long = "no-blockquote-citations")]
+    #[arg(help_heading = "Text Formatting")]
+    pub no_blockquote_citations: bool,
 
     /// Link rendering style
     ///
@@ -460,6 +476,16 @@ pub struct ExtendedConversionArgs {
     #[arg(long, value_name = "CHOICE")]
     #[arg(help_heading = "Element Handling")]
     pub inline_data_media: Option<CliInlineDataMedia>,
+
+    /// Which text that a browser does not show at first to keep
+    ///
+    /// Scripts and style sheets are never written as text:
+    /// - 'drop': Keep none of it (default)
+    /// - 'reachable': Keep elements hidden by the hidden attribute or an inline style, and declarative shadow roots
+    /// - 'all': Also keep the content of template and noscript elements
+    #[arg(long, value_name = "CHOICE")]
+    #[arg(help_heading = "Element Handling")]
+    pub hidden_content: Option<CliHiddenContent>,
 
     /// CSS selectors for elements to exclude entirely
     ///

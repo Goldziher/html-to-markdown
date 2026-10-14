@@ -729,6 +729,22 @@ mod tests {
     }
 
     #[test]
+    fn should_escape_block_prefixes_split_across_text_fragments() {
+        for (before, text, in_list_item, expected) in [
+            ("", "# x", false, "\\# x"),
+            ("1.", " x", false, "1\\. x"),
+            ("a\u{c} ", "# x", false, "a\u{c} # x"),
+            ("\u{c} ", "# x", false, "\u{c} # x"),
+            ("1.", "\u{c} x", false, "1.\u{c} x"),
+            ("- ", "# x", true, "- \\# x"),
+        ] {
+            let mut buffer = format!("{before}{text}");
+            escape_block_start(&mut buffer, before.len(), in_list_item, false);
+            assert_eq!(buffer, expected, "{before:?} + {text:?}");
+        }
+    }
+
+    #[test]
     fn escape_continuation_line_start_escapes_a_line_after_text() {
         assert_eq!(escaped_continuation("a  \n", "1) t"), "a  \n1\\) t");
         assert_eq!(escaped_continuation("x\n- a  \n  ", "- t"), "x\n- a  \n  \\- t");

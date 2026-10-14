@@ -87,6 +87,8 @@ html-to-markdown --url https://example.com > output.md
 | `--sub-symbol SYMBOL`     | any string                             | `""`           | Wrapper symbol for `<sub>` text.                  |
 | `--sup-symbol SYMBOL`     | any string                             | `""`           | Wrapper symbol for `<sup>` text.                  |
 | `--highlight-style STYLE` | `double-equal`, `html`, `bold`, `none` | `double-equal` | Rendering of `<mark>` elements.                   |
+| `--no-expand-abbreviations` | —                                    | off            | Write the text of an `<abbr>` without its title.  |
+| `--no-blockquote-citations` | —                                    | off            | Write a blockquote without its `cite` URL.        |
 | `--escape-asterisks`      | —                                      | off            | Escape `*` characters.                            |
 | `--escape-underscores`    | —                                      | off            | Escape `_` characters.                            |
 | `--escape-misc`           | —                                      | off            | Escape `[`, `]`, `<`, `>`, `#`, etc.              |
@@ -115,6 +117,7 @@ html-to-markdown --url https://example.com > output.md
 | `--keep-inline-images-in ELEMENTS` | Comma-separated element names where images stay as `![alt](src)` (e.g. `a,strong`). |
 | `--skip-images`                    | Drop all `<img>` elements entirely. No `![alt](src)` output, no alt-text fallback.  |
 | `--inline-data-media CHOICE`       | What to write for an image, media element, or link, whose address is a `data:` URL: `keep` (default, the URL with its payload), `alt-text-only`, or `drop-element`. For a link, `alt-text-only` and `drop-element` both write its text with no address. |
+| `--hidden-content CHOICE`          | Which text that a browser does not show at first to keep: `drop` (default, none), `reachable` (elements hidden by the `hidden` attribute or an inline style, and declarative shadow roots), or `all` (also `<template>` and `<noscript>` content). Scripts and style sheets are never written. |
 | `--max-image-size BYTES`           | Skip inline images whose decoded payload exceeds this size. Default `5242880` (5 MB). Requires `--extract-inline-images`. |
 | `--capture-svg`                    | Capture inline `<svg>` elements as extracted images. Requires `--extract-inline-images`. |
 | `--no-infer-dimensions`            | Skip inferring image width and height from the decoded payload when the HTML omits them. Requires `--extract-inline-images`. |
@@ -147,7 +150,7 @@ html-to-markdown --url https://example.com > output.md
 | `--convert-as-inline`  | Treat block elements as inline (no paragraph breaks).                               |
 | `--strip-tags TAGS`    | Comma-separated tags to strip (text content preserved, no Markdown conversion).     |
 | `--preserve-tags TAGS` | Comma-separated tags to emit verbatim as raw HTML instead of converting.            |
-| `--exclude-selectors SELECTORS` | Comma-separated CSS selectors. Matching elements and their descendants are removed before conversion (e.g. `.ad,#sidebar`). |
+| `--exclude-selectors SELECTORS` | Comma-separated CSS selectors. Matching elements and their descendants are removed before conversion (e.g. `.ad,#sidebar`). A selector with a combinator (`.menu a`, `div > p`) or a pseudo-class matches nothing. |
 | `--max-depth N`        | Silently truncate subtrees beyond this DOM nesting depth. Omit for unlimited depth. |
 
 ## Metadata
@@ -248,12 +251,15 @@ Each CLI flag has a corresponding `ConversionOptions` field. Library users can c
 | `--code-block-style STYLE`      | `code_block_style`           | `"indented"` \| `"backticks"` \| `"tildes"`                |
 | `-l, --code-language LANG`      | `code_language`              | string                                                     |
 | `--no-autolinks`                | `autolinks`                  | inverted: flag sets `autolinks = false`; default is `true` |
+| `--no-expand-abbreviations`     | `expand_abbreviations`       | inverted: flag sets `expand_abbreviations = false`; default is `true` |
+| `--no-blockquote-citations`     | `include_blockquote_citations` | inverted: flag sets `include_blockquote_citations = false`; default is `true` |
 | `--default-title`               | `default_title`              | boolean flag                                               |
 | `--link-style STYLE`            | `link_style`                 | `"inline"` \| `"reference"`                                |
 | `--url-escape-style STYLE`      | `url_escape_style`           | `"angle"` \| `"percent"`                                   |
 | `--keep-inline-images-in ELEMS` | `keep_inline_images_in`      | comma-separated tag list                                   |
 | `--skip-images`                 | `skip_images`                | boolean flag                                               |
 | `--inline-data-media CHOICE`    | `inline_data_media`          | `"keep"` \| `"alt_text_only"` \| `"drop_element"`           |
+| `--hidden-content CHOICE`       | `hidden_content`             | `"drop"` \| `"reachable"` \| `"all"`                        |
 | `--max-image-size BYTES`        | `max_image_size`             | integer; default `5242880`                                 |
 | `--capture-svg`                 | `capture_svg`                | boolean flag                                               |
 | `--no-infer-dimensions`         | `infer_dimensions`           | inverted: flag sets `infer_dimensions = false`; default is `true` |

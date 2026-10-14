@@ -70,6 +70,23 @@ fn classify_routes_tier2_when_inline_data_media_is_not_keep() {
     }
 }
 
+#[cfg(feature = "testkit")]
+#[test]
+fn classify_routes_tier2_when_hidden_content_is_not_drop() {
+    use html_to_markdown_rs::HiddenContent;
+    for (choice, expected) in [
+        (HiddenContent::Drop, RouterDecision::Tier1),
+        (HiddenContent::Reachable, RouterDecision::Tier2),
+        (HiddenContent::All, RouterDecision::Tier2),
+    ] {
+        let opts = ConversionOptions {
+            hidden_content: choice,
+            ..minimal_options()
+        };
+        assert_eq!(route("<p>hello</p>", &opts), expected, "{choice:?}");
+    }
+}
+
 // ~keep ── 3. Custom elements no longer gate routing (Phase FF) ────────────────────
 
 #[cfg(feature = "testkit")]

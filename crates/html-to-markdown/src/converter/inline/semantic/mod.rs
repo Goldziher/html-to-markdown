@@ -14,39 +14,32 @@
 mod marks;
 mod typography;
 
-use crate::converter::inline::HandlerContext;
+#[cfg(feature = "visitor")]
+pub use marks::visit_underline;
+pub use marks::{close_inserted, close_mark, close_strikethrough};
+pub use typography::{ScriptEnd, close_abbreviation, close_italic_semantic, close_script, open_span};
 
-/// Handler for semantic inline elements: mark, del, s, ins, u, small, sub, sup, var, dfn, abbr, span.
+use crate::converter::inline::HandlerContext;
+use crate::converter::walk::Open;
+
+/// Open a semantic inline element: mark, del, s, strike, ins, sub, sup, var, dfn, abbr.
 ///
-/// Processes semantic content based on tag and options:
-/// - Mark: configurable highlight style (==, ::, ^^, <mark>, **bold, none)
-/// - Del/S: strikethrough with ~~ and visitor callback support
-/// - Ins: underline with == and visitor callback support
-/// - U: underline with visitor callback support
-/// - Small: pass through without formatting
-/// - Sub/Sup: wrap with configurable symbols
-/// - Var: wrap with italic symbol (`strong_em_symbol`)
-/// - Dfn: wrap with italic symbol (`strong_em_symbol`)
+/// - Mark: configurable highlight style (==, <mark>, **bold, none), visitor callback first
+/// - Del, s, strike: strikethrough with ~~ and visitor callback support
+/// - Ins: inserted text with == and visitor callback support
+/// - Sub, sup: wrap with configurable symbols
+/// - Var, dfn: wrap with italic symbol (`strong_em_symbol`)
 /// - Abbr: pass through content with optional title in parentheses
-/// - Span: pass through content with special handling for OCR words and whitespace
 ///
-/// # Note
-/// This function references helper functions and `walk_node` from converter.rs
-/// which must be accessible (pub(crate)) for this module to work correctly.
-pub fn handle(tag_name: &str, context: HandlerContext<'_>) {
+/// Lists the children in `children`. Returns `None` for an element that is complete.
+pub fn open(tag_name: &str, context: HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> Option<Open> {
     match tag_name {
-        "mark" => marks::handle_mark(context),
-        "del" | "s" | "strike" => marks::handle_strikethrough(tag_name, context),
-        "ins" => marks::handle_inserted(context),
-        "u" => marks::handle_underline(context),
-        "small" => typography::handle_small(context),
-        "sub" => typography::handle_subscript(context),
-        "sup" => typography::handle_superscript(context),
-        "var" => typography::handle_variable(context),
-        "dfn" => typography::handle_definition(context),
-        "abbr" if context.context.in_code => typography::handle_small(context),
-        "abbr" => typography::handle_abbreviation(context),
-        "span" => typography::handle_span(context),
-        _ => {}
+        "mark" => marks::open_mark(context, children),
+        "del" | "s" | "strike" => marks::open_strikethrough(tag_name, &context, children),
+        "ins" => marks::open_inserted(context, children),
+        "sub" | "sup" => typography::open_script(tag_name, &context, children),
+        "var" | "dfn" => typography::open_italic_semantic(&context, children),
+        "abbr" => typography::open_abbreviation(&context, children),
+        _ => None,
     }
 }

@@ -19,6 +19,7 @@ mod flatten;
 pub mod layout;
 pub mod scanner;
 pub(super) mod utils;
+mod walk;
 
 use crate::converter::block::container::HandlerContext;
 
@@ -88,6 +89,16 @@ pub fn handle_table_with_context(
     let mut table_output = String::new();
     builder::handle_table(node_handle, parser, &mut table_output, handler);
 
+    append_table_output(node_handle, parser, output, handler, &table_output);
+}
+
+fn append_table_output(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    table_output: &str,
+) {
     if let Some(ref sc) = handler.ctx.structure_collector {
         if let Some(grid) = collect_table_grid(node_handle, parser, handler) {
             sc.borrow_mut().push_table_data(grid, table_output.trim().to_string());
@@ -114,7 +125,7 @@ pub fn handle_table_with_context(
         }
 
         let indented = layout::indent_table_for_list(
-            &table_output,
+            table_output,
             handler.ctx.list_depth,
             handler.ctx.list_indent_columns,
             handler.options,
@@ -128,7 +139,7 @@ pub fn handle_table_with_context(
                 output.push_str("\n\n");
             }
         }
-        output.push_str(&table_output);
+        output.push_str(table_output);
     }
 
     if !output.ends_with('\n') {
@@ -183,6 +194,10 @@ fn collect_grid_child(
 ) {
     use utils::{is_tag_name, normalized_tag_name};
 
+    if handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
+
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return;
     };
@@ -215,7 +230,17 @@ fn collect_grid_row(
 ) {
     use cell::{collect_table_cells, get_colspan_rowspan};
 
-    collect_table_cells(row_handle, parser, handler.dom_ctx, &mut state.cell_handles);
+    if handler.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
+
+    collect_table_cells(
+        row_handle,
+        parser,
+        handler.dom_ctx,
+        handler.ctx,
+        &mut state.cell_handles,
+    );
 
     let mut col_index: u32 = 0;
     for cell_handle in &state.cell_handles {
@@ -225,42 +250,7 @@ fn collect_grid_row(
                 .tag_name_for(*cell_handle, parser)
                 .is_some_and(|name| name.as_ref() == "th");
 
-        let mut text = String::new();
-        // ~keep This walk runs after `builder::handle_table` has already rendered — and recorded —
-        // ~keep the same cells; it exists only to fill the `TableGrid` returned below, which is
-        // ~keep built from `text` and not from any collector. The collectors are `Rc`s that
-        // ~keep `..ctx.clone()` shares, so without detaching them here `include_document_structure`
-        // ~keep alone would add a third recording of every link, image and nested table in a cell —
-        // ~keep including into the very `DocumentStructure` this walk exists to build.
-        let mut cell_ctx = super::super::Context {
-            in_table_cell: true,
-            ..handler.ctx.clone()
-        };
-        #[cfg(feature = "metadata")]
-        {
-            cell_ctx.metadata_collector = None;
-        }
-        cell_ctx.structure_collector = None;
-        #[cfg(feature = "inline-images")]
-        {
-            cell_ctx.inline_collector = None;
-        }
-        if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
-            for child_handle in cell_tag.children().top().iter() {
-                super::super::walk_node(
-                    child_handle,
-                    parser,
-                    &mut text,
-                    crate::converter::block::container::HandlerContext::new(
-                        handler.options,
-                        &cell_ctx,
-                        handler.depth + 2,
-                        handler.dom_ctx,
-                    ),
-                );
-            }
-        }
-        let content = crate::text::normalize_whitespace_cow(&text).trim().to_string();
+        let content = collect_grid_cell_content(cell_handle, parser, handler);
 
         let (colspan, rowspan) = get_colspan_rowspan(cell_handle, parser);
 
@@ -277,4 +267,66 @@ fn collect_grid_row(
     }
     state.max_cols = state.max_cols.max(col_index);
     state.row_index += 1;
+}
+
+fn collect_grid_cell_content(cell_handle: &tl::NodeHandle, parser: &tl::Parser, handler: HandlerContext<'_>) -> String {
+    let mut text = String::new();
+    // ~keep This walk runs after `builder::handle_table` has already rendered — and recorded —
+    // ~keep the same cells; it exists only to fill the `TableGrid` returned below, which is
+    // ~keep built from `text` and not from any collector. The collectors are `Rc`s that
+    // ~keep `..ctx.clone()` shares, so without detaching them here `include_document_structure`
+    // ~keep alone would add a third recording of every link, image and nested table in a cell —
+    // ~keep including into the very `DocumentStructure` this walk exists to build.
+    let mut cell_ctx = super::super::Context {
+        in_table_cell: true,
+        in_cell_of_inputs: scanner::cell_holds_only_inputs(
+            *cell_handle,
+            parser,
+            handler.dom_ctx,
+            handler.options.br_in_tables,
+        ),
+        ..handler.ctx.clone()
+    };
+    #[cfg(feature = "metadata")]
+    {
+        cell_ctx.metadata_collector = None;
+    }
+    cell_ctx.structure_collector = None;
+    #[cfg(feature = "inline-images")]
+    {
+        cell_ctx.inline_collector = None;
+    }
+    if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
+        for child_handle in cell_tag.children().top().iter() {
+            super::super::walk_node(
+                child_handle,
+                parser,
+                &mut text,
+                crate::converter::block::container::HandlerContext::new(
+                    handler.options,
+                    &cell_ctx,
+                    handler.depth + 2,
+                    handler.dom_ctx,
+                ),
+            );
+        }
+    }
+    crate::text::normalize_whitespace_cow(&text).trim().to_string()
+}
+
+/// Open a table whose content is captured by the heap-backed Markdown walk.
+pub fn open_table_with_context(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    match walk::open(node_handle, parser, handler, children) {
+        walk::Opened::Children(open) => Some(open),
+        walk::Opened::Complete(text) => {
+            append_table_output(node_handle, parser, output, handler, &text);
+            None
+        }
+    }
 }

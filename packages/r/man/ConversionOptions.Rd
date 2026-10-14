@@ -38,6 +38,10 @@ Use \code{\link[ConversionOptions:builder]{ConversionOptions::builder()}} to con
 
 \item{\code{autolinks}}{Automatically convert bare URLs into Markdown autolinks.}
 
+\item{\code{expand_abbreviations}}{Append the title of an \verb{<abbr>} in parentheses (default \code{true}).}
+
+\item{\code{include_blockquote_citations}}{Append the \code{cite} URL after a blockquote (default \code{true}).}
+
 \item{\code{default_title}}{Emit a default title when no \verb{<title>} tag is present.}
 
 \item{\code{br_in_tables}}{Render \verb{<br>} elements inside table cells as literal line breaks.}
@@ -81,6 +85,8 @@ Use \code{\link[ConversionOptions:builder]{ConversionOptions::builder()}} to con
 \item{\code{skip_images}}{Skip conversion of \verb{<img>} elements (omit images from output).}
 
 \item{\code{inline_data_media}}{What the output shows for an image or embedded media element whose address is an inline}
+
+\item{\code{hidden_content}}{Which text that a browser does not show at first the output holds: none of it}
 
 \item{\code{url_escape_style}}{URL encoding strategy for link and image destinations.}
 

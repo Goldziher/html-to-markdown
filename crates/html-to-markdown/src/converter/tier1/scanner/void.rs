@@ -58,12 +58,9 @@ fn emit_void(
     // ~keep A void element closes the "just closed a custom element" boundary
     // window too (see the field's doc comment on `Tier1State`).
     state.last_closed_custom_element = false;
-    if name_lower == b"input"
-        && attrs.iter().any(|(key, value)| {
-            key.eq_ignore_ascii_case(b"type") && value.is_some_and(|v| v.eq_ignore_ascii_case(b"checkbox"))
-        })
-    {
-        // ~keep Tier-2 writes the list item that holds a checkbox as a task item (issue #632).
+    let input_type = (name_lower == b"input").then(|| find_attr(attrs, b"type").unwrap_or_default());
+    if input_type.is_some_and(|input_type| input_type.eq_ignore_ascii_case(b"checkbox")) {
+        // ~keep Tier-2 writes a list item that starts with a checkbox as a task item (issue #632).
         if state
             .stack
             .iter()
@@ -122,6 +119,12 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
     {
         return Err(BailReason::RuleBetweenInlineMarkers);
     }
+    // ~keep A rule in a link in a heading is a block of the link: Tier-2 writes the block
+    // ~keep boundary as one space outside the link (issue #751). This scanner has written the
+    // ~keep text before the link by then, so it leaves the page to Tier-2.
+    if state.escape_ctx.contains(EscapeCtx::HEADING) && !state.link_stack.is_empty() {
+        return Err(BailReason::Classifier);
+    }
     // ~keep Tier-2 starts a rule after an item's content at the item's content column
     // ~keep (issue #583); see `BailReason::ListItemUnsupportedBlockChild`.
     if !state.in_table_cell() && state.list_continuation_indent_width() > 0 && !inside_stray_definition(state) {
@@ -159,11 +162,37 @@ fn emit_hr(state: &mut Tier1State) -> Result<(), BailReason> {
 fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Result<(), BailReason> {
     let in_code = state.escape_ctx.contains(EscapeCtx::CODE);
     let in_pre = state.escape_ctx.contains(EscapeCtx::PRE);
-    let inside_link = !in_code && state.stack.iter().any(|frame| matches!(frame.spec.kind, TagKind::Link));
-    if inside_link {
-        state
-            .cell_or_output_mut()
-            .push_str(crate::converter::main_helpers::hard_break_marker(options));
+    // ~keep A leading split marker is discarded by the DOM code renderer (#842), whereas
+    // ~keep the flat scanner would hoist it before the span. Ordinary interior breaks stay fast.
+    if in_code && !in_pre && !state.in_table_cell() && !state.escape_ctx.contains(EscapeCtx::HEADING) {
+        let start = state
+            .stack
+            .iter()
+            .rev()
+            .find(|frame| matches!(frame.spec.kind, TagKind::Code))
+            .map(|frame| frame.content_start);
+        if start.is_some_and(|start| {
+            state.cell_or_output_mut().get(start..).is_some_and(|content| {
+                content
+                    .chars()
+                    .all(crate::converter::utility::white_space::is_collapsible)
+            })
+        }) {
+            return Err(BailReason::Classifier);
+        }
+    }
+    let label_start = (!in_code)
+        .then(|| {
+            state
+                .stack
+                .iter()
+                .rev()
+                .find(|frame| matches!(frame.spec.kind, TagKind::Link))
+        })
+        .flatten()
+        .map(|frame| frame.content_start);
+    if let Some(label_start) = label_start {
+        emit_label_line_break(state, label_start, options);
     } else if in_code && !in_pre && state.escape_ctx.contains(EscapeCtx::HEADING) {
         let dest = state.cell_or_output_mut();
         crate::converter::main_helpers::trim_trailing_whitespace(dest);
@@ -178,6 +207,36 @@ fn emit_line_break(state: &mut Tier1State, options: &ConversionOptions) -> Resul
         emit_regular_line_break(state, options);
     }
     Ok(())
+}
+
+/// Writes a `<br>` inside a link label, where `label_start` is the start of the label in the
+/// buffer: what Tier-2's `line_break.rs` writes into its label buffer, in the same order of its
+/// arms. In a heading the break is one space after the trimmed label; in a table cell it is the
+/// cell break of the label alone, so a `<br>` that the label starts with is one space, and a
+/// `<br>` after white space or after another `<br>` is nothing (issue #845); elsewhere it is the
+/// hard break marker, and `close_link` decides which marker at an edge stays (issue #497).
+fn emit_label_line_break(state: &mut Tier1State, label_start: usize, options: &ConversionOptions) {
+    let in_heading = state.escape_ctx.contains(EscapeCtx::HEADING);
+    let in_table_cell = state.in_table_cell();
+    let dest = state.cell_or_output_mut();
+    let label_start = clamp_to_char_boundary(dest, label_start);
+    if in_heading {
+        crate::converter::main_helpers::trim_trailing_whitespace(dest);
+        dest.push(' ');
+    } else if in_table_cell {
+        if dest.len() == label_start && !options.br_in_tables {
+            dest.push(' ');
+        } else {
+            crate::converter::main_helpers::trim_trailing_whitespace(dest);
+            if options.br_in_tables {
+                dest.push_str("<br>");
+            } else if dest.len() > label_start {
+                dest.push(' ');
+            }
+        }
+    } else {
+        dest.push_str(crate::converter::main_helpers::hard_break_marker(options));
+    }
 }
 
 fn emit_pre_line_break(state: &mut Tier1State, br_in_tables: bool) {
@@ -223,6 +282,10 @@ fn emit_image(
     html: &str,
     options: &ConversionOptions,
 ) -> Result<(), BailReason> {
+    if options.skip_images {
+        state.last_emitted_was_img = true;
+        return Ok(());
+    }
     let raw_src = find_attr(attrs, b"src").unwrap_or_default();
     if image_uses_lazy_source(attrs, raw_src) {
         return Err(BailReason::ImageLazyLoadSrc);
@@ -242,11 +305,13 @@ fn emit_image(
         .map(|title| crate::converter::inline::link::escape_markdown_title(&title).into_owned());
     let keep_as_markdown = should_keep_image_as_markdown(html, &state.stack, options);
     let dest = state.cell_or_output_mut();
+    let written_from = dest.len();
     if keep_as_markdown {
         emit_markdown_image(dest, &src, &alt, title.as_deref(), options);
     } else {
         dest.push_str(&alt);
     }
+    state.end_document_start_if_written(written_from);
     state.last_emitted_was_img = true;
     Ok(())
 }
@@ -265,7 +330,11 @@ fn emit_image_in_code(
     }
     let treatment = crate::converter::media::inline_data_treatment(options.inline_data_media, src);
     if !options.skip_images && treatment != crate::options::InlineDataMedia::DropElement && !alt.is_empty() {
-        state.cell_or_output_mut().push_str(alt);
+        let dest = state.cell_or_output_mut();
+        let written_from = dest.len();
+        dest.push_str(alt);
+        // ~keep The alt text is content: the text after the code span keeps its leading space.
+        state.end_document_start_if_written(written_from);
     }
     // ~keep Tier-2 keeps white space between two `<img>` siblings, whatever the images wrote.
     state.last_emitted_was_img = true;
@@ -409,12 +478,23 @@ fn is_adjacent_rawtext_ignored_open(bytes: &[u8], pos: usize) -> bool {
     false
 }
 
+/// Closes the element of the close tag `tag_name_bytes` and gives back the place of a text that
+/// follows the tag, where this scanner knows it: after text, when the element holds text and
+/// is no `span`.
+///
+/// ~keep Tier-2 reads the place of a text from the tree (`siblings::place_after_element`). An
+/// ~keep element that holds text and is not in the text flow has text before the text that
+/// ~keep follows it: a link whose label gave up a space at its end leaves `[Go](/p) `, and the
+/// ~keep no-break space that `</a>&nbsp;now` starts with joins that space in both converters
+/// ~keep (rule 4), with no hand-over. After an element with no text, and after an element in
+/// ~keep the text flow, the place depends on what this scanner does not read (how the content
+/// ~keep of a `span` ends, the line end before it): the place stays unknown there.
 fn emit_close(
     state: &mut Tier1State,
     tag_name_bytes: &[u8],
     options: &ConversionOptions,
     table_probes: &mut Vec<TableLayoutProbe>,
-) -> Result<(), BailReason> {
+) -> Result<Option<TextPlace>, BailReason> {
     let mut name_buf = [0u8; MAX_TAG_NAME_BYTES];
     let name_lower = lowercase_into(tag_name_bytes, &mut name_buf);
 
@@ -472,7 +552,10 @@ fn emit_close(
     let breaks_after = is_block_tag(name_lower) && !(matches!(spec.kind, TagKind::Table) && state.in_table_cell());
     state.last_closed_block = breaks_after || (state.last_closed_block && is_inline_tag(name_lower));
 
-    Ok(())
+    let holds_text = state.text_count > frame.texts_before;
+    let in_text_flow =
+        std::str::from_utf8(name_lower).is_ok_and(crate::converter::utility::white_space::writes_in_text_flow);
+    Ok((holds_text && !in_text_flow).then_some(TextPlace::AfterText))
 }
 
 fn dispatch_close(
@@ -486,7 +569,7 @@ fn dispatch_close(
     match spec.kind {
         TagKind::Paragraph => close_paragraph(state),
         TagKind::Heading(n) => close_heading(state, frame, n, false, options)?,
-        TagKind::Blockquote => close_blockquote(state, frame, options.br_in_tables),
+        TagKind::Blockquote => close_blockquote(state, frame, options),
         TagKind::Pre => close_pre(state, frame, options),
         TagKind::Strong if suppress_close_marker(state, EscapeCtx::STRONG, true) => {}
         TagKind::Strong => close_inline_marker(state, frame, "**")?,
@@ -495,10 +578,10 @@ fn dispatch_close(
         TagKind::Strikethrough if suppress_close_marker(state, EscapeCtx::empty(), false) => {}
         TagKind::Strikethrough => close_inline_marker(state, frame, "~~")?,
         TagKind::Inserted if suppress_close_marker(state, EscapeCtx::empty(), false) => {}
-        TagKind::Inserted => close_inline_marker(state, frame, "==")?,
-        TagKind::Code => close_code(state, frame, matches!(name_lower, b"kbd" | b"samp"), options)?,
+        TagKind::Inserted => {}
+        TagKind::Code => close_code(state, frame, matches!(name_lower, b"kbd" | b"samp" | b"tt"), options)?,
         TagKind::Link => close_link(state, frame, options)?,
-        TagKind::List(ListKind::Definition) => close_dl(state, frame),
+        TagKind::List(ListKind::Definition) => close_dl(state, frame, options),
         TagKind::List(kind) => close_list(state, kind),
         TagKind::ListItem => close_list_item(state, frame)?,
         TagKind::DefinitionTerm => close_dt(state),
@@ -509,16 +592,18 @@ fn dispatch_close(
         TagKind::TableRow => close_table_row(state),
         TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
-        TagKind::Block => close_block_container(state, frame, name_lower),
+        TagKind::Block if figure_joins_an_image(state, frame, name_lower) => return Err(BailReason::Classifier),
+        TagKind::Block => close_block_container(state, frame, name_lower, options),
         TagKind::Summary => close_summary(state, frame),
         TagKind::Figcaption => close_figcaption(state, frame),
-        TagKind::Button => close_button(state, frame),
+        TagKind::LineEndControl => close_line_end_control(state, frame),
         TagKind::Inline if name_lower == b"abbr" => close_abbreviation(state, frame),
         TagKind::Hr
         | TagKind::TableFoot
         | TagKind::Inline
         | TagKind::LineBreak
         | TagKind::Image
+        | TagKind::Media
         | TagKind::RawText(_)
         | TagKind::Ignored => {}
     }
@@ -546,6 +631,19 @@ fn close_abbreviation(state: &mut Tier1State, frame: &OpenTag) {
     dest.push_str(&trailing);
 }
 
+/// Whether the `<figure>` of `frame` holds a space or a line end before an image.
+///
+/// ~keep Tier-2 takes that character out of the content of a figure
+/// ~keep (`semantic/figure.rs::handle_figure`). This scanner has no such rule, so the caller
+/// ~keep hands the page over (issue #845: write the text of Tier-2 or hand over).
+fn figure_joins_an_image(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8]) -> bool {
+    name_lower == b"figure"
+        && state
+            .cell_or_output_mut()
+            .get(frame.content_start..)
+            .is_some_and(|content| content.contains(" ![") || content.contains("\n!["))
+}
+
 /// Append a paragraph-break separator after a generic block container close
 /// (`<div>`, `<section>`, etc.) when it produced visible content.
 ///
@@ -554,14 +652,14 @@ fn close_abbreviation(state: &mut Tier1State, frame: &OpenTag) {
 /// diverging from Tier-2 which always emits `\n\n` after a block-with-content
 /// close (see Tier-2 `block/div.rs`).  Skipped inside table cells and inline
 /// contexts where the surrounding code already handles spacing.
-fn close_block_container(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8]) {
-    if block_container_is_passthrough(name_lower) {
+fn close_block_container(state: &mut Tier1State, frame: &OpenTag, name_lower: &[u8], options: &ConversionOptions) {
+    if block_container_is_passthrough(name_lower) || is_transparent_plain_form(name_lower, options) {
         // ~keep Mirrors the open-side skip in `emit_open`'s `TagKind::Block` arm:
         // Tier-2's catch-all handler for these names never emits a trailing
         // separator either.
         return;
     }
-    if state.in_table_cell() {
+    if state.in_table_cell() || start_line_in_pre(state, name_lower) {
         return;
     }
     let buf = state.cell_or_output_mut();
@@ -701,16 +799,15 @@ fn close_figcaption(state: &mut Tier1State, _frame: &OpenTag) {
     dest.push_str("*\n\n");
 }
 
-/// Close a `<button>` (Phase T).  When the button produced visible content,
-/// emit `\n\n` after.  Skipped in table cells (cells stay one logical line).
+/// Close a `<progress>`, `<meter>` or `<output>` (Phase T).  When the control produced visible
+/// content, write the space that keeps it a word of its own before it and `\n\n` after it.  The
+/// `\n\n` is skipped in table cells (cells stay one logical line).
 ///
-/// Mirrors the block-separator tail of Tier-2 `form/elements.rs`'s `handle_button`:
-/// ```text
-/// if !ctx.convert_as_inline && output.len() > start_len {
-///     output.push_str("\n\n");
-/// }
-/// ```
-fn close_button(state: &mut Tier1State, frame: &OpenTag) {
+/// Mirrors Tier-2 `form/elements.rs`'s `write_line_end_control`, with the same `ControlStart`.
+fn close_line_end_control(state: &mut Tier1State, frame: &OpenTag) {
+    let dest = state.cell_or_output_mut();
+    let content_start = clamp_to_char_boundary(dest, frame.content_start);
+    crate::converter::form::spacing::ControlStart::at(dest, content_start).finish(dest);
     if state.in_table_cell() {
         return;
     }
@@ -810,15 +907,28 @@ fn handle_empty_inline_body(
     marker: &str,
 ) -> Result<bool, BailReason> {
     let content_absent = buf.len() <= content_start;
+    let is_marks = matches!(marker, "**" | "*" | "~~" | "==");
+    // ~keep Whitespace-only marks use the full converter, including form feeds that must stay
+    // ~keep outside empty marks (#811). Break syntax at either edge is not visible body text.
     let whitespace_only = !content_absent
-        && buf[content_start..]
-            .bytes()
-            .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'));
+        && if is_marks {
+            buf[content_start..]
+                .trim_start_matches([' ', '\t'])
+                .trim_start_matches("\\\n")
+                .trim_end_matches("  \n")
+                .trim_end_matches("\\\n")
+                .chars()
+                .all(char::is_whitespace)
+        } else {
+            buf[content_start..]
+                .bytes()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
+        };
     if !content_absent && !whitespace_only {
         return Ok(false);
     }
     let was_whitespace_only = whitespace_only || (content_absent && frame.dropped_whitespace_only_text);
-    if was_whitespace_only && matches!(marker, "**" | "*" | "~~" | "==") {
+    if was_whitespace_only && is_marks {
         return Err(BailReason::WhitespaceOnlyInlineEmphasis);
     }
     let marker_start = clamp_to_char_boundary(buf, content_start.saturating_sub(marker.len()));
@@ -849,8 +959,11 @@ fn migrate_leading_inline_whitespace(buf: &mut String, content_start: usize, mar
     let leading = content[..leading_len].to_owned();
     buf.replace_range(content_start..content_start + leading_len, "");
     let marker_start = clamp_to_char_boundary(buf, content_start.saturating_sub(marker.len()));
-    buf.insert_str(marker_start, &leading);
-    content_start + leading_len
+    // ~keep White space on both sides of the element start is one run: Tier-2's `push_inline_prefix`.
+    // ~keep A form feed in it is a character and is written where no space is owed too.
+    let owed = crate::converter::utility::white_space::owed_part(&buf[..marker_start], &leading).len();
+    buf.insert_str(marker_start, &leading[leading_len - owed..]);
+    content_start + owed
 }
 
 fn migrate_trailing_inline_whitespace(buf: &mut String, content_start: usize, marker: &str) -> bool {

@@ -6,17 +6,20 @@
 use std::borrow::Cow;
 
 use super::cell::{collect_table_cells, get_colspan};
-use super::cells::{CellTextCache, RowEnv, RowRender, append_layout_row, collect_row_cell_widths, convert_table_row};
+use super::cells::{
+    CellTextCache, RenderedWidths, RowEnv, RowRender, append_layout_row, collect_row_cell_widths, convert_table_row,
+};
 use super::scanner::{TableScan, scan_table};
 use super::utils::{is_tag_name, normalized_tag_name};
 use crate::converter::block::container::HandlerContext;
 
 /// Return the content cell of a one-cell layout wrapper containing a nested table.
 /// Stop at that cell, so nested data headers do not give the wrapper table semantics.
-fn nested_table_wrapper_cell(
+pub(super) fn nested_table_wrapper_cell(
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     scan: &TableScan,
+    ctx: &super::super::super::Context,
 ) -> Option<(tl::NodeHandle, usize)> {
     if scan.row_counts != [1] || scan.nested_table_count == 0 || scan.has_span || !scan.has_text {
         return None;
@@ -24,6 +27,9 @@ fn nested_table_wrapper_cell(
     let mut cell = None;
     let mut pending: Vec<_> = tag.children().top().iter().map(|handle| (*handle, 1)).collect();
     while let Some((handle, depth)) = pending.pop() {
+        if ctx.excluded_node_ids.contains(&handle.get_inner()) {
+            continue;
+        }
         let Some(tl::Node::Tag(child)) = handle.get(parser) else {
             continue;
         };
@@ -58,13 +64,14 @@ pub fn table_total_columns(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
 ) -> usize {
     let mut max_cols = 0usize;
     let mut cells = Vec::new();
 
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
         for child_handle in tag.children().top().iter() {
-            max_cols = max_cols.max(table_child_columns(child_handle, parser, dom_ctx, &mut cells));
+            max_cols = max_cols.max(table_child_columns(child_handle, parser, dom_ctx, ctx, &mut cells));
         }
     }
 
@@ -75,8 +82,12 @@ fn table_child_columns(
     child_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) -> usize {
+    if ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return 0;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return 0;
     };
@@ -89,10 +100,10 @@ fn table_child_columns(
             .top()
             .iter()
             .filter(|row_handle| is_tag_name(row_handle, parser, dom_ctx, "tr"))
-            .map(|row_handle| row_columns(row_handle, parser, dom_ctx, cells))
+            .map(|row_handle| row_columns(row_handle, parser, dom_ctx, ctx, cells))
             .max()
             .unwrap_or(0),
-        "tr" | "row" => row_columns(child_handle, parser, dom_ctx, cells),
+        "tr" | "row" => row_columns(child_handle, parser, dom_ctx, ctx, cells),
         _ => 0,
     }
 }
@@ -101,9 +112,10 @@ fn row_columns(
     row_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
+    ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) -> usize {
-    collect_table_cells(row_handle, parser, dom_ctx, cells);
+    collect_table_cells(row_handle, parser, dom_ctx, ctx, cells);
     cells.iter().fold(0usize, |count, handle| {
         count.saturating_add(get_colspan(handle, parser))
     })
@@ -123,7 +135,7 @@ fn row_columns(
 /// ~keep two-pass path. The metadata collector does not affect emitted bytes, so reuse stays on
 /// ~keep for it — its entries stop being recorded twice per table cell, which is the double
 /// ~keep walk's bug, not a behaviour worth preserving.
-const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan: &TableScan) -> bool {
+pub(super) const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan: &TableScan) -> bool {
     if table_scan.nested_table_count > 0 {
         return false;
     }
@@ -143,7 +155,11 @@ const fn cell_text_reuse_allowed(ctx: &super::super::super::Context, table_scan:
 
 /// ~keep Ragged row widths alone do not imply layout: the regular renderer pads them. Layout
 /// ~keep requires stronger evidence such as nested tables, borderless spans, blanks, or dense links.
-fn is_layout_table(tag: &tl::HTMLTag<'_>, scan: &TableScan, wrapper_cell: Option<(tl::NodeHandle, usize)>) -> bool {
+pub(super) fn is_layout_table(
+    tag: &tl::HTMLTag<'_>,
+    scan: &TableScan,
+    wrapper_cell: Option<(tl::NodeHandle, usize)>,
+) -> bool {
     if wrapper_cell.is_some() || scan.has_header || scan.has_caption {
         return false;
     }
@@ -170,6 +186,9 @@ fn render_layout_child(
     output: &mut String,
     handler: HandlerContext<'_>,
 ) {
+    if handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
         return;
     };
@@ -237,6 +256,7 @@ struct DataTableState {
     cell_cache: CellTextCache,
     deferred_tables: Vec<String>,
     col_widths: Vec<usize>,
+    rendered_widths: Option<RenderedWidths>,
 }
 
 #[derive(Clone, Copy)]
@@ -254,7 +274,7 @@ fn render_data_table(
     handler: HandlerContext<'_>,
     scan: &TableScan,
 ) {
-    let total_cols = table_total_columns(node_handle, parser, handler.dom_ctx);
+    let total_cols = table_total_columns(node_handle, parser, handler.dom_ctx, handler.ctx);
     let reuse_cell_text = !handler.options.compact_tables && cell_text_reuse_allowed(handler.ctx, scan);
     let mut cell_cache = CellTextCache::new(reuse_cell_text);
     let col_widths = column_widths(tag, parser, handler, total_cols, reuse_cell_text, &mut cell_cache);
@@ -267,6 +287,7 @@ fn render_data_table(
         cell_cache,
         deferred_tables: Vec::new(),
         col_widths,
+        rendered_widths: visitor_rendered_widths(handler),
     };
     let env = DataEnv { parser, handler, scan };
     for child_handle in tag.children().top().iter() {
@@ -283,12 +304,34 @@ fn render_data_table(
         output.truncate(output_start);
         return;
     }
+    if let Some(widths) = state.rendered_widths {
+        widths.repad(output, output_start, handler.options);
+    }
     append_deferred_tables(output, &state.deferred_tables);
+}
+
+#[cfg(feature = "visitor")]
+pub(super) fn visitor_rendered_widths(handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+    if handler.ctx.visitor.is_some()
+        && !handler.options.compact_tables
+        && !handler.ctx.in_code
+        && !handler.ctx.in_code_block
+        && handler.ctx.inline_code_links.is_none()
+        && handler.ctx.pre_cell_break_offsets.is_none()
+    {
+        return Some(RenderedWidths::default());
+    }
+    None
+}
+
+#[cfg(not(feature = "visitor"))]
+pub(super) const fn visitor_rendered_widths(_handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+    None
 }
 
 /// ~keep Width measurement is an internal walk. When rendered text cannot be reused, collectors
 /// ~keep are detached so the pre-pass cannot duplicate caller-visible metadata or structure.
-fn column_widths(
+pub(super) fn column_widths(
     tag: &tl::HTMLTag<'_>,
     parser: &tl::Parser,
     handler: HandlerContext<'_>,
@@ -339,6 +382,9 @@ struct WidthState<'a> {
 }
 
 fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize, state: &mut WidthState<'_>) {
+    if env.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(env.parser) else {
         return;
     };
@@ -357,6 +403,9 @@ fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: us
 }
 
 fn collect_width_row(row_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize, state: &mut WidthState<'_>) {
+    if env.ctx.excluded_node_ids.contains(&row_handle.get_inner()) {
+        return;
+    }
     collect_row_cell_widths(
         row_handle,
         env,
@@ -368,6 +417,9 @@ fn collect_width_row(row_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize,
 }
 
 fn render_data_child(child_handle: &tl::NodeHandle, output: &mut String, env: DataEnv<'_>, state: &mut DataTableState) {
+    if env.handler.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
+        return;
+    }
     let Some(tl::Node::Tag(child_tag)) = child_handle.get(env.parser) else {
         return;
     };
@@ -427,9 +479,10 @@ fn render_caption(tag: &tl::HTMLTag<'_>, output: &mut String, env: DataEnv<'_>) 
     }
     let text = text.trim();
     if !text.is_empty() {
-        output.push('*');
+        output.push(env.handler.options.strong_em_symbol);
         output.push_str(&text.replace('-', r"\-"));
-        output.push_str("*\n\n");
+        output.push(env.handler.options.strong_em_symbol);
+        output.push_str("\n\n");
     }
 }
 
@@ -450,6 +503,7 @@ fn render_data_row(
             dom_ctx: env.handler.dom_ctx,
         },
         &mut RowRender {
+            visitor_is_complete: false,
             row_index: state.row_index,
             has_content: &mut state.has_content,
             has_span: env.scan.has_span,
@@ -461,6 +515,7 @@ fn render_data_row(
             col_widths: &state.col_widths,
             cell_cache: &mut state.cell_cache,
             deferred_tables: &mut state.deferred_tables,
+            rendered_widths: state.rendered_widths.as_mut(),
         },
     );
     if emitted {
@@ -470,7 +525,7 @@ fn render_data_row(
 
 /// ~keep GFM cannot nest tables, so a nested table from a single-cell row is emitted as a
 /// ~keep separate table after its enclosing table instead of being flattened (issues #469/#484).
-fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
+pub(super) fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
     for nested in deferred_tables {
         if !output.ends_with('\n') {
             output.push('\n');
@@ -484,13 +539,13 @@ fn append_deferred_tables(output: &mut String, deferred_tables: &[String]) {
 }
 
 #[cfg(feature = "visitor")]
-struct TableVisitorState {
+pub(super) struct TableVisitorState {
     output_start: usize,
     custom_start: Option<String>,
 }
 
 #[cfg(feature = "visitor")]
-fn begin_table_visit(
+pub(super) fn begin_table_visit(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -544,7 +599,7 @@ fn begin_table_visit(
 }
 
 #[cfg(feature = "visitor")]
-fn finish_table_visit(
+pub(super) fn finish_table_visit(
     node_handle: &tl::NodeHandle,
     parser: &tl::Parser,
     output: &mut String,
@@ -648,8 +703,14 @@ pub fn handle_table(
         finish_table_visit(node_handle, parser, output, tag, handler, visitor_state);
         return;
     }
-    let table_scan = scan_table(node_handle, parser, handler.dom_ctx, handler.options.br_in_tables);
-    let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan).filter(|(_, cell_depth)| {
+    let table_scan = scan_table(
+        node_handle,
+        parser,
+        handler.dom_ctx,
+        handler.ctx,
+        handler.options.br_in_tables,
+    );
+    let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan, handler.ctx).filter(|(_, cell_depth)| {
         handler.depth + cell_depth + 1 < crate::converter::main_helpers::effective_max_depth(handler.options)
     });
     if is_layout_table(tag, &table_scan, wrapper_cell) {

@@ -4,7 +4,6 @@ include = [
     "/Cargo.lock",
     "/src/**",
     "/README.md",
-    "!/src/converter/utility/preprocessing/tests.rs",
 ]
 name = "html-to-markdown-rs"
 version.workspace = true
@@ -78,6 +77,106 @@ comrak = { version = "0.55.0", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml.workspace = true
+
+[[test]]
+name = "issue_489_regressions"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_818_structured_data_script_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_772_omitted_end_tags_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "form_whitespace_followups_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "inline_boundary_followups"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_863_nested_break_ownership_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_829_form_tree_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_859_heading_block_markers_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "review_791_block_boundaries_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_silent_void_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_empty_inline_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_827_removed_script_join_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_omitted_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_nonflow_list_prefix_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_semantic_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_script_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_code_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_link_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_emphasis_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_generic_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_empty_list_block_prefix_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_header_list_prefix_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "bold_break_between_bold_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_897_bold_break_two_breaks_test"
+required-features = ["testkit"]
 
 [[example]]
 name = "test_deser"

@@ -29,30 +29,80 @@ pub fn handle(
     output: &mut String,
     handler: HandlerContext<'_>,
 ) {
-    let options = handler.options;
-    let ctx = handler.ctx;
-
-    let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
-    separate_heading(output, options, ctx, level);
-    let Some(normalized) = heading_text(tag_name, node_handle, parser, handler) else {
+    let mut children = Vec::new();
+    let Some(opened) = open(tag_name, node_handle, parser, output, handler, &mut children) else {
         return;
     };
+    let mut content = String::new();
+    let child_ctx = opened.scope.as_deref().unwrap_or(handler.ctx);
+    for child in &children {
+        crate::converter::walk_node(
+            child,
+            parser,
+            &mut content,
+            HandlerContext::new(handler.options, child_ctx, handler.depth + 1, handler.dom_ctx),
+        );
+    }
+    close(tag_name, &content, node_handle, parser, output, handler);
+}
 
+pub fn open(
+    tag_name: &str,
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+    children: &mut Vec<NodeHandle>,
+) -> Option<crate::converter::walk::Open> {
+    let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
+    separate_heading(output, handler.options, handler.ctx, level);
+    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
+        return None;
+    };
+    children.extend(tag.children().top().iter().copied());
+    let heading_ctx = Context {
+        in_heading: true,
+        convert_as_inline: true,
+        heading_allow_inline_images: heading_allows_inline_images(tag_name, &handler.ctx.keep_inline_images_in),
+        ..handler.ctx.clone()
+    };
+    Some(crate::converter::walk::Open {
+        scope: Some(std::rc::Rc::new(heading_ctx)),
+        close: crate::converter::walk::Close::Capture(crate::converter::walk::CaptureEnd::Heading(level)),
+    })
+}
+
+pub fn close(
+    tag_name: &str,
+    content: &str,
+    node_handle: &NodeHandle,
+    parser: &Parser,
+    output: &mut String,
+    handler: HandlerContext<'_>,
+) {
+    let options = handler.options;
+    let ctx = handler.ctx;
+    let level = tag_name.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(1) as usize;
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let normalized = normalize_heading_text(trimmed);
     #[cfg(feature = "visitor")]
     let heading_output = visitor_heading_output(node_handle, parser, tag_name, level, &normalized, handler);
-
     #[cfg(not(feature = "visitor"))]
     let heading_output = {
         let mut buf = String::new();
         push_heading(&mut buf, ctx, options, level, &normalized);
         Some(buf)
     };
-
     if let Some(heading_output) = heading_output {
         append_heading(output, &heading_output, options, ctx, level);
     }
     #[cfg(feature = "metadata")]
     record_heading(node_handle, parser, &normalized, level, handler);
+    #[cfg(not(feature = "metadata"))]
+    let _ = (node_handle, parser);
 }
 
 fn separate_heading(output: &mut String, options: &ConversionOptions, ctx: &Context, level: usize) {
@@ -71,40 +121,6 @@ fn separate_heading(output: &mut String, options: &ConversionOptions, ctx: &Cont
             "\n\n"
         });
     }
-}
-
-fn heading_text(
-    tag_name: &str,
-    node_handle: &NodeHandle,
-    parser: &Parser,
-    handler: HandlerContext<'_>,
-) -> Option<String> {
-    let mut text = String::new();
-    let heading_ctx = Context {
-        in_heading: true,
-        convert_as_inline: true,
-        heading_allow_inline_images: heading_allows_inline_images(tag_name, &handler.ctx.keep_inline_images_in),
-        ..handler.ctx.clone()
-    };
-
-    let Some(tl::Node::Tag(tag)) = node_handle.get(parser) else {
-        return None;
-    };
-    for child_handle in tag.children().top().iter() {
-        crate::converter::walk_node(
-            child_handle,
-            parser,
-            &mut text,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                &heading_ctx,
-                handler.depth + 1,
-                handler.dom_ctx,
-            ),
-        );
-    }
-    let trimmed = text.trim();
-    (!trimmed.is_empty()).then(|| normalize_heading_text(trimmed).into_owned())
 }
 
 fn append_heading(output: &mut String, heading_text: &str, options: &ConversionOptions, ctx: &Context, level: usize) {
@@ -150,7 +166,7 @@ fn record_heading(
         })
         .map(|value| value.as_utf8_str().to_string());
 
-    if handler.ctx.metadata_wants_headers {
+    if handler.ctx.metadata_wants.headers {
         if let Some(ref collector) = handler.ctx.metadata_collector {
             collector
                 .borrow_mut()

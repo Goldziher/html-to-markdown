@@ -16,6 +16,9 @@ pub(super) fn render(
         .collect();
     pending.reverse();
     while let Some((child, depth)) = pending.pop() {
+        if handler.ctx.excluded_node_ids.contains(&child.get_inner()) {
+            continue;
+        }
         let Some(tl::Node::Tag(tag)) = child.get(parser) else {
             continue;
         };
@@ -42,7 +45,7 @@ pub(super) fn render(
 
 fn render_row(row: &tl::NodeHandle, parser: &tl::Parser<'_>, output: &mut String, handler: HandlerContext<'_>) {
     let mut cells = Vec::new();
-    super::cell::collect_table_cells(row, parser, handler.dom_ctx, &mut cells);
+    super::cell::collect_table_cells(row, parser, handler.dom_ctx, handler.ctx, &mut cells);
     let row = cells
         .iter()
         .map(|cell| {

@@ -4,7 +4,7 @@
 //! - Inline code with backtick formatting
 //! - Code block formatting (indented or fenced)
 //! - Language detection from class attributes
-//! - Whitespace normalization and dedenting
+//! - The lines of a code block as they are in the page
 //! - Visitor callback integration
 
 use crate::converter::Context;
@@ -13,7 +13,9 @@ use crate::converter::inline::HandlerContext;
 use crate::converter::inline::wrapped::emit_code_span;
 use crate::converter::main::walk_node;
 use crate::converter::text::dedent_code_block;
+use crate::converter::walk::{CaptureEnd, Close, Open};
 use crate::options::ConversionOptions;
+use std::rc::Rc;
 
 #[cfg(feature = "visitor")]
 use crate::converter::utility::serialization::serialize_node;
@@ -70,52 +72,72 @@ fn min_safe_code_span_delimiter_length(content: &str) -> usize {
     candidate
 }
 
-/// Handle an inline `<code>` element and convert to Markdown.
+/// Open an inline `<code>` element, or a `<kbd>` or a `<samp>` that holds a link. Lists its
+/// children in `children`.
 ///
-/// This handler processes inline code elements including:
-/// - Extracting code content and applying backtick delimiters
-/// - Handling backticks in content by using multiple delimiters
-/// - Invoking visitor callbacks when the visitor feature is enabled
-/// - Generating appropriate markdown output with proper escaping
-pub fn handle_code(tag: &tl::HTMLTag, mut handler: HandlerContext<'_>) {
-    let links = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+/// In code the element writes nothing of its own. Else the walk captures the text of the
+/// children for [`close_code`], with the links that they hold.
+pub fn open_code(
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    context: &Context,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Open {
+    children.extend(tag.children().top().iter().copied());
+    if context.code_element_is_transparent() {
+        return Open::children_only();
+    }
+    let links = Rc::new(std::cell::RefCell::new(Vec::new()));
     let code_ctx = Context {
         in_code: true,
-        inline_code_links: if handler.context.in_code {
-            handler.context.inline_code_links.clone()
-        } else if contains_anchor(tag, handler.parser) {
+        inline_code_links: if context.in_code {
+            context.inline_code_links.clone()
+        } else if contains_anchor(tag, parser) {
             Some(links.clone())
         } else {
             None
         },
-        ..handler.context.clone()
+        ..context.clone()
     };
-    if handler.context.in_code {
-        walk_children_to_output(tag, &code_ctx, &mut handler);
-        return;
+    Open {
+        scope: Some(Rc::new(code_ctx)),
+        close: Close::Capture(CaptureEnd::Code(CodeEnd { links })),
     }
-    let mut content = String::with_capacity(32);
-    walk_children(tag, &mut content, &code_ctx, &handler);
+}
+
+/// What [`open_code`] leaves for [`close_code`]: the links that the children wrote.
+pub struct CodeEnd {
+    links: Rc<std::cell::RefCell<Vec<crate::converter::context::InlineCodeLink>>>,
+}
+
+/// Write `content`, the text of the children of a code element, as inline code:
+/// - Applying backtick delimiters, more than one when the content holds backticks
+/// - Invoking visitor callbacks when the visitor feature is enabled
+/// - Writing each link of the content around its part of the code
+pub fn close_code(end: &CodeEnd, content: &str, mut handler: HandlerContext<'_>) {
     // ~keep An all-whitespace body is a real code span, not an empty element (#481).
     if content.is_empty() {
         return;
     }
 
     #[cfg(feature = "visitor")]
-    if tag.name().as_utf8_str().eq_ignore_ascii_case("code") {
-        if let Some(custom_output) = visit_inline_code(tag, &content, &handler) {
-            handler.output.push_str(&custom_output);
-            return;
+    if let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) {
+        if tag.name().as_utf8_str().eq_ignore_ascii_case("code") {
+            if let Some(custom_output) = visit_inline_code(tag, content, &handler) {
+                handler.output.push_str(&custom_output);
+                return;
+            }
         }
     }
-    emit_inline_code_with_links(&content, &links.borrow(), &mut handler);
+    emit_inline_code_with_links(content, &end.links.borrow(), &mut handler);
 }
 
+/// Whether the element holds a link. An `<a>` with no `href` is no link: it is text of the code.
 pub(in crate::converter) fn contains_anchor(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> bool {
     let mut pending = tag.children().top().to_vec();
     while let Some(handle) = pending.pop() {
         if let Some(tl::Node::Tag(child)) = handle.get(parser) {
-            if child.name().as_utf8_str().eq_ignore_ascii_case("a") {
+            if child.name().as_utf8_str().eq_ignore_ascii_case("a") && child.attributes().get("href").is_some() {
                 return true;
             }
             pending.extend(child.children().top().iter().copied());
@@ -204,22 +226,6 @@ fn emit_code_content(content: &str, handler: &mut HandlerContext<'_>) {
     );
 }
 
-fn walk_children_to_output(tag: &tl::HTMLTag<'_>, context: &Context, handler: &mut HandlerContext<'_>) {
-    for child_handle in tag.children().top().iter() {
-        walk_node(
-            child_handle,
-            handler.parser,
-            handler.output,
-            crate::converter::block::container::HandlerContext::new(
-                handler.options,
-                context,
-                handler.depth + 1,
-                handler.dom_context,
-            ),
-        );
-    }
-}
-
 fn walk_children(tag: &tl::HTMLTag<'_>, output: &mut String, context: &Context, handler: &HandlerContext<'_>) {
     for child_handle in tag.children().top().iter() {
         walk_node(
@@ -258,6 +264,12 @@ fn visit_inline_code(tag: &tl::HTMLTag<'_>, content: &str, handler: &HandlerCont
         .lock()
         .expect("visitor mutex poisoned")
         .visit_code_inline(&node_context, content);
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, crate::visitor::VisitResult::Skip)
+            || matches!(&result, crate::visitor::VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     visitor_output(result, handler)
 }
 
@@ -306,7 +318,7 @@ pub(in crate::converter) fn emit_inline_code(
 ///
 /// This handler processes code block elements including:
 /// - Extracting language information from class attributes
-/// - Processing whitespace and dedenting code content
+/// - Keeping the lines of the code as they are in the page
 /// - Supporting multiple code block styles (indented, backticks, tildes)
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output
@@ -326,12 +338,32 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
         return;
     }
 
+    // ~keep CommonMark 5.3 keeps indented content in the last list item until an explicit boundary.
+    if handler.options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && !handler.context.in_table_cell
+        && matches!(
+            crate::converter::utility::siblings::previous_content_block(
+                handler.node_handle,
+                handler.parser,
+                handler.dom_context
+            ),
+            Some("ul" | "ol")
+        )
+    {
+        if handler.context.in_list_item {
+            crate::converter::list::utils::start_block_in_list_item(handler.output, handler.context, handler.options);
+        } else {
+            separate_code_block(handler.output, handler.context);
+        }
+        handler.output.push_str("<!-- -->\n\n");
+    }
+
     let offsets = cell_break_offsets
         .as_ref()
         .map(|offsets| offsets.borrow().clone())
         .unwrap_or_default();
     let segmented = (!offsets.is_empty()).then(|| content.clone());
-    let processed = process_pre_content(content, handler.options.whitespace_mode);
+    let processed = process_pre_content(content, handler.options.whitespace_mode, false);
     #[cfg(feature = "visitor")]
     if let Some(custom_output) = visit_code_block(tag, language.as_deref(), &processed, &handler) {
         handler.output.push_str(&custom_output);
@@ -359,6 +391,50 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
     }
 }
 
+/// Whether `tag_name` is a plain block container: inside a code block it starts a line and ends a line.
+///
+/// ~keep A browser renders the content of a `pre` with its line feeds kept, so the text of a code block
+/// ~keep is the lines of that rendering. A block box starts a line and ends a line and adds no line of
+/// ~keep its own: a `<br>` or a line feed at its end is still one break, and an empty one is no line.
+/// ~keep Highlighters write each line of code as such an element. Both tiers read this list.
+pub(in crate::converter) fn is_line_element_in_pre(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "address"
+            | "article"
+            | "aside"
+            | "center"
+            | "dialog"
+            | "div"
+            | "footer"
+            | "header"
+            | "hgroup"
+            | "main"
+            | "nav"
+            | "search"
+            | "section"
+    )
+}
+
+/// Put `output` at the start of a line of the open code block, whose content starts the buffer.
+fn start_pre_line(output: &mut String) {
+    if !output.is_empty() && !output.ends_with('\n') {
+        output.push('\n');
+    }
+}
+
+/// Write the content of a plain block container that is inside a code block, on lines of its own.
+pub(in crate::converter) fn handle_line_element_in_pre(
+    node_handle: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    handler: crate::converter::block::container::HandlerContext<'_>,
+) {
+    start_pre_line(output);
+    crate::converter::block::container::handle_passthrough(node_handle, parser, output, handler);
+    start_pre_line(output);
+}
+
 fn detect_language(tag: &tl::HTMLTag<'_>, parser: &tl::Parser<'_>) -> Option<String> {
     language_from_class(tag).or_else(|| {
         tag.children().top().iter().find_map(|child_handle| {
@@ -384,19 +460,29 @@ fn language_from_class(tag: &tl::HTMLTag<'_>) -> Option<String> {
     })
 }
 
-fn process_pre_content(content: String, whitespace_mode: crate::options::WhitespaceMode) -> String {
-    if whitespace_mode == crate::options::WhitespaceMode::Strict {
-        return content;
-    }
-    let leading_newlines = content.chars().take_while(|&character| character == '\n').count();
-    let trailing_newlines = content.chars().rev().take_while(|&character| character == '\n').count();
-    let core = content.trim_matches('\n');
-    let mut processed = dedent_code_block(core);
-    if core.trim().is_empty() {
-        processed.insert_str(0, &"\n".repeat(leading_newlines));
-    }
-    processed.push_str(&"\n".repeat(trailing_newlines));
-    processed
+/// The text of a code block: the content of the `pre` without the one line feed at its start.
+///
+/// ~keep An HTML parser drops one line feed right after the `<pre>` tag, so a browser shows a
+/// ~keep second one as a blank first line of the code. Every other character is a character of
+/// ~keep the code and stays: indentation that all lines share, blank lines between lines of code,
+/// ~keep spaces at a line end (issues #782, #783). The fence drops the line feeds at the end.
+///
+/// ~keep Strict white space mode writes the start of a block as it did before that rule: the line
+/// ~keep feeds at the start are one blank first line. `tag_feed_dropped` is true for Tier-1, which
+/// ~keep dropped the line feed after the tag in that mode too.
+pub(in crate::converter) fn process_pre_content(
+    mut content: String,
+    whitespace_mode: crate::options::WhitespaceMode,
+    tag_feed_dropped: bool,
+) -> String {
+    let leading = content.len() - content.trim_start_matches('\n').len();
+    let kept = if whitespace_mode == crate::options::WhitespaceMode::Strict {
+        leading.saturating_sub(usize::from(tag_feed_dropped)).min(1)
+    } else {
+        leading.saturating_sub(1)
+    };
+    content.drain(..leading - kept);
+    content
 }
 
 #[cfg(feature = "visitor")]
@@ -427,6 +513,12 @@ fn visit_code_block(
             .lock()
             .expect("visitor mutex poisoned")
             .visit_code_block(&node_context, language, content);
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, crate::visitor::VisitResult::Skip)
+            || matches!(&result, crate::visitor::VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     visitor_output(result, handler)
 }
 
@@ -546,6 +638,16 @@ fn format_code_block(
     }
 
     separate_code_block(output, ctx);
+    render_code_block(content, language, output, options);
+}
+
+/// Write the code block for `content` in the configured style. Both tiers call it.
+pub(in crate::converter) fn render_code_block(
+    content: &str,
+    language: Option<&str>,
+    output: &mut String,
+    options: &ConversionOptions,
+) {
     match options.code_block_style {
         crate::options::CodeBlockStyle::Indented => format_indented_code_block(content, output),
         crate::options::CodeBlockStyle::Backticks | crate::options::CodeBlockStyle::Tildes => {
@@ -566,7 +668,9 @@ fn separate_code_block(output: &mut String, context: &Context) {
 }
 
 fn format_indented_code_block(content: &str, output: &mut String) {
+    // ~keep Markdown has no indented code block that starts with a blank line.
     let indented = content
+        .trim_start_matches('\n')
         .lines()
         .map(|line| {
             if line.is_empty() {
@@ -749,4 +853,119 @@ fn format_code_block_in_list_item(
             output.push_str(segment);
         }
     }
+}
+
+pub struct PreEnd {
+    offsets: Option<Rc<std::cell::RefCell<Vec<usize>>>>,
+    language: Option<String>,
+}
+
+pub fn open_pre(
+    tag: &tl::HTMLTag,
+    parser: &tl::Parser,
+    context: &Context,
+    options: &ConversionOptions,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Open {
+    let offsets = (context.in_table_cell && options.br_in_tables).then(|| Rc::new(std::cell::RefCell::new(Vec::new())));
+    let code_ctx = Context {
+        in_code: true,
+        in_code_block: true,
+        pre_cell_break_offsets: offsets.clone(),
+        ..context.clone()
+    };
+    children.extend(tag.children().top().iter().copied());
+    Open {
+        scope: Some(Rc::new(code_ctx)),
+        close: Close::Capture(CaptureEnd::Pre(PreEnd {
+            offsets,
+            language: detect_language(tag, parser),
+        })),
+    }
+}
+
+pub fn close_pre(end: &PreEnd, captured: &str, handler: HandlerContext<'_>) {
+    if captured.is_empty() {
+        return;
+    }
+    let Some(tl::Node::Tag(tag)) = handler.node_handle.get(handler.parser) else {
+        return;
+    };
+    #[cfg(not(feature = "visitor"))]
+    let _ = tag;
+    let content = captured.to_owned();
+    let language = &end.language;
+    let cell_break_offsets = &end.offsets;
+    // ~keep CommonMark 5.3 keeps indented content in the last list item until an explicit boundary.
+    if handler.options.code_block_style == crate::options::CodeBlockStyle::Indented
+        && !handler.context.in_table_cell
+        && matches!(
+            crate::converter::utility::siblings::previous_content_block(
+                handler.node_handle,
+                handler.parser,
+                handler.dom_context
+            ),
+            Some("ul" | "ol")
+        )
+    {
+        if handler.context.in_list_item {
+            crate::converter::list::utils::start_block_in_list_item(handler.output, handler.context, handler.options);
+        } else {
+            separate_code_block(handler.output, handler.context);
+        }
+        handler.output.push_str("<!-- -->\n\n");
+    }
+
+    let offsets = cell_break_offsets
+        .as_ref()
+        .map(|offsets| offsets.borrow().clone())
+        .unwrap_or_default();
+    let segmented = (!offsets.is_empty()).then(|| content.clone());
+    let processed = process_pre_content(content, handler.options.whitespace_mode, false);
+    #[cfg(feature = "visitor")]
+    if let Some(custom_output) = visit_code_block(tag, language.as_deref(), &processed, &handler) {
+        handler.output.push_str(&custom_output);
+    } else {
+        format_code_block(
+            segmented.as_deref().unwrap_or(&processed),
+            &offsets,
+            language.as_deref(),
+            handler.output,
+            handler.options,
+            handler.context,
+        );
+    }
+    #[cfg(not(feature = "visitor"))]
+    format_code_block(
+        segmented.as_deref().unwrap_or(&processed),
+        &offsets,
+        language.as_deref(),
+        handler.output,
+        handler.options,
+        handler.context,
+    );
+    if let Some(ref collector) = handler.context.structure_collector {
+        collector.borrow_mut().push_code(&processed, language.as_deref());
+    }
+}
+
+pub fn open_line_element_in_pre(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    output: &mut String,
+    children: &mut Vec<tl::NodeHandle>,
+) -> Option<Open> {
+    let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+        return None;
+    };
+    start_pre_line(output);
+    children.extend(tag.children().top().iter().copied());
+    Some(Open {
+        scope: None,
+        close: Close::PreLine,
+    })
+}
+
+pub fn close_line_element_in_pre(output: &mut String) {
+    start_pre_line(output);
 }

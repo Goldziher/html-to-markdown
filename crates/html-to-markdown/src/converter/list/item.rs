@@ -10,7 +10,6 @@ use crate::converter::list::ListContext;
 use crate::converter::list::utils::add_list_leading_separator;
 use crate::converter::main_helpers::effective_max_depth;
 use crate::converter::main_helpers::strip_trailing_backslash_breaks;
-use crate::converter::main_helpers::tag_name_eq;
 use crate::converter::main_helpers::trim_trailing_whitespace;
 use crate::converter::utility::content::normalized_tag_name;
 use crate::converter::walk_node;
@@ -53,6 +52,20 @@ struct TaskInfo {
     checkbox: Option<tl::NodeHandle>,
 }
 
+/// What the search for the checkbox of a task item met first in a node.
+enum FirstContent {
+    /// A checkbox, with its checked state.
+    Checkbox(bool, tl::NodeHandle),
+    /// Content that is not a checkbox: the item is not a task item.
+    Other,
+    /// Nothing a reader sees.
+    Nothing,
+}
+
+/// Finds the checkbox a list item starts with.
+///
+/// ~keep A task item starts with its checkbox. A checkbox after other content of the item is a
+/// ~keep control in the text, not the item's marker.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn find_checkbox<'a>(
     node_handle: &tl::NodeHandle,
@@ -60,53 +73,51 @@ fn find_checkbox<'a>(
     options: &ConversionOptions,
     ctx: &Context,
     depth: usize,
-) -> Option<(bool, tl::NodeHandle)> {
-    // ~keep This helper recurses over the li subtree independently of `walk_node`
-    // ~keep (it runs before any handler dispatch), so it needs its own depth guard
-    // ~keep instead of relying on the main walker's check.
-    if depth >= effective_max_depth(options) {
-        ctx.depth_limit_reached.set(true);
-        return None;
-    }
-    if let Some(tl::Node::Tag(node_tag)) = node_handle.get(parser) {
-        if tag_name_eq(node_tag.name().as_utf8_str(), "input") {
-            let input_type = node_tag
-                .attributes()
-                .get("type")
-                .flatten()
-                .map(|value| value.as_utf8_str());
-            // ~keep An attribute value like `CHECKBOX` names the same type.
-            if input_type.is_some_and(|input_type| input_type.eq_ignore_ascii_case("checkbox")) {
-                return Some((node_tag.attributes().get("checked").is_some(), *node_handle));
-            }
+) -> FirstContent {
+    let mut pending = vec![(*node_handle, depth)];
+    while let Some((handle, depth)) = pending.pop() {
+        if depth >= effective_max_depth(options) {
+            ctx.depth_limit_reached.set(true);
+            return FirstContent::Other;
         }
-        // ~keep A nested list's items own the checkboxes inside it (issue #604).
-        if matches!(normalized_tag_name(node_tag.name().as_utf8_str()).as_ref(), "ul" | "ol") {
-            return None;
-        }
-        for child_handle in node_tag.children().top().iter() {
-            if let Some(result) = find_checkbox(child_handle, parser, options, ctx, depth + 1) {
-                return Some(result);
+        match handle.get(parser) {
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => return FirstContent::Other,
+            Some(tl::Node::Tag(tag)) => {
+                match normalized_tag_name(tag.name().as_utf8_str()).as_ref() {
+                    "input" => {
+                        if let Some(checked) = crate::converter::form::elements::checkbox_state(tag) {
+                            return FirstContent::Checkbox(checked, handle);
+                        }
+                        continue;
+                    }
+                    "ul" | "ol" | "img" | "hr" => return FirstContent::Other,
+                    "script" | "style" | "template" | "noscript" => continue,
+                    _ => {}
+                }
+                let start = pending.len();
+                pending.extend(tag.children().top().iter().copied().map(|handle| (handle, depth + 1)));
+                pending[start..].reverse();
             }
+            _ => {}
         }
     }
-    None
+    FirstContent::Nothing
 }
 
 impl TaskInfo {
     fn new(node_handle: &tl::NodeHandle, parser: &tl::Parser, context: ListContext<'_>) -> Self {
-        find_checkbox(node_handle, parser, context.options, context.ctx, context.depth).map_or(
-            Self {
-                is_task: false,
-                checked: false,
-                checkbox: None,
-            },
-            |(checked, checkbox)| Self {
+        match find_checkbox(node_handle, parser, context.options, context.ctx, context.depth) {
+            FirstContent::Checkbox(checked, checkbox) => Self {
                 is_task: true,
                 checked,
                 checkbox: Some(checkbox),
             },
-        )
+            FirstContent::Other | FirstContent::Nothing => Self {
+                is_task: false,
+                checked: false,
+                checkbox: None,
+            },
+        }
     }
 }
 
@@ -360,6 +371,7 @@ fn collect_task_text(
     context: ListContext<'_>,
 ) -> String {
     let mut task_text = String::new();
+    let item_ctx = item_ctx.with_inline_break_owner(&task_text);
     for child_handle in tag.children().top().iter() {
         render_li_content(
             child_handle,
@@ -367,7 +379,7 @@ fn collect_task_text(
             &mut task_text,
             marker.task.checkbox,
             ListContext {
-                ctx: item_ctx,
+                ctx: &item_ctx,
                 depth: context.depth + 1,
                 ..context
             },
@@ -444,7 +456,9 @@ fn render_task_item(
     item_ctx: &Context,
     context: ListContext<'_>,
 ) {
-    output.push_str(&marker.list_marker());
+    if !context.ctx.in_heading {
+        output.push_str(&marker.list_marker());
+    }
     output.push_str(if marker.task.checked { "[x]" } else { "[ ]" });
     let task_text = collect_task_text(tag, parser, marker, item_ctx, context);
     let first_block = first_task_block(&task_text, parser, item_ctx);
@@ -464,6 +478,7 @@ fn write_regular_children(
     render: &ItemRenderContext<'_, '_>,
 ) -> (usize, usize) {
     let item_start = output.len();
+    let item_ctx = render.item_ctx.with_inline_break_owner(output);
     let mut text_end = item_start;
     for child_handle in tag.children().top().iter() {
         let is_nested_list = child_handle.get(parser).is_some_and(|node| {
@@ -481,7 +496,7 @@ fn write_regular_children(
             output,
             crate::converter::block::container::HandlerContext::new(
                 render.list.options,
-                render.item_ctx,
+                &item_ctx,
                 render.list.depth + 1,
                 render.list.dom_ctx,
             ),
@@ -590,7 +605,7 @@ fn render_regular_item(
     let _ = node_handle;
     if render.list.ctx.in_table_cell {
         add_list_leading_separator(output, render.list.ctx, render.list.options);
-    } else {
+    } else if !render.list.ctx.in_heading {
         output.push_str(&render.marker.list_marker());
     }
     let (item_start, _) = write_regular_children(tag, parser, output, render);
@@ -776,3 +791,6 @@ fn unordered_bullet(ctx: &Context, options: &ConversionOptions) -> char {
         bullets[bullet_index % bullets.len()]
     }
 }
+
+mod heap;
+pub use heap::{TaskItemEnd, close_task, open_regular};

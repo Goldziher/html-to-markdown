@@ -4,13 +4,16 @@
 //! visible text content with structural whitespace, bypassing the full
 //! Markdown/Djot conversion pipeline.
 
-use std::collections::HashSet;
-use std::fmt::Write;
+mod output;
+#[cfg(test)]
+mod stack_tests;
+mod walker;
 
-use crate::converter::main_helpers::effective_max_depth;
-use crate::converter::preprocessing_helpers::should_drop_for_preprocessing;
+use std::collections::HashSet;
+
 use crate::options::ConversionOptions;
 use crate::text;
+use output::PlainOutput;
 
 #[cfg(feature = "visitor")]
 use crate::converter::utility::content::is_block_level_element;
@@ -19,10 +22,12 @@ use crate::visitor::EMPTY_ATTRS;
 #[cfg(feature = "visitor")]
 use crate::visitor::{NodeContext, NodeType, VisitResult, VisitorHandle};
 #[cfg(feature = "visitor")]
+use output::Checkpoint;
+#[cfg(feature = "visitor")]
 use std::borrow::Cow;
 
 /// Tracks list context for proper marker emission on `<li>` elements.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum ListContext {
     /// Not inside any list.
     None,
@@ -34,7 +39,7 @@ enum ListContext {
 }
 
 /// Tags whose content should be skipped entirely.
-const SKIP_TAGS: &[&str] = &["script", "style", "head", "template", "noscript", "svg", "math"];
+const SKIP_TAGS: &[&str] = &["script", "style", "head", "template", "noscript", "math"];
 
 /// Block-level tags that should be separated by blank lines.
 const BLOCK_TAGS: &[&str] = &[
@@ -65,12 +70,17 @@ const BLOCK_TAGS: &[&str] = &[
     "dialog",
     "menu",
     "legend",
+    // ~keep The terms and the descriptions are the blocks of a definition list; the list
+    // ~keep itself writes nothing of its own, so an empty list stays out of the line.
+    "dt",
+    "dd",
 ];
 
-/// Shared walker state threaded through all recursive calls.
+/// State carried by each scheduled DOM action.
 ///
 /// Holds the options, visitor (feature-gated), and current DOM depth.
 /// Using a struct avoids feature-gated function parameters at call sites.
+#[derive(Clone, Copy)]
 struct WalkState<'a> {
     options: &'a ConversionOptions,
     excluded_node_ids: &'a HashSet<u32>,
@@ -78,6 +88,9 @@ struct WalkState<'a> {
     /// follows the marker directly starts on its line. A table cell starts its own buffer with `None`.
     item_marker_end: Option<usize>,
     in_pre: bool,
+    /// Inside the element that writes an option list: the outermost `<select>`, `<datalist>`
+    /// or `<option>`. An option there is a word of that list.
+    in_option_list: bool,
     in_document_body: bool,
     in_content_header_scope: bool,
     depth: usize,
@@ -92,12 +105,27 @@ impl WalkState<'_> {
             excluded_node_ids: self.excluded_node_ids,
             item_marker_end: self.item_marker_end,
             in_pre: self.in_pre,
+            in_option_list: self.in_option_list,
             in_document_body: self.in_document_body,
             in_content_header_scope: self.in_content_header_scope,
             depth: self.depth + 1,
             #[cfg(feature = "visitor")]
             visitor: self.visitor,
         }
+    }
+
+    /// The state for text that a control writes to a buffer of its own. The marker end of a
+    /// list item is a length of the item's buffer, so this state holds none.
+    const fn for_own_buffer(&self) -> Self {
+        WalkState {
+            item_marker_end: None,
+            ..*self
+        }
+    }
+
+    /// Whether a selector of `exclude_selectors` names the node.
+    fn excludes(&self, node_handle: &tl::NodeHandle) -> bool {
+        self.excluded_node_ids.contains(&node_handle.get_inner())
     }
 }
 
@@ -107,17 +135,15 @@ impl WalkState<'_> {
 /// - Block elements get blank-line separation
 /// - `<br>` becomes a newline, `<hr>` a blank line
 /// - `<pre>` preserves internal whitespace
-/// - `<img>` outputs alt text (unless `skip_images` is set)
+/// - `<img>` outputs alt text, and an inline `<svg>` its text (unless `skip_images` is set)
 /// - `<script>`, `<style>`, `<head>`, `<template>`, `<noscript>` are skipped
 /// - Tables: cells separated by tab, rows by newline
 /// - Inline elements are recursed without markers
+/// - A form control that writes text is a word of its own, and so is each option of a list
 /// - Nodes matching `excluded_node_ids` (from `exclude_selectors`) are dropped entirely
 /// - When a visitor is configured, `visit_element_start`, `visit_element_end`, and
 ///   `visit_text` callbacks are fired and their results are honoured.
 pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &ConversionOptions) -> String {
-    let mut buf = String::with_capacity(1024);
-    let mut list_ctx = ListContext::None;
-
     let excluded_node_ids: HashSet<u32> = if options.exclude_selectors.is_empty() {
         HashSet::new()
     } else {
@@ -137,6 +163,7 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
         excluded_node_ids: &excluded_node_ids,
         item_marker_end: None,
         in_pre: false,
+        in_option_list: false,
         in_document_body: false,
         in_content_header_scope: false,
         depth: 0,
@@ -144,43 +171,14 @@ pub fn extract_plain_text(dom: &tl::VDom, parser: &tl::Parser, options: &Convers
         visitor: options.visitor.as_ref(),
     };
 
-    for child_handle in dom.children() {
-        walk_plain(child_handle, parser, &mut buf, &mut list_ctx, &state);
-    }
-
-    post_process(&mut buf);
-    buf
+    let mut text = walker::extract(dom.children(), parser, state);
+    post_process(&mut text);
+    text
 }
 
-/// Recursive plain-text walker.
-fn walk_plain(
-    node_handle: &tl::NodeHandle,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    if state.depth >= effective_max_depth(state.options) {
-        return;
-    }
-
-    let Some(node) = node_handle.get(parser) else {
-        return;
-    };
-
-    match node {
-        tl::Node::Raw(bytes) => emit_raw_text(bytes, buf, state),
-        tl::Node::Tag(tag) => {
-            if state.excluded_node_ids.contains(&node_handle.get_inner()) {
-                return;
-            }
-            walk_tag(tag, parser, buf, list_ctx, state);
-        }
-        tl::Node::Comment(_) => {}
-    }
-}
-
-fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut String, state: &WalkState<'_>) {
+/// Writes a text node. `after_passed_over` says whether the walker passed over the node right
+/// before the text.
+fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut PlainOutput, state: &WalkState<'_>, after_passed_over: bool) {
     let raw = bytes.as_utf8_str();
     let decoded = text::decode_html_entities_cow(raw.as_ref());
     #[cfg(feature = "visitor")]
@@ -188,17 +186,26 @@ fn emit_raw_text(bytes: &tl::Bytes<'_>, buf: &mut String, state: &WalkState<'_>)
         return;
     }
     if state.in_pre {
-        buf.push_str(&decoded);
+        buf.push_text(&decoded);
         return;
     }
     let normalized = text::normalize_whitespace_cow(&decoded);
-    if !(normalized.is_empty() || normalized.as_ref() == " " && buf.ends_with('\n')) {
-        buf.push_str(&normalized);
+    // ~keep A node that the walker passed over is no part of the text, so the white space on
+    // ~keep its two sides is one run: the space that opens this text is not written after a
+    // ~keep space. An element that was walked and wrote nothing keeps both spaces, and so does
+    // ~keep a no-break space that opens the text, which `normalized` holds as a space.
+    let joins_run = after_passed_over && decoded.starts_with([' ', '\t']) && buf.ends_with_space();
+    let words = normalized
+        .strip_prefix(' ')
+        .filter(|_| joins_run)
+        .unwrap_or_else(|| normalized.as_ref());
+    if !(words.is_empty() || words == " " && buf.ends_with_line_end()) {
+        buf.push_text(words);
     }
 }
 
 #[cfg(feature = "visitor")]
-fn visit_plain_text(decoded: &str, buf: &mut String, state: &WalkState<'_>) -> bool {
+fn visit_plain_text(decoded: &str, buf: &mut PlainOutput, state: &WalkState<'_>) -> bool {
     let Some(visitor_handle) = state.visitor else {
         return false;
     };
@@ -218,45 +225,20 @@ fn visit_plain_text(decoded: &str, buf: &mut String, state: &WalkState<'_>) -> b
     match visit_result {
         VisitResult::Skip => true,
         VisitResult::Custom(custom) => {
-            buf.push_str(&custom);
+            buf.push_text(&custom);
             true
         }
         _ => false,
     }
 }
 
-fn walk_tag(
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    let tag_name = tag.name().as_utf8_str().to_ascii_lowercase();
-    let tag_str = tag_name.as_str();
-    if SKIP_TAGS.contains(&tag_str)
-        || should_drop_for_preprocessing(
-            tag_str,
-            tag,
-            state.options,
-            tag_str == "header" && state.in_document_body && !state.in_content_header_scope,
-        )
-    {
-        return;
-    }
-    #[cfg(feature = "visitor")]
-    if visit_plain_element_start(tag_str, tag, buf, state) {
-        return;
-    }
-    #[cfg(feature = "visitor")]
-    let element_output_start = buf.len();
-    dispatch_plain_tag(tag_str, tag, parser, buf, list_ctx, state);
-    #[cfg(feature = "visitor")]
-    visit_plain_element_end(tag_str, tag, buf, state, element_output_start);
-}
-
 #[cfg(feature = "visitor")]
-fn visit_plain_element_start(tag_name: &str, tag: &tl::HTMLTag<'_>, buf: &mut String, state: &WalkState<'_>) -> bool {
+fn visit_plain_element_start(
+    tag_name: &str,
+    tag: &tl::HTMLTag<'_>,
+    buf: &mut PlainOutput,
+    state: &WalkState<'_>,
+) -> bool {
     let Some(visitor_handle) = state.visitor else {
         return false;
     };
@@ -268,44 +250,46 @@ fn visit_plain_element_start(tag_name: &str, tag: &tl::HTMLTag<'_>, buf: &mut St
     let VisitResult::Custom(custom) = result else {
         return matches!(result, VisitResult::Skip);
     };
-    buf.push_str(&custom);
+    let start = buf.open();
+    buf.push_text(&custom);
     let end_result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
         .visit_element_end(&node_ctx, &custom);
-    if let VisitResult::Custom(replacement) = end_result {
-        buf.truncate(buf.len() - custom.len());
-        buf.push_str(&replacement);
-    } else if matches!(end_result, VisitResult::Skip) {
-        buf.truncate(buf.len() - custom.len());
-    }
+    close_plain_checkpoint(buf, start, end_result);
     true
 }
 
+/// Calls the visitor at the end of an element and closes `element_start`, the checkpoint
+/// opened before the element wrote.
 #[cfg(feature = "visitor")]
 fn visit_plain_element_end(
+    visitor_handle: &VisitorHandle,
     tag_name: &str,
     tag: &tl::HTMLTag<'_>,
-    buf: &mut String,
-    state: &WalkState<'_>,
-    output_start: usize,
+    buf: &mut PlainOutput,
+    depth: usize,
+    element_start: Checkpoint,
 ) {
-    let Some(visitor_handle) = state.visitor else {
-        return;
-    };
-    let node_ctx = plain_element_context(tag_name, tag, state.depth);
-    let safe_start = output_start.min(buf.len());
+    let node_ctx = plain_element_context(tag_name, tag, depth);
     let result = visitor_handle
         .lock()
         .expect("visitor mutex poisoned")
-        .visit_element_end(&node_ctx, &buf[safe_start..]);
-    match result {
+        .visit_element_end(&node_ctx, buf.since(&element_start));
+    close_plain_checkpoint(buf, element_start, result);
+}
+
+/// Closes `checkpoint` as the visitor answered at the end of an element: its text takes the
+/// place of the text written since, a skip removes that text, and every other answer keeps it.
+#[cfg(feature = "visitor")]
+fn close_plain_checkpoint(buf: &mut PlainOutput, checkpoint: Checkpoint, end_result: VisitResult) {
+    match end_result {
         VisitResult::Custom(custom) => {
-            buf.truncate(safe_start);
-            buf.push_str(&custom);
+            buf.rollback(checkpoint);
+            buf.push_text(&custom);
         }
-        VisitResult::Skip => buf.truncate(safe_start),
-        _ => {}
+        VisitResult::Skip => buf.rollback(checkpoint),
+        _ => buf.commit(checkpoint),
     }
 }
 
@@ -322,194 +306,24 @@ fn plain_element_context<'a>(tag_name: &'a str, tag: &'a tl::HTMLTag<'a>, depth:
     )
 }
 
-fn dispatch_plain_tag(
-    tag_name: &str,
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    let child_state = WalkState {
-        in_document_body: state.in_document_body || tag_name == "body",
-        in_content_header_scope: state.in_content_header_scope || matches!(tag_name, "article" | "section" | "main"),
-        ..state.descend()
-    };
-    match tag_name {
-        "br" => buf.push('\n'),
-        "hr" => ensure_blank_line(buf),
-        "pre" => walk_plain_pre(tag, parser, buf, list_ctx, state),
-        "img" => emit_plain_image(tag, buf, state.options),
-        "table" => {
-            ensure_blank_line(buf);
-            walk_table(tag, parser, buf, &child_state);
-            ensure_blank_line(buf);
-        }
-        "ul" => {
-            let list_state = WalkState {
-                in_pre: false,
-                ..child_state
-            };
-            walk_plain_list(tag, parser, buf, ListContext::Unordered, &list_state);
-        }
-        "ol" => {
-            let start = tag
-                .attributes()
-                .get("start")
-                .flatten()
-                .and_then(|value| value.as_utf8_str().parse::<u32>().ok())
-                .unwrap_or(1);
-            let list_state = WalkState {
-                in_pre: false,
-                ..child_state
-            };
-            walk_plain_list(
-                tag,
-                parser,
-                buf,
-                ListContext::Ordered { next_index: start },
-                &list_state,
-            );
-        }
-        "li" => walk_plain_list_item(tag, parser, buf, list_ctx, state),
-        _ if BLOCK_TAGS.contains(&tag_name) => {
-            if state.item_marker_end != Some(buf.len()) {
-                ensure_blank_line(buf);
-            }
-            walk_children(tag, parser, buf, list_ctx, &child_state);
-            ensure_blank_line(buf);
-        }
-        _ => walk_children(tag, parser, buf, list_ctx, &child_state),
-    }
-}
-
-fn walk_plain_pre(
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    ensure_blank_line(buf);
-    let pre_state = WalkState {
-        in_pre: true,
-        ..state.descend()
-    };
-    walk_children(tag, parser, buf, list_ctx, &pre_state);
-    ensure_blank_line(buf);
-}
-
-fn emit_plain_image(tag: &tl::HTMLTag<'_>, buf: &mut String, options: &ConversionOptions) {
+fn emit_plain_image(tag: &tl::HTMLTag<'_>, buf: &mut PlainOutput, options: &ConversionOptions) {
     if options.skip_images {
         return;
     }
     if let Some(alt) = crate::converter::utility::attributes::decoded_attribute(tag, "alt")
         && !alt.is_empty()
     {
-        buf.push_str(alt.as_ref());
+        buf.push_text(alt.as_ref());
     }
 }
 
-fn walk_plain_list(
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    buf: &mut String,
-    mut list_context: ListContext,
-    state: &WalkState<'_>,
-) {
-    ensure_newline(buf);
-    walk_children(tag, parser, buf, &mut list_context, state);
-    ensure_newline(buf);
-}
-
-fn walk_plain_list_item(
-    tag: &tl::HTMLTag<'_>,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    ensure_newline(buf);
-    match list_ctx {
-        ListContext::Unordered | ListContext::None => buf.push_str("- "),
-        ListContext::Ordered { next_index } => {
-            let _ = write!(buf, "{next_index}. ");
-            *next_index += 1;
-        }
-    }
-    let item_state = WalkState {
-        item_marker_end: Some(buf.len()),
-        in_pre: false,
-        ..state.descend()
-    };
-    walk_children(tag, parser, buf, list_ctx, &item_state);
-    ensure_newline(buf);
-}
-
-/// Walk all children of a tag.
-fn walk_children(
-    tag: &tl::HTMLTag,
-    parser: &tl::Parser,
-    buf: &mut String,
-    list_ctx: &mut ListContext,
-    state: &WalkState<'_>,
-) {
-    let children = tag.children();
-    let top = children.top();
-    for child in top.iter() {
-        walk_plain(child, parser, buf, list_ctx, state);
-    }
-}
-
-/// Walk a `<table>` element, extracting cells as tab-separated, rows as newline-separated.
-fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut String, state: &WalkState<'_>) {
-    let mut row_handles = Vec::new();
-    collect_descendant_handles(table_tag, parser, "tr", &mut row_handles);
-
-    for (row_idx, row_handle) in row_handles.iter().enumerate() {
-        if row_idx > 0 {
-            buf.push('\n');
-        }
-        let Some(tl::Node::Tag(row_tag)) = row_handle.get(parser) else {
-            continue;
-        };
-
-        let mut cell_handles = Vec::new();
-        let row_children = row_tag.children();
-        let row_top = row_children.top();
-        for child in row_top.iter() {
-            if let Some(tl::Node::Tag(child_tag)) = child.get(parser) {
-                let name = child_tag.name().as_utf8_str();
-                if name.eq_ignore_ascii_case("th") || name.eq_ignore_ascii_case("td") {
-                    cell_handles.push(*child);
-                }
-            }
-        }
-
-        let cell_state = WalkState {
-            item_marker_end: None,
-            in_pre: false,
-            ..state.descend()
-        };
-        for (cell_idx, cell_handle) in cell_handles.iter().enumerate() {
-            if cell_idx > 0 {
-                buf.push('\t');
-            }
-            let mut cell_buf = String::new();
-            if let Some(tl::Node::Tag(cell_tag)) = cell_handle.get(parser) {
-                let mut cell_list_ctx = ListContext::None;
-                walk_children(cell_tag, parser, &mut cell_buf, &mut cell_list_ctx, &cell_state);
-            }
-            buf.push_str(cell_buf.trim());
-        }
-    }
-}
-
-/// Collect all descendant `NodeHandle`s matching `target_tag` (by cloning handles).
+/// Collect all descendant `NodeHandle`s matching `target_tag` (by cloning handles). An element
+/// that `exclude_selectors` names is not collected, and neither is an element in it.
 fn collect_descendant_handles(
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     target_tag: &str,
+    state: &WalkState<'_>,
     result: &mut Vec<tl::NodeHandle>,
 ) {
     let children = tag.children();
@@ -517,6 +331,9 @@ fn collect_descendant_handles(
     stack.reverse();
 
     while let Some(handle) = stack.pop() {
+        if state.excludes(&handle) {
+            continue;
+        }
         if let Some(tl::Node::Tag(child_tag)) = handle.get(parser) {
             let name = child_tag.name().as_utf8_str();
             if SKIP_TAGS.iter().any(|skip| name.eq_ignore_ascii_case(skip)) {
@@ -533,30 +350,6 @@ fn collect_descendant_handles(
                 }
             }
         }
-    }
-}
-
-/// Ensure the buffer ends with a blank line (two newlines).
-fn ensure_blank_line(buf: &mut String) {
-    if buf.is_empty() {
-        return;
-    }
-    while buf.ends_with(' ') || buf.ends_with('\t') {
-        buf.pop();
-    }
-    let current_newlines = buf.chars().rev().take_while(|&c| c == '\n').count();
-    for _ in current_newlines..2 {
-        buf.push('\n');
-    }
-}
-
-/// Ensure the buffer ends with at least one newline.
-fn ensure_newline(buf: &mut String) {
-    if buf.is_empty() {
-        return;
-    }
-    if !buf.ends_with('\n') {
-        buf.push('\n');
     }
 }
 

@@ -80,7 +80,6 @@
 //! fn walk_node(...) {
 //!     // Try each dispatcher in order
 //!     if block::dispatch_block_handler(&tag, ...) { return; }
-//!     if inline::dispatch_inline_handler(&tag, ...) { return; }
 //!     if list::dispatch_list_handler(&tag, ...) { return; }
 //!     if media::dispatch_media_handler(&tag, ...) { return; }
 //!     if semantic::dispatch_semantic_handler(&tag, ...) { return; }
@@ -91,6 +90,7 @@
 
 mod anchor_origin;
 pub mod block;
+mod code_scan;
 pub mod context;
 pub mod dom_context;
 pub mod form;
@@ -104,6 +104,8 @@ mod main_dispatch;
 mod main_helpers;
 pub mod media;
 mod metadata;
+#[cfg(all(test, feature = "metadata"))]
+mod metadata_preferences_tests;
 pub mod plain_text;
 pub mod preprocessing_helpers;
 pub mod prescan;
@@ -118,14 +120,15 @@ pub mod utility;
 
 #[cfg(feature = "visitor")]
 pub mod visitor_hooks;
+mod walk;
 
 pub use self::context::Context;
 pub use self::dom_context::DomContext;
 
-pub use self::main::{convert_html_impl, walk_node};
+pub use self::main::{convert_html_impl, owner_mark_numbers_after_cleanup, walk_node};
 pub use self::main_helpers::document_head;
-pub use self::main_helpers::repair_head_content_before_explicit_head;
 pub use self::main_helpers::{emit_table_cell_break, strip_trailing_backslash_breaks, trim_trailing_whitespace};
+pub use self::main_helpers::{has_head_content_outside_head, repair_head_content_outside_head};
 
 pub use crate::converter::utility::content::{
     chomp_inline, get_text_content, merge_adjacent_emphasis, normalized_tag_name,

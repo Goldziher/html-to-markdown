@@ -352,7 +352,9 @@ fn should_keep_repaired_script_bytes_across_document_head_and_body_prefixes() {
         ("<html><head>", "</head></html>", true),
         ("<html>", "</html>", false),
         ("<!doctype html><html>", "</html>", false),
-        ("<title>prefix</title>", "", false),
+        // ~keep A title before the body content of a page with no head tag is in the head (#816),
+        // ~keep and the script after it is there too.
+        ("<title>prefix</title>", "", true),
         ("<body>", "</body>", false),
         ("<body><p>prefix</p><head>", "</head></body>", true),
     ] {
@@ -426,7 +428,9 @@ fn should_not_restore_a_marker_forged_in_a_closed_script_body() {
             ConversionOptions { preserve_tags: vec!["script".into()], ..Default::default() },
         )
         .expect("closed marker-shaped script");
-        assert_eq!(converted.content.as_deref(), Some(format!("<script type=\"application/ld+json\">{prefix}0_end</script>\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n").as_str()));
+        // ~keep The body of a closed structured data script is raw text (#818): the processing
+        // ~keep instruction stays in it, with its `<` written as a reference, so no marker forms.
+        assert_eq!(converted.content.as_deref(), Some(format!("<script type=\"application/ld+json\">{prefix}&lt;?x?>0_end</script>\n\n<script type=\"application/ld+json\">{json}</script>\n\nt\n").as_str()));
     }
 }
 
@@ -497,10 +501,10 @@ fn should_activate_repaired_script_transport_only_for_script_preservation() {
         },
     )
     .expect("ancestor preservation");
-    // ~keep Ancestor encoding is an inherited queued limitation; this fix scopes transport to script preservation.
+    // ~keep The repair writes the body as the page has it, so the ancestor gives the bytes of the page (#824).
     assert_eq!(
         ancestor.content.as_deref(),
-        Some("<div><script type=\"application/ld+json\">{\"a\":\"&amp;lt; &amp;amp; 雪\"}</script><p>tail</p></div>\n")
+        Some("<div><script type=\"application/ld+json\">{\"a\":\"&lt; &amp; 雪\"}</script><p>tail</p></div>\n")
     );
 }
 
@@ -631,7 +635,8 @@ fn should_keep_authored_owner_attributes_from_claiming_another_scripts_body() {
                 .as_utf8_str(),
             "application/ld+json"
         );
-        assert_eq!(tag.inner_text(dom.parser()), "h2m_script_body_0_end");
+        // ~keep The body of the closed script is raw text (#818): its `<` is written as a reference.
+        assert_eq!(tag.inner_text(dom.parser()), "h2m_script_body_&lt;?x?>0_end");
         assert_eq!(
             &content[end..],
             format!("\n\n<script type=\"application/ld+json\">{json}</script>\n\ntail\n")
@@ -757,7 +762,9 @@ fn should_restore_owned_script_bytes_even_when_foreign_close_case_confuses_the_l
         )
         .expect("mixed-case foreign boundary");
         let content = converted.content.as_deref().expect("content");
-        let payload = if prefix.to_ascii_lowercase().starts_with("<svg") {
+        // ~keep An end tag in another letter case ends the foreign element, so the script is its
+        // ~keep sibling: the page after the JSON is written as text (#875), not inside the graphic.
+        let graphic = if prefix.to_ascii_lowercase().starts_with("<svg") {
             let encoded = content
                 .split_once("data:image/svg+xml;base64,")
                 .expect("SVG image")
@@ -765,19 +772,22 @@ fn should_restore_owned_script_bytes_even_when_foreign_close_case_confuses_the_l
                 .split_once(')')
                 .expect("image end")
                 .0;
-            String::from_utf8(
+            let payload = String::from_utf8(
                 base64::engine::general_purpose::STANDARD
                     .decode(encoded)
                     .expect("SVG bytes"),
             )
-            .expect("UTF-8 SVG")
+            .expect("UTF-8 SVG");
+            assert_eq!(payload, "<svg />", "{prefix}");
+            format!("![](data:image/svg+xml;base64,{encoded})")
         } else {
-            content.to_owned()
+            String::new()
         };
-        let expected = format!("<script type=\"application/ld+json\">{json}</script><p>tail</p>");
-        assert!(payload.contains(&expected), "{prefix}: {payload}");
-        assert!(!payload.contains("data-h2m-script-"), "{prefix}: {payload}");
-        assert!(!payload.contains("h2m_script_body_"), "{prefix}: {payload}");
+        assert_eq!(
+            content,
+            format!("{graphic}<script type=\"application/ld+json\">{json}</script>\n\ntail\n"),
+            "{prefix}"
+        );
     }
 }
 

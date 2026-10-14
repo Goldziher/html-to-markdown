@@ -238,8 +238,8 @@ fn should_keep_the_blocks_of_a_list_item_in_a_quote_in_the_item() {
     assert_converts(
         "<blockquote><ul><li>x<dl><dt>t</dt><dd>d</dd></dl></li></ul></blockquote>",
         &options(TierStrategy::Tier2),
-        "> - x\n>\n>   t\n>   d\n",
-        "<blockquote><ul><li><p>x</p><p>td</p></li></ul></blockquote>",
+        "> - x\n>\n>   t\n>\n>   d\n",
+        "<blockquote><ul><li><p>x</p><p>t</p><p>d</p></li></ul></blockquote>",
     );
     assert_converts(
         "<blockquote><ul><li>x<section><p>s</p></section></li></ul></blockquote>",
@@ -525,13 +525,13 @@ fn should_keep_the_text_of_a_quote_in_a_wide_ordered_item_right_after_an_inline_
     assert_converts(
         html,
         &width4(options(TierStrategy::Tier2)),
-        "100.  **100. a\n          > - x\n          >     > q\n          >     tu**\n",
+        "100. **100. a\n          > - x\n          >     > q\n          >     tu**\n",
         "<ol start=\"100\"><li><strong>100. a&gt; - x&gt;     &gt; q&gt;     tu</strong></li></ol>",
     );
     assert_converts(
         html,
         &tabs(options(TierStrategy::Tier2)),
-        "100.  **100. a\n\t\t\t> - x\n\t\t\t> \t> q\n\t\t\t> \ttu**\n",
+        "100. **100. a\n\t\t\t> - x\n\t\t\t> \t> q\n\t\t\t> \ttu**\n",
         "<ol start=\"100\"><li><strong>100. a&gt; - x&gt; \t&gt; q&gt; \ttu</strong></li></ol>",
     );
 }

@@ -414,6 +414,14 @@ tasks:
     cmds:
       - alef test --e2e --lang r
 
+  rust:test:complexity:
+    desc: "Run the stray closing tag complexity regression"
+    cmds:
+      - >-
+        cargo test --locked --release
+        -p html-to-markdown-rs --features full,testkit
+        --test stray_closing_tags_complexity -- --nocapture
+
   r:docs:verify:
     desc: "Check committed R reference pages against a fresh roxygen2 render"
     cmds:
