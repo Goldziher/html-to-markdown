@@ -6,7 +6,9 @@
 use std::borrow::Cow;
 
 use super::cell::{collect_table_cells, get_colspan};
-use super::cells::{CellTextCache, RowEnv, RowRender, append_layout_row, collect_row_cell_widths, convert_table_row};
+use super::cells::{
+    CellTextCache, RenderedWidths, RowEnv, RowRender, append_layout_row, collect_row_cell_widths, convert_table_row,
+};
 use super::scanner::{TableScan, scan_table};
 use super::utils::{is_tag_name, normalized_tag_name};
 use crate::converter::block::container::HandlerContext;
@@ -250,6 +252,7 @@ struct DataTableState {
     cell_cache: CellTextCache,
     deferred_tables: Vec<String>,
     col_widths: Vec<usize>,
+    rendered_widths: Option<RenderedWidths>,
 }
 
 #[derive(Clone, Copy)]
@@ -280,6 +283,7 @@ fn render_data_table(
         cell_cache,
         deferred_tables: Vec::new(),
         col_widths,
+        rendered_widths: visitor_rendered_widths(handler),
     };
     let env = DataEnv { parser, handler, scan };
     for child_handle in tag.children().top().iter() {
@@ -296,7 +300,29 @@ fn render_data_table(
         output.truncate(output_start);
         return;
     }
+    if let Some(widths) = state.rendered_widths {
+        widths.repad(output, output_start, handler.options);
+    }
     append_deferred_tables(output, &state.deferred_tables);
+}
+
+#[cfg(feature = "visitor")]
+fn visitor_rendered_widths(handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+    if handler.ctx.visitor.is_some()
+        && !handler.options.compact_tables
+        && !handler.ctx.in_code
+        && !handler.ctx.in_code_block
+        && handler.ctx.inline_code_links.is_none()
+        && handler.ctx.pre_cell_break_offsets.is_none()
+    {
+        return Some(RenderedWidths::default());
+    }
+    None
+}
+
+#[cfg(not(feature = "visitor"))]
+const fn visitor_rendered_widths(_handler: HandlerContext<'_>) -> Option<RenderedWidths> {
+    None
 }
 
 /// ~keep Width measurement is an internal walk. When rendered text cannot be reused, collectors
@@ -484,6 +510,7 @@ fn render_data_row(
             col_widths: &state.col_widths,
             cell_cache: &mut state.cell_cache,
             deferred_tables: &mut state.deferred_tables,
+            rendered_widths: state.rendered_widths.as_mut(),
         },
     );
     if emitted {

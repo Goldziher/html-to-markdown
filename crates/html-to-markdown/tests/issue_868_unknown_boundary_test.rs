@@ -225,11 +225,11 @@ fn should_preserve_unknown_observer_replacements_and_table_measurements() {
         (
             "<table><tr><td>a <x-y></x-y>&nbsp;b</td></tr></table>",
             [
-                ("| a b  |\n| ---- |\n", 3, 3),
-                ("| a V  b |\n| ---- |\n", 3, 3),
-                ("| a V  b |\n| ---- |\n", 3, 3),
+                ("| a b |\n| --- |\n", 3, 3),
+                ("| a V  b |\n| ------ |\n", 3, 3),
+                ("| a V  b |\n| ------ |\n", 3, 3),
                 ("| a  b |\n| ---- |\n", 3, 0),
-                ("| a b  |\n| ---- |\n", 3, 3),
+                ("| a b |\n| --- |\n", 3, 3),
             ],
         ),
         (
