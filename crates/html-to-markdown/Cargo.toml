@@ -175,6 +175,10 @@ required-features = ["testkit"]
 name = "bold_break_between_bold_test"
 required-features = ["testkit"]
 
+[[test]]
+name = "issue_897_bold_break_two_breaks_test"
+required-features = ["testkit"]
+
 [[example]]
 name = "test_deser"
 required-features = ["serde"]
