@@ -133,13 +133,17 @@ fn should_keep_the_separator_in_the_block_that_starts_the_output() {
 }
 
 #[test]
-fn should_keep_the_separator_of_a_wrapper_with_more_than_one_break() {
+fn should_keep_the_break_of_a_wrapper_with_two_breaks() {
+    assert_rows(&[(
+        "<p>x</p><p><b>a</b><b><br><br></b><b>c</b></p>",
+        "x\n\n**a**  \n**c**\n",
+        "x\n\n**a**\\\n**c**\n",
+    )]);
+}
+
+#[test]
+fn should_keep_the_separator_of_a_wrapper_with_white_space_after_the_break() {
     for style in [NewlineStyle::Spaces, NewlineStyle::Backslash] {
-        assert_routes(
-            "<p>x</p><p><b>a</b><b><br><br></b><b>c</b></p>",
-            "x\n\n**a** **c**\n",
-            style,
-        );
         assert_routes(
             "<p>x</p><p><b>a</b><b><br> </b><b>c</b></p>",
             "x\n\n**a** **c**\n",
