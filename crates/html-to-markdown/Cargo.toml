@@ -156,6 +156,14 @@ name = "issue_868_link_visitor_break_boundary_test"
 required-features = ["testkit"]
 
 [[test]]
+name = "issue_868_emphasis_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_generic_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
 name = "issue_868_empty_list_block_prefix_test"
 required-features = ["testkit"]
 

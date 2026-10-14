@@ -279,6 +279,12 @@ fn visit_emphasis(tag: &tl::HTMLTag<'_>, kind: EmphasisKind, handler: &HandlerCo
             EmphasisKind::Emphasis => visitor.visit_emphasis(&node_context, &text_content),
         }
     };
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, VisitResult::Skip)
+            || matches!(&result, VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     match result {
         VisitResult::Continue => None,
         VisitResult::Custom(custom) => {
@@ -286,9 +292,6 @@ fn visit_emphasis(tag: &tl::HTMLTag<'_>, kind: EmphasisKind, handler: &HandlerCo
             Some(custom)
         }
         VisitResult::Skip => {
-            if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict {
-                handler.dom_context.record_absent_breaks(node_id, true);
-            }
             crate::converter::structure_capture::replace_element(handler.context, None);
             Some(String::new())
         }

@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer promotes source line endings to hard breaks when emphasis or
+  strong visitors replace a break subtree with only spaces/tabs (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when generic element
+  visitors skip a break subtree at exit or replace it with only spaces/tabs at entry or exit (#868).
+
 - Strict whitespace no longer promotes source line endings to hard breaks when inline-code
   visitors skip a break subtree or replace it with only spaces/tabs (#868).
 
