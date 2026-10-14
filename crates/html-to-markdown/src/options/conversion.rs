@@ -221,8 +221,17 @@ pub struct ConversionOptions {
     ///
     /// Unlike `strip_tags` (which removes the tag wrapper but keeps children),
     /// excluded elements and all their descendants are dropped from the output.
-    /// Supports any CSS selector that `tl` supports: tag names, `.class`,
-    /// `#id`, `[attribute]`, etc.
+    ///
+    /// A selector matches an element by its own properties: a tag name (`nav`), `.class`,
+    /// `#id`, an attribute (`[hidden]`, `[role=banner]`, and the `~=`, `^=`, `$=` and `*=`
+    /// forms), `*`, and these joined with no space (`div.note`, `a[href$="share"]`). One entry
+    /// can hold a comma-separated list of such selectors (`nav, footer`). Write a tag name in
+    /// lower case.
+    ///
+    /// A selector with a combinator (`.menu a`, `div > p`, `h2 + p`, `h2 ~ p`) or a
+    /// pseudo-class (`li:first-child`) matches nothing, and the conversion reports no error.
+    /// In a comma-separated list, such a member can stop the other members of the list too:
+    /// give each selector as an entry of its own.
     ///
     /// Invalid selectors are silently skipped at conversion time.
     ///

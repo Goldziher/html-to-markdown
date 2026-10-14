@@ -71,6 +71,10 @@ const BLOCK_TAGS: &[&str] = &[
     "dialog",
     "menu",
     "legend",
+    // ~keep The terms and the descriptions are the blocks of a definition list; the list
+    // ~keep itself writes nothing of its own, so an empty list stays out of the line.
+    "dt",
+    "dd",
 ];
 
 /// Shared walker state threaded through all recursive calls.
@@ -607,8 +611,47 @@ fn walk_children(
     }
 }
 
-/// Walk a `<table>` element, extracting cells as tab-separated, rows as newline-separated.
+/// Writes each caption of a table as a block of its own. `state` is the state of the children
+/// of the table.
+///
+/// ~keep The caption goes through `walk_plain`, so `exclude_selectors` and a visitor are asked
+/// ~keep for the caption element as for every other element. It writes to a buffer of its own,
+/// ~keep as a cell does, so the white space around its text is not text of the page.
+fn walk_table_captions(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutput, state: &WalkState<'_>) {
+    let caption_state = WalkState {
+        item_marker_end: None,
+        in_pre: false,
+        ..*state
+    };
+    for child in table_tag.children().top().iter() {
+        let Some(tl::Node::Tag(child_tag)) = child.get(parser) else {
+            continue;
+        };
+        if !child_tag.name().as_utf8_str().eq_ignore_ascii_case("caption") {
+            continue;
+        }
+        let mut caption_buf = PlainOutput::default();
+        let mut caption_list_ctx = ListContext::None;
+        walk_plain(
+            child,
+            parser,
+            &mut caption_buf,
+            &mut caption_list_ctx,
+            &caption_state,
+            false,
+        );
+        let caption = caption_buf.into_text();
+        if !caption.trim().is_empty() {
+            buf.push_text(caption.trim());
+            buf.end_block();
+        }
+    }
+}
+
+/// Walk a `<table>` element: the captions before the rows, then the cells as tab-separated and
+/// the rows as newline-separated.
 fn walk_table(table_tag: &tl::HTMLTag, parser: &tl::Parser, buf: &mut PlainOutput, state: &WalkState<'_>) {
+    walk_table_captions(table_tag, parser, buf, state);
     let mut row_handles = Vec::new();
     collect_descendant_handles(table_tag, parser, "tr", state, &mut row_handles);
 
