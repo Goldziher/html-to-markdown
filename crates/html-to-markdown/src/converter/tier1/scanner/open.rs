@@ -272,7 +272,10 @@ fn prepare_open_state(
     {
         return Err(BailReason::InlineMarkerNotReproduced);
     }
-    if matches!(name_lower, b"select" | b"option" | b"optgroup" | b"datalist") {
+    if matches!(
+        name_lower,
+        b"select" | b"option" | b"optgroup" | b"datalist" | b"button"
+    ) {
         return Err(BailReason::FormControl);
     }
     let is_link_block = is_block_open_kind(spec);

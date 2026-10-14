@@ -149,11 +149,11 @@ fn should_write_no_checkbox_state_in_a_cell_that_holds_another_element() {
 }
 
 #[test]
-fn should_write_a_button_before_an_image_as_inline_text() {
-    // ~keep A button is inline text (issue #785): nothing separates it from the image.
+fn should_separate_a_button_from_an_image_beside_it() {
+    // ~keep A button is a box of its own: one space separates it from the image.
     assert_in_both_modes(
         "<p><span><button>One</button><img src=\"a.png\" alt=\"x\"></span></p>",
-        "One![x](a.png)\n",
+        "One ![x](a.png)\n",
     );
 }
 

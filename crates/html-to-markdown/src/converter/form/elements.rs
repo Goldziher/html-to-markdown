@@ -388,7 +388,7 @@ fn starts_with_control(tag: &tl::HTMLTag, parser: &tl::Parser, dom_ctx: &crate::
     };
     match crate::converter::utility::content::normalized_tag_name(control.name().as_utf8_str()).as_ref() {
         "input" => super::spacing::white_space_follows(handle.get_inner(), parser, dom_ctx),
-        name => super::spacing::writes_own_markdown_text(name),
+        name => super::spacing::writes_own_text(name),
     }
 }
 
@@ -710,7 +710,8 @@ pub fn handle_optgroup(
 /// Handles the `<button>` element.
 ///
 /// A button element represents a clickable button. Its content is inline text in the line of
-/// the text around it, as the content of a `span` is (issue #785).
+/// the text around it, as the content of a `span` is (issue #785). A browser draws a button as
+/// a box of its own, so one space separates its text from a word or a button right beside it.
 pub fn handle_button(
     _tag_name: &str,
     node_handle: &tl::NodeHandle,
@@ -768,6 +769,7 @@ pub fn handle_button(
             }
         }
 
+        let start = ControlStart::new(output);
         let children = tag.children();
         for child_handle in children.top().iter() {
             walk_node(
@@ -776,6 +778,10 @@ pub fn handle_button(
                 output,
                 crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
             );
+        }
+        // ~keep In code the text of a button is written as the source has it.
+        if !ctx.in_code && start.finish(output) {
+            separate_from_next_text(output, *node_handle, parser, dom_ctx);
         }
     }
 }

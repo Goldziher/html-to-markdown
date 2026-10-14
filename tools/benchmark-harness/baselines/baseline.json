@@ -74,7 +74,7 @@
       "median_ms": 11.2530497,
       "mad_ms": 0.059547700000000425,
       "mb_per_s": 22.469003268139822,
-      "output_bytes": 58099
+      "output_bytes": 58109
     },
     {
       "fixture": "mdream/github-markdown-complete.html",
