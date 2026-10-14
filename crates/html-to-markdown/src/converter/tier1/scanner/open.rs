@@ -225,11 +225,11 @@ fn validate_code_open(state: &Tier1State, spec: &TagSpec, is_link_block: bool) -
     Ok(())
 }
 
-fn prepare_open_state(
-    state: &mut Tier1State,
+/// Hand the page to Tier-2 at a link or a form group that opens in code.
+fn hand_over_link_or_form_group_in_code(
+    state: &Tier1State,
     spec: &TagSpec,
     name_lower: &[u8],
-    options: &ConversionOptions,
 ) -> Result<(), BailReason> {
     // ~keep Links in inline code need split spans; code-block links must stay literal (#813).
     if matches!(spec.kind, TagKind::Link) && state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE) {
@@ -242,6 +242,16 @@ fn prepare_open_state(
     {
         return Err(BailReason::Classifier);
     }
+    Ok(())
+}
+
+fn prepare_open_state(
+    state: &mut Tier1State,
+    spec: &TagSpec,
+    name_lower: &[u8],
+    options: &ConversionOptions,
+) -> Result<(), BailReason> {
+    hand_over_link_or_form_group_in_code(state, spec, name_lower)?;
     if std::mem::take(&mut state.last_closed_list)
         && matches!(spec.kind, TagKind::Pre)
         && options.code_block_style == crate::options::CodeBlockStyle::Indented

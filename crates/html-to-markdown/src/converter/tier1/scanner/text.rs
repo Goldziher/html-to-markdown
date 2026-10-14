@@ -621,6 +621,17 @@ fn is_text_of_an_element(raw: &str) -> bool {
     !matches!(classify_text(decoded.as_ref()), TextClass::WhiteSpaceOnly(_))
 }
 
+/// What was written before this text, read once: the two flags are clear for the next text.
+const fn take_whitespace_history(state: &mut Tier1State) -> WhitespaceHistory {
+    let history = WhitespaceHistory {
+        after_custom_element: state.last_closed_custom_element,
+        after_img: state.last_emitted_was_img,
+    };
+    state.last_closed_custom_element = false;
+    state.last_emitted_was_img = false;
+    history
+}
+
 fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), BailReason> {
     let TextFlush {
         raw,
@@ -633,13 +644,7 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         return Ok(());
     }
     state.text_count += usize::from(is_text_of_an_element(raw));
-
-    let history = WhitespaceHistory {
-        after_custom_element: state.last_closed_custom_element,
-        after_img: state.last_emitted_was_img,
-    };
-    state.last_closed_custom_element = false;
-    state.last_emitted_was_img = false;
+    let history = take_whitespace_history(state);
 
     if handle_structural_text(state, raw, br_in_tables)? {
         return Ok(());

@@ -79,7 +79,7 @@ title: "1.1 데이터란 무엇인가? :: 파프리 블로그"
 
 - [![Actual is not normal (a tribute to Edward Tufte)](http://farm3.static.flickr.com/2173/2121472112_8ac5d673ff.jpg)](http://www.flickr.com/photos/12836528@N00/2121472112 "Actual is not normal (a tribute to Edward Tufte)") Actual is not normal (a tribute to Edward Tufte) by [kevindooley](http://www.flickr.com/photos/12836528@N00) [![저작자 표시](http://cfs.tistory.com/static/admin/editor/ccl_black01.png)](http://creativecommons.org/licenses/by/2.0/kr/)
 
-하지만 데이터 자체로는 큰 의미가 없습니다. 컴퓨터 공학에서는 데이터를 가공( 처리 : Processing )하여 정보를
+ 하지만 데이터 자체로는 큰 의미가 없습니다. 컴퓨터 공학에서는 데이터를 가공( 처리 : Processing )하여 정보를
 만듭니다. 예를 들면 날씨를 나타내는 데이터들 ( 기온, 습도, 풍속, 위성사진 등 )은 기상대나
 백엽상 등에서 측정 장비로 관측됩니다. 이 데이터는 그저 사실을 나타 낼 뿐이죠.
 이제 이 데이터들을 처리하여 정보를 만듭니다. 기상대에서 측정 된 각각의
@@ -88,16 +88,16 @@ title: "1.1 데이터란 무엇인가? :: 파프리 블로그"
 
 - [![Extinct Poster](http://farm4.static.flickr.com/3554/3581969837_db517db954.jpg)](http://www.flickr.com/photos/9729909@N07/3581969837 "Extinct Poster") Extinct Poster by [Network Osaka](http://www.flickr.com/photos/9729909@N07) [![저작자 표시](http://cfs.tistory.com/static/admin/editor/ccl_black01.png)![비영리](http://cfs.tistory.com/static/admin/editor/ccl_black02.png)![변경 금지](http://cfs.tistory.com/static/admin/editor/ccl_black04.png)](http://creativecommons.org/licenses/by-nc-nd/2.0/kr/)
 
-데이터를 처리하여 나온 결과를 "정보"라고 하는데, 정보란 간략하게
+ 데이터를 처리하여 나온 결과를 "정보"라고 하는데, 정보란 간략하게
 정의하자면 "사용자의 의사결정에 도움이 될 만한 잘 정리 된 데이터들." 이라고 할 수 있습니다. 현실 세계에서 보자면 구름 사진( 데이터 )이 지구과학
 교과서에 사용되어 교육용으로 이용( 정보 ) 될 수도 있고, 사진 작품전에 출품( 정보
 ) 될 수도 있습니다.  
 
-컴퓨터는 이런 데이터를 입력 받아서 정보로 만들어 주는 역할을 하는
+ 컴퓨터는 이런 데이터를 입력 받아서 정보로 만들어 주는 역할을 하는
 기계라고 할 수 있습니다.  
 
 -- 요약 --  
-데이터는 그냥 사실을 나타내는 수치일 뿐이고, 정보는 사용자의 의사결정에
+ 데이터는 그냥 사실을 나타내는 수치일 뿐이고, 정보는 사용자의 의사결정에
 도움을 주는 가공 된 데이터들의 집합이다.  
 
 공유하기
