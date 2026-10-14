@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:1f460882f7a64720d63b663e83dcd68d562be012867f6b3965f60a23b7ee819d
-Source-Hash: blake3:db2cd0c8ccc69a2299555f746f5924c24ec889c5486cc677d0f31c2ea7ce0e17
+Content-Hash: blake3:3993e4b317a6c78412510e4877f8933e859447c2abd5fe194628f53d4637ed02
+Source-Hash: blake3:5dafffdc4edfda5a2230fc2decd518b71dd77f8ff3e161ef4f9bd0fa25b00f1f
 Schema-Version: v1
 -->
 
@@ -79,6 +79,14 @@ html-to-markdown [OPTIONS] [FILE]
 | `--link-style <STYLE>` | `inline`, `reference`   | `inline` | Link rendering style. `inline`: `[text](url)`. `reference`: `[text][1]` with definitions at end. |
 | `--default-title`      | flag                    | off      | Use href as link title when no `title` attribute exists.                                    |
 | `--url-escape-style <STYLE>` | `angle`, `percent` | `angle` | Destination escaping. `angle`: wrap destinations containing spaces or newlines in `<...>`. `percent`: percent-encode every character that is not RFC 3986 unreserved or `/`. |
+
+## Content
+
+| Flag                        | Values                          | Default | Description                                                                                                                                           |
+| --------------------------- | ------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--hidden-content <CHOICE>` | `drop`, `reachable`, `all`      | `drop`  | Text a browser does not show at first. `reachable` keeps `hidden` and inline-style-hidden elements and declarative shadow roots; `all` also keeps `<template>` and `<noscript>` content. |
+| `--no-expand-abbreviations` | flag                            | off     | Write the text of an `<abbr>` without its title.                                                                                                      |
+| `--no-blockquote-citations` | flag                            | off     | Write a blockquote without its `cite` URL.                                                                                                            |
 
 ## Images
 

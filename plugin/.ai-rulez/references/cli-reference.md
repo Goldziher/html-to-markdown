@@ -73,6 +73,14 @@ html-to-markdown [OPTIONS] [FILE]
 | `--default-title`      | flag                    | off      | Use href as link title when no `title` attribute exists.                                    |
 | `--url-escape-style <STYLE>` | `angle`, `percent` | `angle` | Destination escaping. `angle`: wrap destinations containing spaces or newlines in `<...>`. `percent`: percent-encode every character that is not RFC 3986 unreserved or `/`. |
 
+## Content
+
+| Flag                        | Values                          | Default | Description                                                                                                                                           |
+| --------------------------- | ------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--hidden-content <CHOICE>` | `drop`, `reachable`, `all`      | `drop`  | Text a browser does not show at first. `reachable` keeps `hidden` and inline-style-hidden elements and declarative shadow roots; `all` also keeps `<template>` and `<noscript>` content. |
+| `--no-expand-abbreviations` | flag                            | off     | Write the text of an `<abbr>` without its title.                                                                                                      |
+| `--no-blockquote-citations` | flag                            | off     | Write a blockquote without its `cite` URL.                                                                                                            |
+
 ## Images
 
 | Flag                                 | Values                    | Default | Description                                                          |
