@@ -10,9 +10,8 @@
     "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest run"
   },
   "devDependencies": {
-    "@xberg-io/html-to-markdown-wasm": "^3.17.2",
-    "rollup": "^4.64.5",
-    "vitest": "^5.0.3"
-  },
-  "packageManager": "pnpm@12.11.2"
+    "@xberg-io/html-to-markdown-wasm": "^3.18.0",
+    "rollup": "^4.63.1",
+    "vitest": "^5.0.0"
+  }
 }

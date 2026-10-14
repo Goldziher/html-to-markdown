@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-monorepo",
-  "version": "3.17.2",
+  "version": "3.18.0",
   "private": true,
   "description": "HTML to Markdown converter - monorepo root",
   "scripts": {

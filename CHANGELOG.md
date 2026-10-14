@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.0] - 2026-10-14
+
 ### Added
 
 - **`ConversionOptions::hidden_content`** chooses whether the output holds the text that a browser
@@ -25,43 +27,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   written under any choice: a kept `<template>` or `<noscript>` that a selector matches is removed
   whole, and a selector removes the same elements under each choice. The CLI takes it as
   `--hidden-content` ([#753](https://github.com/xberg-io/html-to-markdown/issues/753)).
+- **Coding-agent plugins** for Claude Code, Cursor, Codex, Gemini, Kimi, OpenCode, Factory,
+  Hermes, Pi, GitHub Copilot and the agent-plugins format are generated from one source under
+  `plugin/`, with a marketplace index and a CLI reference that lists every flag.
+- The C FFI release now publishes static C libraries beside the shared libraries.
 
 ### Changed
 
-- Strict whitespace no longer promotes source line endings to hard breaks when emphasis or
-  strong visitors replace a break subtree with only spaces/tabs (#868).
+- Rust dependencies were upgraded: `ext-php-rs` 0.16.2, `html-escape` 0.3.0, `schemars` 1.2.3 and
+  `rustls` 0.23.46, which fixes RUSTSEC-2026-0346, RUSTSEC-2026-0347 and RUSTSEC-2026-0348. All
+  generated bindings, documentation, test applications and E2E suites were refreshed with
+  Alef 0.110.12. JavaScript packages moved to pnpm 12.
+- Head-tag lookup skips text bytes and bounds implicit-head searches to the document prefix, and
+  the previous sibling's tag context is cached, which speeds up conversion of large pages.
 
-- Strict whitespace no longer promotes source line endings to hard breaks when generic element
-  visitors skip a break subtree at exit or replace it with only spaces/tabs at entry or exit (#868).
-
-- Strict whitespace no longer promotes source line endings to hard breaks when inline-code
-  visitors skip a break subtree or replace it with only spaces/tabs (#868).
-
-- Strict whitespace treats skipped links and space/tab-only link replacements as break-subtree
-  omissions. Partial link replacements that retain deferred blocks keep their existing break behavior (#868).
-
-- Strict whitespace no longer promotes source line endings to hard breaks when subscript or
-  superscript visitors skip a break subtree or replace it with only spaces/tabs (#868).
-
-- Strict whitespace no longer promotes source line endings to hard breaks when strikethrough,
-  underline, insertion, or mark visitors skip a break subtree or replace it with only spaces/tabs (#868).
+- Strict whitespace no longer turns source line endings into hard breaks when a visitor skips a
+  break subtree or replaces it with only spaces or tabs. This holds for emphasis, strong, generic
+  element, inline-code, link, subscript, superscript, strikethrough, underline, insertion and mark
+  visitors, and for an empty line-break callback or a CSS-excluded break subtree in a blank inline
+  wrapper. A partial link replacement that retains deferred blocks keeps its break behavior, and
+  breaks are retained on later table passes. Normalized Markdown and Djot keep the no-break-space
+  prefix after empty `header`, `figcaption`, `address`, `fieldset`, `center`, `dialog`, `hgroup`,
+  `aside`, `footer`, `main` and `details` blocks in list continuations (#868).
 
 - Markdown, Djot and plain output honor `exclude_selectors` on table cells, rows, and sections,
   including layout and nested tables. The document table grid excludes the same selected parts
   ([#730](https://github.com/xberg-io/crawlberg/issues/730),
   [#896](https://github.com/xberg-io/html-to-markdown/issues/896)).
-
-- Normalized Markdown and Djot retain no-break-space prefixes after empty `header`, `figcaption`,
-  `address`, `fieldset`, `center`, `dialog`, and `hgroup` blocks in list continuations (#868).
-
-- Strict whitespace treats space/tab-only line-break replacements and visitor-skipped
-  inline break subtrees as omissions, while retaining breaks on later table passes (#868).
-
-- Strict whitespace no longer turns an empty line-break callback or a CSS-excluded
-  break subtree into a hard break inside blank inline wrappers (#868).
-
-- Normalized Markdown and Djot retain the no-break-space prefix after empty
-  `aside`, `footer`, `main`, and `details` blocks in list continuations (#868).
 
 - The text inside a `textarea` is text: `<textarea><b>bold</b></textarea>` gave `**bold**` and now gives `<b>bold</b>` ([#828](https://github.com/xberg-io/html-to-markdown/issues/828)).
 - The fast converter keeps the text after a `</style>` end tag with a form feed after the name ([#826](https://github.com/xberg-io/html-to-markdown/issues/826)).

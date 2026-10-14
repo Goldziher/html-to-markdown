@@ -2,6 +2,6 @@ Package: e2e.r
 Title: E2E Tests for htmltomarkdown
 Version: 0.1.0
 Description: End-to-end test suite.
-Imports: htmltomarkdown (3.17.2)
+Imports: htmltomarkdown (3.18.0)
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3

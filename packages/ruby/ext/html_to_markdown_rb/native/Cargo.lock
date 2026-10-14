@@ -246,13 +246,13 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "html-escape"
-version = "0.2.15"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
+checksum = "491194d601b4fa9fac3c9571e014070a0ad1bc3392d1bc10419695196a8b3cc3"
 
 [[package]]
 name = "html-to-markdown-rb"
-version = "3.17.2"
+version = "3.18.0"
 dependencies = [
  "async-trait",
  "html-to-markdown-rs",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "html-to-markdown-rs"
-version = "3.17.2"
+version = "3.18.0"
 dependencies = [
  "ahash",
  "astral-tl",

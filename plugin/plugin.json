@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "html-to-markdown",
-  "version": "3.17.2",
+  "version": "3.18.0",
   "description": "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.",
   "author": {
     "name": "Kreuzberg, Inc.",

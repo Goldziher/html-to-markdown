@@ -4,7 +4,7 @@ requires = ["setuptools>=69"]
 
 [project]
 name = "html-to-markdown-workspace"
-version = "0.0.0"
+version = "3.18.0"
 description = "Workspace-only metadata for tooling."
 requires-python = ">=3.10"
 classifiers = [

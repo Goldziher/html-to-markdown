@@ -52,6 +52,14 @@ values = [
   "docs-site/src/snippets/typescript/**",
   "docs-site/src/snippets/wasm/**",
   "docs-site/src/snippets/zig/**",
+  "plugin/plugin.json",
+  "plugin/mcp.json",
+  "plugin/.pi/**",
+  "plugin/.github/**",
+  ".github/plugin/**",
+  ".cursor-plugin/marketplace.json",
+  ".ai-rulez/.generated-manifest.json",
+  "plugin/.ai-rulez/.generated-manifest.json",
   "scripts/tests/lib/**",
   "docs-site/src/snippets/**",
   "**/_generated/**",
@@ -97,6 +105,7 @@ values = [
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   "/.ai-rulez-generated.json",
+  "skills/**",
 ]
 
 [[entries]]
@@ -151,6 +160,14 @@ values = [
   "docs-site/src/snippets/typescript/**",
   "docs-site/src/snippets/wasm/**",
   "docs-site/src/snippets/zig/**",
+  "plugin/plugin.json",
+  "plugin/mcp.json",
+  "plugin/.pi/**",
+  "plugin/.github/**",
+  ".github/plugin/**",
+  ".cursor-plugin/marketplace.json",
+  ".ai-rulez/.generated-manifest.json",
+  "plugin/.ai-rulez/.generated-manifest.json",
   "scripts/tests/lib/**",
   "docs-site/src/snippets/**",
   "**/_generated/**",
@@ -196,6 +213,7 @@ values = [
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   ".ai-rulez-generated.json",
+  "skills/**",
 ]
 
 [[entries]]
@@ -240,6 +258,14 @@ values = [
   "docs-site/src/snippets/typescript/**",
   "docs-site/src/snippets/wasm/**",
   "docs-site/src/snippets/zig/**",
+  "plugin/plugin.json",
+  "plugin/mcp.json",
+  "plugin/.pi/**",
+  "plugin/.github/**",
+  ".github/plugin/**",
+  ".cursor-plugin/marketplace.json",
+  ".ai-rulez/.generated-manifest.json",
+  "plugin/.ai-rulez/.generated-manifest.json",
   "scripts/tests/lib/**",
   "docs-site/src/snippets/**",
   "**/_generated/**",
@@ -285,6 +311,7 @@ values = [
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   ".ai-rulez-generated.json",
+  "skills/**",
 ]
 
 [[entries]]
@@ -329,6 +356,14 @@ values = [
   "docs-site/src/snippets/typescript/**",
   "docs-site/src/snippets/wasm/**",
   "docs-site/src/snippets/zig/**",
+  "plugin/plugin.json",
+  "plugin/mcp.json",
+  "plugin/.pi/**",
+  "plugin/.github/**",
+  ".github/plugin/**",
+  ".cursor-plugin/marketplace.json",
+  ".ai-rulez/.generated-manifest.json",
+  "plugin/.ai-rulez/.generated-manifest.json",
   "scripts/tests/lib/**",
   "docs-site/src/snippets/**",
   "**/_generated/**",
@@ -374,6 +409,7 @@ values = [
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   ".ai-rulez-generated.json",
+  "skills/**",
 ]
 
 [[entries]]

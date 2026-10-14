@@ -2,11 +2,11 @@
     .name = .e2e_zig,
     .version = "0.1.0",
     .fingerprint = 0xf16334c0592376fc,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .html_to_markdown = .{
-            .url = "https://github.com/xberg-io/html-to-markdown/releases/download/v3.17.2/html-to-markdown-rs-zig-v3.17.2.tar.gz",
-            .hash = "html_to_markdown_rs-3.17.2-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5",
+            .url = "https://github.com/xberg-io/html-to-markdown/releases/download/v3.18.0/html-to-markdown-rs-zig-v3.18.0.tar.gz",
+            .hash = "html_to_markdown_rs-3.18.0-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5",
         },
     },
     .paths = .{
