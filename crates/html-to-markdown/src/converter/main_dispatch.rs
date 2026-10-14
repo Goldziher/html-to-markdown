@@ -46,6 +46,24 @@ pub(super) fn dispatch_tag<'a>(
             "p" | "section" | "article" | "nav" | "aside" | "header" | "footer" | "main" | "form"
         )
     {
+        // ~keep A form in a heading is written as a `div`, but the visitor still sees it (#906).
+        #[cfg(feature = "visitor")]
+        if tag_name == "form"
+            && crate::converter::form::elements::dispatch_form_visitor(
+                node_handle,
+                tag,
+                parser,
+                dispatcher.output,
+                crate::converter::form::FormContext {
+                    options: handler.options,
+                    ctx: handler.ctx,
+                    depth: handler.depth,
+                    dom_ctx: handler.dom_ctx,
+                },
+            )
+        {
+            return (false, false);
+        }
         dispatcher.dispatch_div_like();
         return (false, false);
     }

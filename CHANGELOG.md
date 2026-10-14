@@ -235,6 +235,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#781](https://github.com/xberg-io/html-to-markdown/issues/781)).
 - With `extract_metadata` off, an empty `pre` writes nothing in place of an empty fence, as with the
   default options.
+- The documentation of `exclude_selectors` names the selector forms that match: a tag name, a
+  class, an id, an attribute, `*`, and these joined with no space. A selector with a combinator
+  (`.menu a`, `div > p`, `h2 + p`) or a pseudo-class matches nothing and reports no error, and
+  the documentation now says so. The conversion is the same as before.
 
 ### Fixed
 
@@ -585,6 +589,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading in the cell: `<td>a<br>&nbsp;b</td>` gives `a`, two spaces and `b`, as before. Inside
   one text, and with only a comment between the two, a space and a no-break space are one
   space, as before.
+- Plain text output writes each term and each description of a definition list as a block of its
+  own, as Markdown output does. Before, the words joined:
+  `<dl><dt>Bread</dt><dd>Baked dough.</dd></dl>` gave `BreadBaked dough.`. A `<dt>` or a `<dd>`
+  outside a `<dl>` is a block too.
+- Plain text output writes the caption of a table as a block of its own before the rows. Before,
+  the caption text was lost, and a table with only a caption wrote nothing. A caption that
+  `exclude_selectors` names is not written.
+- A visitor sees a form inside a heading again, as in 3.17.2. Before, the form text stayed in the
+  heading and the visitor was not called. With no visitor the output is the same as before
+  ([#906](https://github.com/xberg-io/html-to-markdown/issues/906)).
 
 ## [3.17.2] - 2026-10-06
 

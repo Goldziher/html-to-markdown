@@ -26,7 +26,7 @@ fn should_not_write_the_excluded_cell_of_the_issue() {
         r#"<p>ZkpreZ</p><table><caption>ZkcapZ</caption><tr><th>Zks0r0c0Z</th><th>Zks0r0c1Z</th></tr><tr><td class="hx">Zks0r1c0Z</td><td>Zks0r1c1Z</td></tr></table><p>ZkpostZ</p>"#,
         ".hx",
         "<p>ZkpreZ</p><table><caption>ZkcapZ</caption><tr><th>Zks0r0c0Z</th><th>Zks0r0c1Z</th></tr><tr><td>Zks0r1c1Z</td></tr></table><p>ZkpostZ</p>",
-        "ZkpreZ\n\nZks0r0c0Z\tZks0r0c1Z\nZks0r1c1Z\n\nZkpostZ\n",
+        "ZkpreZ\n\nZkcapZ\n\nZks0r0c0Z\tZks0r0c1Z\nZks0r1c1Z\n\nZkpostZ\n",
     );
 }
 
