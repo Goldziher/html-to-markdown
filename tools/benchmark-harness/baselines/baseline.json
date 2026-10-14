@@ -56,7 +56,7 @@
       "median_ms": 4.2013817499999995,
       "mad_ms": 0.007192083333332988,
       "mb_per_s": 37.692703105715985,
-      "output_bytes": 40654
+      "output_bytes": 40647
     },
     {
       "fixture": "mdream/mdn-array.html",
@@ -65,7 +65,7 @@
       "median_ms": 9.792242166666666,
       "mad_ms": 0.03259875000000001,
       "mb_per_s": 22.540711522261777,
-      "output_bytes": 70691
+      "output_bytes": 70758
     },
     {
       "fixture": "mdream/react-learn.html",
@@ -92,7 +92,7 @@
       "median_ms": 20.702064166666666,
       "mad_ms": 0.23588433333333114,
       "mb_per_s": 44.81605854708142,
-      "output_bytes": 188901
+      "output_bytes": 186290
     },
     {
       "fixture": "real-world/wikipedia/lists_timeline.html",
@@ -101,7 +101,7 @@
       "median_ms": 9.131580333333334,
       "mad_ms": 0.026678916666666552,
       "mb_per_s": 26.314140525404298,
-      "output_bytes": 22256
+      "output_bytes": 22248
     },
     {
       "fixture": "real-world/wikipedia/tables_countries.html",
@@ -110,7 +110,7 @@
       "median_ms": 13.523123875,
       "mad_ms": 0.10901675000000033,
       "mb_per_s": 53.34222606784996,
-      "output_bytes": 183837
+      "output_bytes": 183829
     },
     {
       "fixture": "real-world/wikipedia/medium_python.html",
@@ -119,7 +119,7 @@
       "median_ms": 55.250820000000004,
       "mad_ms": 0.37981900000000124,
       "mb_per_s": 21.474769821837455,
-      "output_bytes": 256956
+      "output_bytes": 256179
     },
     {
       "fixture": "real-world/wikipedia/large_rust.html",
@@ -128,7 +128,7 @@
       "median_ms": 21.6927905,
       "mad_ms": 0.15314100000000153,
       "mb_per_s": 46.82765043913996,
-      "output_bytes": 191367
+      "output_bytes": 190956
     },
     {
       "fixture": "real-world/issues/gh-190/mitrade.html",
@@ -191,7 +191,7 @@
       "median_ms": 2.02843646,
       "mad_ms": 0.005187359999999863,
       "mb_per_s": 32.65208577172492,
-      "output_bytes": 24895
+      "output_bytes": 24827
     },
     {
       "fixture": "real-world/issues/gh-190/sjsu.html",
@@ -209,7 +209,7 @@
       "median_ms": 2.805736277777778,
       "mad_ms": 0.0058021111111108414,
       "mb_per_s": 55.47636370403781,
-      "output_bytes": 39505
+      "output_bytes": 39487
     },
     {
       "fixture": "real-world/issues/gh-121-hacker-news.html",
@@ -234,7 +234,7 @@
       "group": "spec_rules",
       "bytes": 25,
       "median_ms": 0.0053530523687138525,
-      "mad_ms": 0.00004397717285162077,
+      "mad_ms": 4.397717285162077e-05,
       "mb_per_s": 4.45388093893888,
       "output_bytes": 12
     },
@@ -252,7 +252,7 @@
       "group": "adversarial",
       "bytes": 19,
       "median_ms": 0.0003792224960837401,
-      "mad_ms": 4.509169490597047e-6,
+      "mad_ms": 4.509169490597047e-06,
       "mb_per_s": 47.781479735098635,
       "output_bytes": 12
     },
@@ -261,7 +261,7 @@
       "group": "adversarial",
       "bytes": 27,
       "median_ms": 0.003039970529253206,
-      "mad_ms": 0.000031540926813443306,
+      "mad_ms": 3.1540926813443306e-05,
       "mb_per_s": 8.470215844261574,
       "output_bytes": 20
     },
@@ -270,7 +270,7 @@
       "group": "adversarial",
       "bytes": 21,
       "median_ms": 0.0040182091712213375,
-      "mad_ms": 0.00004425190851896658,
+      "mad_ms": 4.425190851896658e-05,
       "mb_per_s": 4.984101073674067,
       "output_bytes": 16
     },
@@ -279,7 +279,7 @@
       "group": "adversarial",
       "bytes": 18,
       "median_ms": 0.0034694473849136423,
-      "mad_ms": 0.00003053078317114379,
+      "mad_ms": 3.053078317114379e-05,
       "mb_per_s": 4.947801707544783,
       "output_bytes": 16
     },
@@ -288,7 +288,7 @@
       "group": "adversarial",
       "bytes": 47,
       "median_ms": 0.012293813057529517,
-      "mad_ms": 0.00009349611330956766,
+      "mad_ms": 9.349611330956766e-05,
       "mb_per_s": 3.6459552997384703,
       "output_bytes": 120
     }

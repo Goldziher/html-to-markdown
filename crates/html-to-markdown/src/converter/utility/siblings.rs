@@ -23,6 +23,11 @@ pub fn get_previous_sibling_tag<'a>(
     dom_ctx: &'a DomContext,
 ) -> Option<&'a str> {
     let id = node_handle.get_inner();
+    if let Some(previous) = dom_ctx.prev_tag_map.get(id as usize).and_then(std::cell::OnceCell::get) {
+        return previous
+            .and_then(|id| dom_ctx.tag_info(id, parser))
+            .map(|info| info.name.as_str());
+    }
     let parent = dom_ctx.parent_of(id);
 
     let siblings = if let Some(parent_id) = parent {

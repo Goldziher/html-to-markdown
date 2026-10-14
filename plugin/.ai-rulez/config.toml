@@ -1,58 +1,8 @@
 version = "5.0"
+default_layers = ["plugins"]
 name = "html-to-markdown"
 description = "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction."
 # Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
 agents_md = false
 # Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
 gitignore = true
-
-[plugin]
-runtimes = ["claude", "cursor", "codex", "gemini", "kimi", "opencode", "factory", "hermes", "pi"]
-name = "html-to-markdown"
-version = "3.17.2"
-display_name = "html-to-markdown"
-description = "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction."
-homepage = "https://xberg.io"
-repository = "https://github.com/xberg-io/html-to-markdown"
-license = "MIT"
-category = "developer-tools"
-brand_color = "#58FBDA"
-icon = "./assets/icon.svg"
-logo = "./assets/logo.svg"
-keywords = ["html-to-markdown", "markdown", "html", "conversion", "metadata"]
-
-[plugin.author]
-name = "Kreuzberg, Inc."
-email = "contact@xberg.io"
-url = "https://xberg.io"
-
-[[plugin.mcp]]
-name = "html-to-markdown"
-command = "${PLUGIN_ROOT}/scripts/mcp-launch.sh"
-args = ["mcp"]
-
-[plugin.interface]
-display_name = "html-to-markdown"
-short_description = "Lossless HTML→Markdown with structured extraction"
-long_description = "Convert HTML to Markdown, Djot, or plain text with a single-pass Rust engine. Extracts metadata (title, OG tags, JSON-LD, headers, links, images), GFM tables, inline images, and a structured document tree. Fetches and converts live URLs. Runs locally via the html-to-markdown CLI; plugin ships skills covering conversion, metadata, tables, and URL fetching across CLI and 12 language bindings."
-developer_name = "Kreuzberg, Inc."
-category = "developer-tools"
-capabilities = ["Read", "Write"]
-default_prompt = [
-  "Convert this HTML file to Markdown",
-  "Fetch a URL and convert it to Markdown",
-  "Extract metadata and tables from this HTML",
-]
-website_url = "https://xberg.io"
-privacy_policy_url = "https://xberg.io/privacy"
-terms_of_service_url = "https://xberg.io/terms"
-composer_icon = "./assets/icon.svg"
-logo = "./assets/logo.svg"
-brand_color = "#58FBDA"
-
-[plugin.gemini]
-context_file_name = "GEMINI.md"
-
-# Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
-[header]
-hashes = "full"

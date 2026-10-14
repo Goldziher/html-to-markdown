@@ -1,4 +1,4 @@
-use super::preprocess_repaired_html;
+use super::{preprocess_repaired_html, trace_parse_complete};
 use crate::converter::DomContext;
 use crate::converter::main_helpers::repair_with_html5ever;
 use crate::converter::preprocessing_helpers::has_inline_block_misnest;
@@ -65,6 +65,23 @@ pub(super) fn parse_for_conversion<'a>(
         "misnested HTML elements detected; re-parsed with html5ever repair"
     );
     Ok(ParseOutcome::Retry(preprocess_repaired_html(&repaired, preserve_menu)))
+}
+
+pub(super) fn finish_dom_parse(
+    dom: &mut tl::VDom<'_>,
+    dom_ctx: &mut DomContext,
+    inert_bodies: &std::collections::HashMap<String, String>,
+    input_len: usize,
+) -> Result<std::collections::HashSet<usize>> {
+    let literal_body_ids = if inert_bodies.is_empty() {
+        std::collections::HashSet::new()
+    } else {
+        let ids = crate::converter::utility::preprocessing::restore_inert_bodies(dom, inert_bodies)?;
+        *dom_ctx = build_dom_context(dom, dom.parser(), input_len);
+        ids
+    };
+    trace_parse_complete(dom, input_len);
+    Ok(literal_body_ids)
 }
 
 #[cfg(test)]

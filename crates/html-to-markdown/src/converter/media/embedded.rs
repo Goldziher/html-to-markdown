@@ -52,7 +52,11 @@ pub fn extract_media_src<'a>(tag: &'a HTMLTag<'a>) -> Cow<'a, str> {
 ///
 /// With any choice but [`InlineDataMedia::Keep`], a `data:` address is passed over for the next
 /// non-empty one among the element's `src` and every nested `<source>`'s.
-fn media_element_src<'a>(tag: &'a HTMLTag<'a>, parser: &'a Parser, choice: InlineDataMedia) -> Cow<'a, str> {
+pub(in crate::converter) fn media_element_src<'a>(
+    tag: &'a HTMLTag<'a>,
+    parser: &'a Parser,
+    choice: InlineDataMedia,
+) -> Cow<'a, str> {
     let own = extract_media_src(tag);
     let children = tag.children();
     let mut sources = children

@@ -92,11 +92,16 @@ impl DjotRuleLikeText {
     }
 }
 
+pub(super) struct InlineCodeLink {
+    pub(super) range: std::ops::Range<usize>,
+    pub(super) markdown: String,
+}
+
 /// Conversion context that tracks state during HTML to Markdown conversion.
 ///
 /// This context is passed through the recursive tree walker and maintains information
 /// about the current position in the document tree, nesting levels, and enabled features.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Context {
     /// Are we inside a code-like element (pre, code, kbd, samp)?
     pub(crate) in_code: bool,
@@ -111,6 +116,8 @@ pub struct Context {
     /// SPAN must split the span in two rather than embed a newline inside the backticks
     /// (issue #487). ~keep
     pub(crate) in_code_block: bool,
+    /// ~keep Link ranges refer to the raw inline-code buffer, before delimiters are emitted (#813).
+    pub(super) inline_code_links: Option<Rc<RefCell<Vec<InlineCodeLink>>>>,
     /// Output offsets of real `<br>` nodes while a table-cell `<pre>` is collected. ~keep
     pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<Vec<usize>>>>,
     /// Current list item counter for ordered lists.
@@ -124,6 +131,8 @@ pub struct Context {
     pub(crate) blockquote_depth: usize,
     /// Are we inside a table cell (td/th)?
     pub(crate) in_table_cell: bool,
+    /// ~keep Deferred single-cell tables keep their surrounding cell context but render as blocks.
+    pub(crate) allow_nested_table_markup: bool,
     /// Are we inside a *layout*-table cell, whose row renders as a list item rather than a
     /// pipe row?
     ///
@@ -291,6 +300,9 @@ pub struct Context {
     pub(crate) keep_inline_images_in: Rc<HashSet<String>>,
     /// Node IDs matching `exclude_selectors` — these nodes and all descendants are dropped.
     pub(crate) excluded_node_ids: Rc<HashSet<u32>>,
+    // ~keep Restored raw nodes own literal source bytes; JSON-LD must not decode another entity layer.
+    #[cfg(feature = "metadata")]
+    pub(crate) literal_body_ids: Rc<HashSet<usize>>,
     /// Shared flag set when the guarded DOM walk reaches its effective depth limit.
     pub(crate) depth_limit_reached: Rc<Cell<bool>>,
     /// Shared flag set when `inline_data_media` replaced or dropped an element. A link reads it to
@@ -366,57 +378,8 @@ impl Context {
     pub(crate) fn new(options: &crate::options::ConversionOptions, parameters: ContextParameters) -> Self {
         #[cfg(feature = "metadata")]
         let metadata = metadata_preferences(parameters.metadata_collector.as_ref());
-
-        Self {
-            in_code: false,
-            in_code_block: false,
-            pre_cell_break_offsets: None,
-            list_counter: 0,
-            in_ordered_list: false,
-            blockquote_depth: 0,
-            in_table_cell: false,
-            in_layout_cell: false,
+        let mut context = Self {
             convert_as_inline: options.convert_as_inline,
-            inline_depth: 0,
-            in_list_item: false,
-            list_item_open: false,
-            text_in_markers: false,
-            in_marker_span: false,
-            inline_buffer_column: None,
-            inline_buffer_after_hard_break: false,
-            escapes_hyphens: false,
-            list_depth: 0,
-            list_indent_columns: 0,
-            real_item_columns: 0,
-            quote_starts_after_markers: false,
-            previous_marker: crate::converter::list::utils::PreviousMarker::default(),
-            last_list: crate::converter::list::utils::LastList::default(),
-            ordered_delimiter: None,
-            item_lines: crate::converter::list::utils::ItemLineScan::default(),
-            first_writer: None,
-            task_item_scope: None,
-            ul_depth: 0,
-            in_list: false,
-            loose_list: false,
-            prev_item_had_blocks: false,
-            in_heading: false,
-            heading_allow_inline_images: false,
-            cell_allow_inline_images: false,
-            link_allow_inline_images: false,
-            in_paragraph: false,
-            djot_rule_like_text: None,
-            block_content_start: 0,
-            block_output_ptr: 0,
-            at_fresh_block_start: Rc::new(Cell::new(true)),
-            in_ruby: false,
-            in_strong: false,
-            in_link: false,
-            strip_tags: Rc::new(options.strip_tags.iter().cloned().collect()),
-            preserve_tags: Rc::new(options.preserve_tags.iter().cloned().collect()),
-            keep_inline_images_in: Rc::new(options.keep_inline_images_in.iter().cloned().collect()),
-            excluded_node_ids: Rc::new(HashSet::new()),
-            depth_limit_reached: Rc::new(Cell::new(false)),
-            inline_data_replaced: Rc::new(Cell::new(false)),
             #[cfg(feature = "inline-images")]
             inline_collector: parameters.inline_collector,
             #[cfg(feature = "metadata")]
@@ -433,16 +396,17 @@ impl Context {
             metadata_wants_structured_data: metadata.structured_data,
             #[cfg(feature = "visitor")]
             visitor: parameters.visitor,
-            #[cfg(feature = "visitor")]
-            visitor_error: Rc::new(RefCell::new(None)),
             structure_collector: parameters.structure_collector,
             reference_collector: parameters.reference_collector,
-            skip_visitor_hooks: false,
-            measure_width_only: false,
             base_url: parameters.base_url,
-        }
+            ..Self::default()
+        };
+        context.at_fresh_block_start.set(true);
+        Rc::make_mut(&mut context.strip_tags).extend(options.strip_tags.iter().cloned());
+        Rc::make_mut(&mut context.preserve_tags).extend(options.preserve_tags.iter().cloned());
+        Rc::make_mut(&mut context.keep_inline_images_in).extend(options.keep_inline_images_in.iter().cloned());
+        context
     }
-
     /// Whether the current output buffer is written between inline markers: an inline wrapper's
     /// (`inline_depth`, a link's brackets included), a summary's or caption's (`text_in_markers`)
     /// or a marker-only wrapper's (`in_marker_span`). A rule written there is text, since the
@@ -507,5 +471,17 @@ impl Context {
             return None;
         }
         crate::converter::url_resolve::resolve_attribute_url(self.base_url.as_deref()?, value)
+    }
+    pub(crate) fn resolve_link_url(
+        &self,
+        value: &str,
+        node_handle: &tl::NodeHandle,
+        parser: &tl::Parser,
+        dom_ctx: &crate::converter::DomContext,
+    ) -> Option<String> {
+        if dom_ctx.has_raw_text_ancestor(node_handle.get_inner(), parser) {
+            return None;
+        }
+        crate::converter::url_resolve::resolve_link_url(self.base_url.as_deref()?, value)
     }
 }

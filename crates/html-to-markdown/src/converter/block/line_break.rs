@@ -56,8 +56,12 @@ fn write_special_break(output: &mut String, ctx: &Context) -> bool {
         // ~keep "  \n" marker regardless of heading context, but `close_heading` then
         // ~keep folds every whitespace run (including that marker) in the finished
         // ~keep heading body down to one space.
-        trim_trailing_whitespace(output);
-        output.push(' ');
+        if ctx.inline_code_links.is_some() {
+            output.push('\n');
+        } else {
+            trim_trailing_whitespace(output);
+            output.push(' ');
+        }
         true
     } else if ctx.in_table_cell && ctx.in_code && !ctx.in_code_block {
         // ~keep Neither a code SPAN nor a table cell can carry a hard break on its own
@@ -70,8 +74,13 @@ fn write_special_break(output: &mut String, ctx: &Context) -> bool {
         // ~keep newline). Not `emit_table_cell_break`: a literal `<br>` in HTML is not
         // ~keep valid content inside a code span regardless of `br_in_tables`, so that
         // ~keep option is never consulted here either.
-        trim_trailing_whitespace(output);
-        output.push(' ');
+        if ctx.inline_code_links.is_some() {
+            // ~keep Collected link ranges must remain valid until the code span is emitted.
+            output.push('\n');
+        } else {
+            trim_trailing_whitespace(output);
+            output.push(' ');
+        }
         true
     } else if ctx.in_code_block {
         // ~keep A `<pre>` code BLOCK reproduces its content literally, line structure

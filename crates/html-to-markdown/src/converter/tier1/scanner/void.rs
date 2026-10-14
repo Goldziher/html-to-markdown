@@ -228,8 +228,14 @@ fn emit_image(
         return Err(BailReason::ImageLazyLoadSrc);
     }
     let src = decode_attr(raw_src)?;
+    if src.trim().is_empty() {
+        return Err(BailReason::ImageMissingSource);
+    }
     let src = state.resolve_url(&src).unwrap_or(src);
     let alt = decode_attr(find_attr(attrs, b"alt").unwrap_or_default())?;
+    if state.escape_ctx.contains(EscapeCtx::CODE) {
+        return emit_image_in_code(state, &src, &alt, options);
+    }
     let title = find_attr(attrs, b"title")
         .map(decode_attr)
         .transpose()?
@@ -241,6 +247,27 @@ fn emit_image(
     } else {
         dest.push_str(&alt);
     }
+    state.last_emitted_was_img = true;
+    Ok(())
+}
+
+// ~keep In code text (`code`, `kbd`, `samp`, `pre`) an image is its alt text, written as literal
+// ~keep code text as Tier-2 writes it; `keep_inline_images_in` does not apply there. A line end
+// ~keep in the buffer of a code span marks a `<br>`, so Tier-2 takes an alt text that has one.
+fn emit_image_in_code(
+    state: &mut Tier1State,
+    src: &str,
+    alt: &str,
+    options: &ConversionOptions,
+) -> Result<(), BailReason> {
+    if alt.contains(['\n', '\r']) {
+        return Err(BailReason::Classifier);
+    }
+    let treatment = crate::converter::media::inline_data_treatment(options.inline_data_media, src);
+    if !options.skip_images && treatment != crate::options::InlineDataMedia::DropElement && !alt.is_empty() {
+        state.cell_or_output_mut().push_str(alt);
+    }
+    // ~keep Tier-2 keeps white space between two `<img>` siblings, whatever the images wrote.
     state.last_emitted_was_img = true;
     Ok(())
 }
@@ -480,7 +507,7 @@ fn dispatch_close(
         TagKind::TableHead => close_table_head(state),
         TagKind::TableBody => close_table_body(state),
         TagKind::TableRow => close_table_row(state),
-        TagKind::TableCell { .. } => close_table_cell(state, false)?,
+        TagKind::TableCell { .. } => close_table_cell(state, false, options)?,
         TagKind::TableCaption => close_table_caption(state),
         TagKind::Block => close_block_container(state, frame, name_lower),
         TagKind::Summary => close_summary(state, frame),

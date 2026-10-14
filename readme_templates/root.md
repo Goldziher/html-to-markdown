@@ -229,7 +229,24 @@ See [CLI usage](https://docs.html-to-markdown.xberg.io) for full documentation.
 
 ### AI Coding Assistants
 
-Install the html-to-markdown plugin from [`xberg-io/html-to-markdown`](https://github.com/xberg-io/html-to-markdown). It ships the html-to-markdown agent skills and works with every major coding agent — expand your harness below.
+Install the html-to-markdown plugin from [`xberg-io/html-to-markdown`](https://github.com/xberg-io/html-to-markdown). It ships the html-to-markdown agent skills — select your runtime below.
+
+The bundle targets Claude Code, Codex, Cursor, Gemini CLI, Kimi, OpenCode, Factory Droid,
+Hermes, Pi, Agent Plugins and GitHub Copilot CLI. Read [the plugin guide](https://github.com/xberg-io/html-to-markdown/blob/main/plugin/README.md)
+for runtime resources, CLI prerequisites and configuration. MCP-capable adapters expose the
+product's tools; Hermes uses a local stdio bridge and explicitly selected skills. Pi loads
+skills and prompt templates and requires the product CLI for executable operations.
+
+Install only the public [Agent Skills](https://github.com/xberg-io/html-to-markdown/tree/main/skills),
+without a plugin or MCP registration, using the [skills CLI](https://github.com/vercel-labs/skills):
+
+```sh
+npx skills add xberg-io/html-to-markdown --list
+npx skills add xberg-io/html-to-markdown
+```
+
+Choose the skills and target agents interactively. Installing instructions does not install the
+product CLI or configure provider credentials.
 
 <details open>
 <summary><strong>Claude Code</strong></summary>
@@ -262,9 +279,14 @@ Settings → Plugins → Add from URL → `https://github.com/xberg-io/html-to-m
 <details>
 <summary><strong>Gemini CLI</strong></summary>
 
-```text
-gemini extensions install https://github.com/xberg-io/html-to-markdown
+From a checkout of this repository:
+
+```sh
+gemini extensions install ./plugin
 ```
+
+The manifest is inside `plugin/`. See the [Gemini extension reference](https://geminicli.com/docs/extensions/reference/)
+for local installation and updates.
 
 </details>
 

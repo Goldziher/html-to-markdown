@@ -63,7 +63,7 @@ pub fn handle_mark(handler: HandlerContext<'_>) {
         }
     }
 
-    if ctx.convert_as_inline {
+    if ctx.convert_as_inline || ctx.in_code {
         walk_children(tag, output, ctx, depth, site);
         return;
     }

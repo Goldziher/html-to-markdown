@@ -13,7 +13,7 @@ die() {
 
 LAUNCHER="${HTML_TO_MARKDOWN_LAUNCHER:-auto}"
 case "$LAUNCHER" in
-auto | pnpm dlx | uvx | brew | download) ;;
+auto | npx | uvx | brew | download) ;;
 *) die "invalid HTML_TO_MARKDOWN_LAUNCHER='$LAUNCHER' (expected auto|npx|uvx|brew|download)" ;;
 esac
 
@@ -47,16 +47,17 @@ if have "$BINARY_NAME"; then
   fi
 fi
 
-if want pnpm dlx && have npx; then
-  log "probing pnpm dlx $NPM_PKG@latest ..."
+if want npx && have npx; then
+  log "resolving npx $NPM_PKG@latest ..."
   scratch="$(mktemp -d)"
-  if (cd "$scratch" && pnpm dlx "$NPM_PKG@latest" --version >/dev/null 2>&1); then
-    log "launching via pnpm dlx $NPM_PKG@latest"
-    cd "$scratch"
-    exec pnpm dlx "$NPM_PKG@latest" "$@"
+  # Resolve in an empty project, then execute the selected binary in the caller's cwd. ~keep
+  if npm_bin="$(cd "$scratch" && npx -y --package "$NPM_PKG@latest" --call "command -v ${BINARY_NAME%.exe}" 2>/dev/null)" && runnable "$npm_bin"; then
+    rm -rf "$scratch"
+    log "launching npm package binary $npm_bin"
+    exec "$npm_bin" "$@"
   fi
   rm -rf "$scratch"
-  log "pnpm dlx $NPM_PKG not available (no CLI bin yet); falling through"
+  log "npx $NPM_PKG not available (no CLI bin yet); falling through"
 fi
 
 if want uvx && have uvx; then

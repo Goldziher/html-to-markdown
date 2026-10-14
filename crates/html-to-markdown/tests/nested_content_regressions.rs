@@ -63,10 +63,7 @@ fn wrapper_preserves_content_after_nested_table() {
 #[test]
 fn preformatted_nested_anchors_keep_literal_content() {
     let html = r#"<pre><a href="/outer">Outer <a href="/inner">Inner</a></a></pre>"#;
-    assert_eq!(
-        convert(html, None).unwrap().content.unwrap(),
-        "```\n[Outer \\[Inner\\](/inner)](/outer)\n```\n"
-    );
+    assert_eq!(convert(html, None).unwrap().content.unwrap(), "```\nOuter Inner\n```\n");
 }
 
 #[cfg(feature = "visitor")]

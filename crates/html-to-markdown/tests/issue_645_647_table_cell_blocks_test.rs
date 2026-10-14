@@ -166,7 +166,7 @@ fn should_write_the_same_cell_in_a_table_inside_a_quote_in_both_tiers() {
         ),
         (
             "<table><tr><td>a <blockquote><table><tr><td>x</td></tr></table></blockquote></td><td>z</td></tr></table>",
-            r"| a \| x \| \| --- \| | z |",
+            r"| a x | z |",
         ),
     ] {
         for br_in_tables in [false, true] {
@@ -239,14 +239,11 @@ fn should_separate_text_after_a_dropped_navigation_block_in_a_cell() {
     check(&[("a<nav>x <p>b</p></nav>c", "a c", "a<br>c")]);
 }
 
-/// The text after a nested table folded into a cell joins the table's last row in both tiers.
+/// ~keep The nested table boundary separates the following text instead of joining words (#760).
 #[test]
-fn should_join_text_after_a_folded_nested_table_in_both_tiers() {
+fn should_separate_text_after_a_folded_nested_table_in_both_tiers() {
     let html = "<table><tr><td><table><tr><td>x</td></tr></table>b</td><td>z</td></tr></table>";
-    for (br_in_tables, cell) in [
-        (false, r"| \| x \| \| --- \|b | z |"),
-        (true, r"| \| x \|<br>\| --- \|b | z |"),
-    ] {
+    for (br_in_tables, cell) in [(false, r"| x b | z |"), (true, r"| x<br>b | z |")] {
         let tier2_out = tier2(html, br_in_tables);
         assert_eq!(tier2_out.lines().next(), Some(cell), "br_in_tables={br_in_tables}");
         let tier1_out = tier1_run(html, br_in_tables).expect("tier 1 must not bail");

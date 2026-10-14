@@ -26,10 +26,17 @@ fn inline_like_value(node_handle: tl::NodeHandle, parser: &tl::Parser) -> Option
 
 fn cache_sibling_context(siblings: &[tl::NodeHandle], parser: &tl::Parser, ctx: &mut DomContext) {
     let mut previous_inline_like = false;
+    let mut previous_tag = None;
     for sibling in siblings {
         let id = sibling.get_inner();
         ctx.ensure_capacity(id);
         let _ = ctx.prev_inline_like_map[id as usize].set(previous_inline_like);
+        let _ = ctx.prev_tag_map[id as usize].set(previous_tag);
+        match sibling.get(parser) {
+            Some(tl::Node::Tag(_)) => previous_tag = Some(id),
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => previous_tag = None,
+            _ => {}
+        }
         if let Some(value) = inline_like_value(*sibling, parser) {
             previous_inline_like = value;
         }
@@ -80,6 +87,7 @@ pub fn build_dom_context(dom: &tl::VDom, parser: &tl::Parser, _input_len: usize)
         tag_info_map: Vec::new(),
         prev_inline_like_map: Vec::new(),
         next_inline_like_map: Vec::new(),
+        prev_tag_map: Vec::new(),
         next_tag_map: Vec::new(),
         next_whitespace_map: Vec::new(),
         table_content_summary_cache: std::cell::RefCell::new(std::collections::HashMap::new()),

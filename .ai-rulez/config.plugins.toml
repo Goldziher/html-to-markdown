@@ -1,0 +1,13 @@
+[[marketplaces]]
+name = "basemind"
+source = "Goldziher/basemind"
+type = "github"
+
+[marketplace]
+name = "html-to-markdown"
+description = "Fast, lossless HTML→Markdown conversion for coding agents, by Kreuzberg, Inc."
+members = ["plugin"]
+
+[marketplace.owner]
+name = "Kreuzberg, Inc."
+email = "contact@xberg.io"

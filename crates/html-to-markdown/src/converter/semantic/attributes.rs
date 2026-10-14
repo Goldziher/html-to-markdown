@@ -240,6 +240,9 @@ pub fn handle_q(
     handler: super::HandlerContext<'_>,
 ) {
     if let Some(tl::Node::Tag(tag)) = node_handle.get(parser) {
+        if handle_collected_q(tag, parser, output, handler) {
+            return;
+        }
         let mut content = String::with_capacity(32);
         let children = tag.children();
         {
@@ -272,10 +275,46 @@ pub fn handle_q(
             }
             return;
         }
+        // ~keep A block remains a block when inline text follows it inside the quotation (#820).
+        if !handler.ctx.convert_as_inline && content.contains("\n\n") {
+            let quoted = format!("\"{trimmed}\"");
+            crate::converter::block::div::push_block(output, handler.options, handler.ctx, &quoted);
+            return;
+        }
         output.push('"');
         output.push_str(trimmed);
         output.push('"');
     }
+}
+
+fn handle_collected_q(
+    tag: &tl::HTMLTag<'_>,
+    parser: &tl::Parser<'_>,
+    output: &mut String,
+    handler: super::HandlerContext<'_>,
+) -> bool {
+    let Some(links) = handler.ctx.inline_code_links.as_ref() else {
+        return false;
+    };
+    let link_count = links.borrow().len();
+    let start = output.len();
+    output.push('"');
+    super::walk_tag_children(tag, parser, output, handler);
+    if links.borrow().len() == link_count {
+        let body = output[start + 1..].to_string();
+        output.truncate(start);
+        if body.trim().is_empty() {
+            crate::converter::inline::wrapped::emit_whitespace_only_inline_body(&body, output);
+        } else {
+            output.push('"');
+            output.push_str(body.trim());
+            output.push('"');
+        }
+    } else {
+        // ~keep Quoted links were collected in this buffer; preserve their offsets.
+        output.push('"');
+    }
+    true
 }
 
 /// Dispatcher for semantic inline attribute elements.

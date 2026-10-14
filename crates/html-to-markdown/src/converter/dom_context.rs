@@ -61,6 +61,7 @@ pub struct DomContext {
     pub(crate) tag_info_map: Vec<OnceCell<Option<TagInfo>>>,
     pub(crate) prev_inline_like_map: Vec<OnceCell<bool>>,
     pub(crate) next_inline_like_map: Vec<OnceCell<bool>>,
+    pub(crate) prev_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_tag_map: Vec<OnceCell<Option<u32>>>,
     pub(crate) next_whitespace_map: Vec<OnceCell<bool>>,
     pub(crate) table_content_summary_cache: RefCell<HashMap<u32, TableContentSummary>>,
@@ -78,6 +79,7 @@ impl DomContext {
             self.tag_info_map.resize_with(new_len, OnceCell::new);
             self.prev_inline_like_map.resize_with(new_len, OnceCell::new);
             self.next_inline_like_map.resize_with(new_len, OnceCell::new);
+            self.prev_tag_map.resize_with(new_len, OnceCell::new);
             self.next_tag_map.resize_with(new_len, OnceCell::new);
             self.next_whitespace_map.resize_with(new_len, OnceCell::new);
         }

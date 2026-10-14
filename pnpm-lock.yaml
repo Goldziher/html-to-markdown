@@ -167,6 +167,7 @@ overrides:
   postcss: '>=8.5.26 <9'
   nanoid: '>=3.3.17 <4'
   js-yaml: '>=4.3.2 <5'
+  source-map-js: '>=1.2.2 <2'
 
 importers:
 
@@ -3547,6 +3548,10 @@ snapshots:
       '@babel/parser': 7.29.9
       '@babel/types': 7.29.8
       source-map-js: 1.2.2
+
+  make-dir@4.0.0:
+    dependencies:
+      semver: 7.8.5
 
   map-like@1.1.3: {}
 

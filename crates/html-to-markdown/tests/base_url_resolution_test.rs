@@ -150,10 +150,10 @@ fn should_leave_mailto_href_unchanged_on_both_tiers() {
 }
 
 #[test]
-fn should_leave_empty_href_unchanged_on_both_tiers() {
+fn should_resolve_empty_href_against_the_base_on_both_tiers() {
     let html = r#"<a href="">empty</a>"#;
     let out = assert_tier1_matches_tier2(html, "https://example.com/");
-    assert_eq!(out, "[empty](<>)\n");
+    assert_eq!(out, "[empty](https://example.com/)\n");
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn should_not_resolve_link_like_text_inside_textarea() {
 #[test]
 fn should_not_resolve_link_like_text_inside_other_raw_text_elements() {
     for (element, expected) in [
-        ("xmp", "see [here](x.html)\n\nafter\n"),
+        ("xmp", "see <a href=\"x.html\">here</a>\n\nafter\n"),
         ("iframe", "after\n"),
         ("noscript", "after\n"),
         ("noembed", "see [here](x.html)\n\nafter\n"),

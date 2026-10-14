@@ -577,7 +577,7 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
     ];
     if !HEAD_CONTENT
         .iter()
-        .any(|name| first_start_tag(input.as_bytes(), name).is_some_and(|start| start < head_start))
+        .any(|name| first_start_tag(&input.as_bytes()[..head_start], name).is_some())
     {
         return None;
     }
@@ -590,21 +590,23 @@ pub fn repair_head_content_before_explicit_head(input: &str) -> Option<String> {
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
+    memchr::memchr_iter(b'<', bytes)
         .rev()
-        .find_map(|(start, _)| is_start_tag_at(bytes, name, start).then_some(start))
+        .find(|&start| is_start_tag_at(bytes, name, start))
+}
+
+#[cfg(test)]
+thread_local! {
+    static START_TAG_CANDIDATE_CHECKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn is_start_tag_at(bytes: &[u8], name: &[u8], start: usize) -> bool {
+    #[cfg(test)]
+    START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(checks.get() + 1));
     if bytes.get(start) != Some(&b'<') {
         return false;
     }
@@ -684,6 +686,51 @@ pub fn is_inline_element(tag_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn should_preserve_head_repair_decisions_at_prefix_boundaries() {
+        for html in [
+            "<head></head><p title=\"<title>x\">é🦀</p>",
+            "<!-- é🦀 --><head></head><p>body</p>",
+            "<tit<head></head><p>body</p>",
+            "<title<head></head><p>body</p>",
+        ] {
+            assert_eq!(repair_head_content_before_explicit_head(html), None, "{html}");
+        }
+        for prefix in ["", "<!-- é🦀 -->"] {
+            let html = format!("{prefix}<title>First</title><head><title>Second</title></head><p>x</p>");
+            let repaired = repair_head_content_before_explicit_head(&html).expect("repair implicit head");
+            assert_eq!(
+                repaired,
+                format!(
+                    "{prefix}<html><head><title>First</title><title>Second</title></head><body><p>x</p></body></html>"
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn should_limit_head_content_searches_to_input_before_the_head() {
+        let html = format!("<head></head>{}", "<p>body</p>".repeat(10_000));
+        START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
+
+        assert_eq!(repair_head_content_before_explicit_head(&html), None);
+        START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 20_002));
+    }
+
+    #[test]
+    fn should_scan_only_markup_candidates_when_finding_head_tags() {
+        let padding = "plain text ".repeat(10_000);
+        let html = format!("{padding}<head>{padding}</head>{padding}<HEAD >{padding}");
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
+
+        assert_eq!(super::first_start_tag(html.as_bytes(), b"head"), Some(padding.len()));
+        assert_eq!(
+            super::last_start_tag(html.as_bytes(), b"head"),
+            Some(padding.len() * 3 + "<head></head>".len())
+        );
+        super::START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 2));
+    }
 
     #[test]
     fn test_is_ignorable_before_head() {
