@@ -312,15 +312,9 @@ fn skip_bang(bytes: &[u8], pos: usize) -> Result<usize, BailReason> {
 
     if bytes.get(start) == Some(&b'-') && bytes.get(start + 1) == Some(&b'-') {
         let comment_start = start + 2;
-        let mut i = comment_start;
-        while i + 2 < bytes.len() {
-            if bytes[i] == b'-' && bytes[i + 1] == b'-' && bytes[i + 2] == b'>' {
-                return Ok(i + 3);
-            }
-            i += 1;
-        }
         // ~keep Unclosed comment — bail
-        return Err(BailReason::LiteralLt { offset: pos });
+        return crate::converter::utility::preprocessing::find_html_comment_end(bytes, comment_start)
+            .ok_or(BailReason::LiteralLt { offset: pos });
     }
 
     let mut i = start;

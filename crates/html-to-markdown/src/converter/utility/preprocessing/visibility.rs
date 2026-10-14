@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use super::head_scan::body_start;
 use super::kept::{OpenKept, TagStep};
-use super::markup::{find_subslice, find_tag_end, matches_tag_start, skip_written_text_element};
+use super::markup::{find_html_comment_end, find_subslice, find_tag_end, matches_tag_start, skip_written_text_element};
 use super::raw_text::{
     find_closing_tag_bytes_nested, is_self_closing_tag, matching_tag_ends, opens_a_tag, skip_opaque_region,
 };
@@ -67,7 +67,7 @@ fn skip_real_comment_or_cdata(bytes: &[u8], idx: usize, len: usize, next: u8, re
     // ~keep like a bogus comment. Stripping that would delete the `-->` closing the real
     // ~keep comment, leaving it unterminated and swallowing the rest of the document.
     if next == b'!' && rest.starts_with(b"--") {
-        return Some(find_subslice(bytes, idx + 4, b"-->").map_or(len, |end| end + 3));
+        return Some(find_html_comment_end(bytes, idx + 4).unwrap_or(len));
     }
     // ~keep Likewise CDATA: its interior is character data, not markup.
     if next == b'!' && rest.starts_with(b"[CDATA[") {
