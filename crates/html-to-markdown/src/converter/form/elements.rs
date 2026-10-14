@@ -381,17 +381,31 @@ pub fn handle_label(
     }
 }
 
-/// The first child of `tag` that is not white space or a comment.
+/// The first child with content after transparent spans, white space and comments are ignored.
 fn first_content(tag: &tl::HTMLTag, parser: &tl::Parser) -> Option<tl::NodeHandle> {
     tag.children()
         .top()
         .iter()
         .copied()
-        .find(|child| match child.get(parser) {
-            Some(tl::Node::Raw(raw)) => !raw.as_utf8_str().trim().is_empty(),
-            Some(tl::Node::Comment(_)) | None => false,
-            Some(tl::Node::Tag(_)) => true,
-        })
+        .find(|child| first_visible_content(*child, parser).is_some())
+}
+
+// ~keep Spans are transparent to control boundaries; an iterative search avoids source-controlled recursion.
+fn first_visible_content(handle: tl::NodeHandle, parser: &tl::Parser) -> Option<tl::NodeHandle> {
+    let mut pending = vec![handle];
+    while let Some(handle) = pending.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Raw(raw)) if !raw.as_utf8_str().trim().is_empty() => return Some(handle),
+            Some(tl::Node::Tag(tag)) if tag.name().as_utf8_str().eq_ignore_ascii_case("span") => {
+                let start = pending.len();
+                pending.extend(tag.children().top().iter().copied());
+                pending[start..].reverse();
+            }
+            Some(tl::Node::Tag(_)) => return Some(handle),
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Whether `first`, the first content of a label, separates the label from the text before it:
@@ -404,7 +418,7 @@ fn starts_with_control(
     dom_ctx: &crate::converter::DomContext,
     button_wrote: bool,
 ) -> bool {
-    let Some(handle) = first else {
+    let Some(handle) = first.and_then(|handle| first_visible_content(handle, parser)) else {
         return false;
     };
     let Some(tl::Node::Tag(control)) = handle.get(parser) else {
@@ -805,7 +819,9 @@ pub fn handle_button(
                 crate::converter::block::container::HandlerContext::new(options, ctx, depth + 1, dom_ctx),
             );
         }
-        ctx.button_wrote.set(!output[content_start..].trim().is_empty());
+        if output[..content_start].trim().is_empty() {
+            ctx.button_wrote.set(!output[content_start..].trim().is_empty());
+        }
         // ~keep In code the text of a button is written as the source has it.
         if !ctx.in_code && start.finish(output) {
             separate_from_next_text(output, *node_handle, parser, dom_ctx);

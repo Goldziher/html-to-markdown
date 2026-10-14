@@ -291,3 +291,95 @@ fn should_separate_a_label_from_a_button_that_the_element_hooks_kept() {
         }
     }
 }
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_separate_a_label_from_a_button_inside_transparent_or_empty_spans() {
+    use html_to_markdown_rs::VisitResult;
+    for html in [
+        "<p>a<label><span><button>x</button></span></label>b</p>",
+        "<p>a<label><span></span><button>x</button></label>b</p>",
+        "<p>a<label><span><span><button>x</button></span></span></label>b</p>",
+    ] {
+        for answer in [None, Some(&VisitResult::Continue)] {
+            assert_with_button_answer(html, answer, "a x b\n");
+        }
+    }
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_preserve_wrapped_button_visitor_replacements_and_ordinary_label_text() {
+    use html_to_markdown_rs::VisitResult;
+    for html in [
+        "<p>a<label><span><button>x</button></span></label>b</p>",
+        "<p>a<label><span></span><button>x</button></label>b</p>",
+    ] {
+        assert_with_button_answer(html, Some(&VisitResult::Skip), "ab\n");
+        assert_with_button_answer(html, Some(&VisitResult::Custom("Q".to_string())), "aQb\n");
+    }
+    assert_with_button_answer(
+        "<p>a<label><span>y<button>x</button></span></label>b</p>",
+        None,
+        "ay x b\n",
+    );
+    assert_with_button_answer(
+        "<p>a<label><span>y</span><button>x</button></label>b</p>",
+        None,
+        "ay x b\n",
+    );
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn should_base_a_wrapped_label_boundary_on_the_first_button_output() {
+    use html_to_markdown_rs::visitor::HtmlVisitor;
+    use html_to_markdown_rs::{NodeContext, VisitResult};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug)]
+    struct Rewrite;
+    impl HtmlVisitor for Rewrite {
+        fn visit_element_end(&mut self, ctx: &NodeContext<'_>, _text: &str) -> VisitResult {
+            if ctx.attributes().get("id").map(String::as_str) == Some("rewrite") {
+                VisitResult::Custom("Q".to_string())
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    for (html, expected) in [
+        (
+            r#"<p>a<label><span><button id="rewrite">x</button><button>y</button></span></label>b</p>"#,
+            "aQ y b\n",
+        ),
+        (
+            r#"<p>a<label><span><button>x</button><button id="rewrite">y</button></span></label>b</p>"#,
+            "a x Qb\n",
+        ),
+    ] {
+        for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
+            let options = ConversionOptions {
+                output_format,
+                visitor: Some(Arc::new(Mutex::new(Rewrite))),
+                ..Default::default()
+            };
+            assert_eq!(
+                convert(html, Some(options)).unwrap().content.unwrap(),
+                expected,
+                "{html} {output_format:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn should_separate_a_button_through_deeply_nested_transparent_spans() {
+    let html = format!(
+        "<p>a<label>{}<button>x</button>{}</label>b</p>",
+        "<span>".repeat(32),
+        "</span>".repeat(32)
+    );
+    assert_each_format(&html, "a x b\n");
+}
