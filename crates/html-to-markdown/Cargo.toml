@@ -41,7 +41,7 @@ ahash.workspace = true
 axum = { version = "0.8", optional = true }
 base64.workspace = true
 bitflags = "2"
-html-escape = "0.2.15"
+html-escape = "0.3.0"
 html5ever.workspace = true
 image = { version = "0.25", default-features = false, features = [
     "gif",
@@ -61,7 +61,7 @@ rmcp = { version = "3.5.1", features = [
     "transport-streamable-http-server",
     "server-side-http",
 ], optional = true }
-schemars = { version = "1.2.2", optional = true }
+schemars = { version = "1.2.3", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", features = ["raw_value"] }
 thiserror.workspace = true
