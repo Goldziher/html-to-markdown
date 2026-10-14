@@ -260,6 +260,12 @@ fn visit_inline_code(tag: &tl::HTMLTag<'_>, content: &str, handler: &HandlerCont
         .lock()
         .expect("visitor mutex poisoned")
         .visit_code_inline(&node_context, content);
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, crate::visitor::VisitResult::Skip)
+            || matches!(&result, crate::visitor::VisitResult::Custom(custom) if custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     visitor_output(result, handler)
 }
 
