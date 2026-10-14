@@ -1,4 +1,5 @@
 {
+  "plugin": "html-to-markdown",
   "mcp": {
     "html-to-markdown": {
       "type": "local",

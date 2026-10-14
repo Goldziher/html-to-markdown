@@ -1,6 +1,6 @@
 {
   "schema_version": "v1",
-  "source_hash": "blake3:13e3f16488f3027b008068eb70568940e817652c9a5ab60e873c689b8b10db22",
+  "source_hash": "blake3:b4e45457828193fe66c1b837fddb114162b63251a7c1585ceb4830574147727b",
   "outputs": {
     ".claude-plugin/plugin.json": {
       "content_hash": "blake3:147d68f791168c734da8931da51289eb131730b4a45f18f253788411c9399297",
@@ -651,11 +651,11 @@
       "mode": "0644"
     },
     ".opencode/ai-rulez-bundle.json": {
-      "content_hash": "blake3:b4d722d8c2b7610617396006d522e0ff740cb15e6800557d418015ad09c7a98f",
+      "content_hash": "blake3:4ba0122d493c39f56271706ff6ad897b67aa590284bfa518caba3b2c53f08184",
       "mode": "0644"
     },
     ".opencode/ai-rulez-content.js": {
-      "content_hash": "blake3:822c510deb007e4f72877ad42f29918d0499f210ae363e82d465a0f0331ab294",
+      "content_hash": "blake3:011ec20caa671eb4bd4e886b09e15f720a786de4bf747419efd0690889fc5549",
       "mode": "0644"
     },
     ".opencode/commands/html-to-markdown-convert.md": {
