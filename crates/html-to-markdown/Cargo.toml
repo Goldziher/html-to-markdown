@@ -140,6 +140,30 @@ name = "issue_868_visitor_break_boundary_test"
 required-features = ["testkit"]
 
 [[test]]
+name = "issue_868_semantic_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_script_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_code_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_link_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_emphasis_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_868_generic_visitor_break_boundary_test"
+required-features = ["testkit"]
+
+[[test]]
 name = "issue_868_empty_list_block_prefix_test"
 required-features = ["testkit"]
 
@@ -149,6 +173,10 @@ required-features = ["testkit"]
 
 [[test]]
 name = "bold_break_between_bold_test"
+required-features = ["testkit"]
+
+[[test]]
+name = "issue_897_bold_break_two_breaks_test"
 required-features = ["testkit"]
 
 [[example]]

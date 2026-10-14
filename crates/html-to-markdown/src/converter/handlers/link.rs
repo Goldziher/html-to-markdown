@@ -810,6 +810,13 @@ fn visit_link(
         label,
         data.title.as_deref(),
     );
+    if handler.options.whitespace_mode == crate::options::WhitespaceMode::Strict
+        && (matches!(&result, VisitResult::Skip)
+            || matches!(&result, VisitResult::Custom(custom)
+                if !data.emit_blocks_separately && custom.trim_matches([' ', '\t']).is_empty()))
+    {
+        handler.dom_context.record_absent_breaks(node_id, true);
+    }
     match result {
         VisitResult::Continue => write_link_with_edges(data, label, edges, handler),
         VisitResult::Custom(custom) => {

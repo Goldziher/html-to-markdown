@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Strict whitespace no longer promotes source line endings to hard breaks when emphasis or
+  strong visitors replace a break subtree with only spaces/tabs (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when generic element
+  visitors skip a break subtree at exit or replace it with only spaces/tabs at entry or exit (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when inline-code
+  visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
+- Strict whitespace treats skipped links and space/tab-only link replacements as break-subtree
+  omissions. Partial link replacements that retain deferred blocks keep their existing break behavior (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when subscript or
+  superscript visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
+- Strict whitespace no longer promotes source line endings to hard breaks when strikethrough,
+  underline, insertion, or mark visitors skip a break subtree or replace it with only spaces/tabs (#868).
+
 - Markdown, Djot and plain output honor `exclude_selectors` on table cells, rows, and sections,
   including layout and nested tables. The document table grid excludes the same selected parts
   ([#730](https://github.com/xberg-io/crawlberg/issues/730),
@@ -229,6 +247,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<p>x</p><p><b>a</b><b><br></b><b>c</b></p>` gave `**a** **c**` in the second paragraph and
   gives `**a**`, a hard break and `**c**`, as before. The block that starts the output keeps the
   one space (#502).
+- A bold element after bold text that holds two or more line breaks, or a blank element before its
+  line break, writes its hard break again at every position:
+  `<h1>Notes</h1><p><b>Name</b><b><br><br></b>Ada</p>` gave `**Name** Ada` and gives `**Name**`, a
+  hard break and `Ada`, as before
+  ([#897](https://github.com/xberg-io/html-to-markdown/issues/897)). Only an element that holds
+  one line break and nothing else is the one space of #502.
 
 - Collapse no-break-space tails after empty options and empty or line-end-only inline descendants
   to full-main spacing on every route (#868), retaining literal pre content and strict whitespace.
