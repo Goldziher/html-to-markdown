@@ -300,6 +300,9 @@ bin/
 .ai-rulez/.generated-manifest.json
 .ai-rulez/.generated-manifest.local.json
 .ai-rulez/local/
+.github/agents/
+.github/prompts/iterate.prompt.md
+.github/prompts/parallelize.prompt.md
 .mcp.json
 .opencode/agents/
 .opencode/commands/

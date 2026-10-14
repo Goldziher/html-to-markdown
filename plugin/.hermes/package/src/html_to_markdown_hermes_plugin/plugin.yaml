@@ -3,3 +3,6 @@ version: "3.17.2"
 description: "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction."
 author: "Kreuzberg, Inc."
 kind: "standalone"
+python_dependencies:
+  - "mcp==1.28.1"
+  - "PyYAML==6.0.3"

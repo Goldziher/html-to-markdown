@@ -1,0 +1,47 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "html-to-markdown",
+  "version": "3.17.2",
+  "description": "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.",
+  "author": {
+    "name": "Kreuzberg, Inc.",
+    "email": "contact@xberg.io",
+    "url": "https://xberg.io"
+  },
+  "homepage": "https://xberg.io",
+  "repository": "https://github.com/xberg-io/html-to-markdown",
+  "license": "MIT",
+  "keywords": [
+    "html-to-markdown",
+    "markdown",
+    "html",
+    "conversion",
+    "metadata"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "brandColor": "#58FBDA",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "category": "developer-tools",
+        "composerIcon": "./assets/icon.svg",
+        "defaultPrompt": [
+          "Convert this HTML file to Markdown",
+          "Fetch a URL and convert it to Markdown",
+          "Extract metadata and tables from this HTML"
+        ],
+        "developerName": "Kreuzberg, Inc.",
+        "displayName": "html-to-markdown",
+        "logo": "./assets/logo.svg",
+        "longDescription": "Convert HTML to Markdown, Djot, or plain text with a single-pass Rust engine. Extracts metadata (title, OG tags, JSON-LD, headers, links, images), GFM tables, inline images, and a structured document tree. Fetches and converts live URLs. Runs locally via the html-to-markdown CLI; plugin ships skills covering conversion, metadata, tables, and URL fetching across CLI and 12 language bindings.",
+        "privacyPolicyURL": "https://xberg.io/privacy",
+        "shortDescription": "Lossless HTML→Markdown with structured extraction",
+        "termsOfServiceURL": "https://xberg.io/terms",
+        "websiteURL": "https://xberg.io"
+      }
+    }
+  }
+}

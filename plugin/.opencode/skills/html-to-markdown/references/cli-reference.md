@@ -1,7 +1,7 @@
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
-Content-Hash: blake3:dfaf03eca6acf6844233aed17bde4f7282aeea1213133a40331becfeb81f2bd2
-Source-Hash: blake3:568a4ea7e94a211bb55b0d3df2984bf570265f331b3dbf396e5b3b597fdb358e
+Content-Hash: blake3:1f460882f7a64720d63b663e83dcd68d562be012867f6b3965f60a23b7ee819d
+Source-Hash: blake3:b4e45457828193fe66c1b837fddb114162b63251a7c1585ceb4830574147727b
 Schema-Version: v1
 -->
 
@@ -178,7 +178,7 @@ Metadata is returned in `result.metadata` within the JSON output (use `--json` t
 | Flag                      | Default | Description                                                                                                                                 |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--json`                  | off     | Output the full `ConversionResult` as JSON instead of plain Markdown. JSON has keys: `content`, `tables`, `metadata`, `images`, `warnings`. |
-| `--include-structure`     | off     | Include document structure tree in JSON output (`document` key). Requires `--json`.                                                         |
+| `--include-structure`     | off     | Include document structure tree and structured tables in JSON output. Requires `--json`.                                                         |
 | `--extract-inline-images` | off     | Include extracted inline image data in JSON output (`images` key). Requires `--json`.                                                       |
 | `--show-warnings`         | off     | Print non-fatal processing warnings to stderr.                                                                                              |
 | `--no-content`            | off     | Suppress Markdown text output — only extract metadata/tables/images. Useful with `--json` for extraction-only mode.                         |
@@ -234,8 +234,8 @@ html-to-markdown --url https://example.com > output.md
 # Fetch URL with custom user agent
 html-to-markdown --url https://example.com --user-agent "MyBot/1.0"
 
-# JSON output (ConversionResult with content, tables, metadata, images, warnings)
-html-to-markdown --json input.html
+# JSON output with document structure and populated tables
+html-to-markdown --json --include-structure input.html
 
 # JSON output with document structure
 html-to-markdown --json --include-structure input.html
