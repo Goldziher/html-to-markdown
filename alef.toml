@@ -24,6 +24,9 @@ languages = [
 # updated by scripts/sync_consumer_versions.py.
 [workspace.ownership]
 user_owned = [
+  # ~keep Alef 0.110.12 compares its raw go.mod render against go mod tidy's output.
+  # ~keep go:manifest:verify checks tidy freshness and the release pin; Go source remains Alef-verified.
+  "e2e/go/go.mod",
   "changelog-archive-*.md",
   "test_apps/dart/pubspec.yaml",
   "test_apps/elixir/mix.exs",
@@ -1262,78 +1265,78 @@ categories = ["smoke", "conversion"]
 
 [crates.e2e.registry.packages.python]
 name = "html-to-markdown"
-version = ">=3.18.0"
+version = ">=3.18.1"
 
 [crates.e2e.registry.packages.node]
 name = "@xberg-io/html-to-markdown"
-version = "^3.18.0"
+version = "^3.18.1"
 
 [crates.e2e.registry.packages.rust]
 name = "html-to-markdown-rs"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.go]
 module = "github.com/xberg-io/html-to-markdown/packages/go/v3"
-version = "v3.18.0"
+version = "v3.18.1"
 
 [crates.e2e.registry.packages.java]
 name = "io.xberg:html-to-markdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.csharp]
 name = "XbergIo.HtmlToMarkdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.php]
 name = "xberg-io/html-to-markdown"
-version = ">=3.18.0"
+version = ">=3.18.1"
 
 [crates.e2e.registry.packages.ruby]
 name = "html-to-markdown"
-version = "~> 3.18.0"
+version = "~> 3.18.1"
 
 [crates.e2e.registry.packages.elixir]
 name = "html_to_markdown"
-version = "~> 3.18.0"
+version = "~> 3.18.1"
 
 [crates.e2e.registry.packages.wasm]
 name = "@xberg-io/html-to-markdown-wasm"
-version = "^3.18.0"
+version = "^3.18.1"
 
 [crates.e2e.registry.packages.r]
 name = "htmltomarkdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.c]
 name = "html-to-markdown-rs-ffi"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.kotlin_android]
 name = "io.xberg:html-to-markdown-android"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.swift]
 name = "HtmlToMarkdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.dart]
 name = "h2m"
-version = "^3.18.0"
+version = "^3.18.1"
 
 [crates.e2e.registry.packages.zig]
 name = "html_to_markdown"
-version = "3.18.0"
-hash = "html_to_markdown_rs-3.18.0-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5"
+version = "3.18.1"
+hash = "html_to_markdown_rs-3.18.1-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5"
 
 [crates.e2e.registry.packages.php_ext]
 name = "xberg-io/html-to-markdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.registry.packages.homebrew]
 tap = "xberg-io/tap"
 cli_formula = "html-to-markdown"
 ffi_formula = "libhtml-to-markdown"
-version = "3.18.0"
+version = "3.18.1"
 
 [crates.e2e.packages.rust]
 path = "../../crates/html-to-markdown"
@@ -1349,7 +1352,7 @@ path = "../../crates/html-to-markdown-node"
 [crates.e2e.packages.go]
 module = "github.com/xberg-io/html-to-markdown/packages/go/v3"
 path = "../../packages/go"
-version = "v3.18.0"
+version = "v3.18.1"
 
 [crates.e2e.packages.php]
 name = "xberg-io/html-to-markdown"

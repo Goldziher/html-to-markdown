@@ -26,7 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="XbergIo.HtmlToMarkdown" Version="3.18.0" />
+    <PackageReference Include="XbergIo.HtmlToMarkdown" Version="3.18.1" />
   </ItemGroup>
 
   <ItemGroup>

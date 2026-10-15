@@ -1,5 +1,5 @@
 name: "html-to-markdown"
-version: "3.18.0"
+version: "3.18.1"
 description: "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction."
 author: "Kreuzberg, Inc."
 kind: "standalone"

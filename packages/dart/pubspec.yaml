@@ -1,6 +1,6 @@
 name: h2m
 description: High-performance HTML to Markdown converter
-version: 3.18.0
+version: 3.18.1
 repository: https://github.com/xberg-io/html-to-markdown
 environment:
   sdk: ">=3.13.0 <4.0.0"

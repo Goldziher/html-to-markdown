@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.1] - 2026-10-15
+
 ### Fixed
 
 - Preserve slashes and literal quotes in unquoted attributes on the fast converter, and use the
