@@ -2,35 +2,37 @@ use crate::converter::block::container::HandlerContext;
 use crate::converter::handlers::{handle_graphic, handle_img, open_link};
 use crate::converter::walk::{CaptureEnd, Close, Open};
 
+#[cfg(feature = "visitor")]
 pub(super) fn walks_kept_inert_element(
     node: &tl::NodeHandle,
     parser: &tl::Parser,
     handler: HandlerContext<'_>,
 ) -> bool {
-    #[cfg(feature = "visitor")]
-    {
-        if handler.ctx.visitor.is_none() || handler.options.hidden_content != crate::options::HiddenContent::All {
+    if handler.ctx.visitor.is_none() || handler.options.hidden_content != crate::options::HiddenContent::All {
+        return false;
+    }
+    // ~keep Raw-text lookalikes inside these legacy containers were never unwrapped as HTML.
+    let mut parent = handler.dom_ctx.parent_of(node.get_inner());
+    while let Some(id) = parent {
+        if handler
+            .dom_ctx
+            .tag_info(id, parser)
+            .is_some_and(|info| matches!(info.name.as_str(), "plaintext" | "noembed" | "noframes"))
+        {
             return false;
         }
-        // ~keep Raw-text lookalikes inside these legacy containers were never unwrapped as HTML.
-        let mut parent = handler.dom_ctx.parent_of(node.get_inner());
-        while let Some(id) = parent {
-            if handler
-                .dom_ctx
-                .tag_info(id, parser)
-                .is_some_and(|info| matches!(info.name.as_str(), "plaintext" | "noembed" | "noframes"))
-            {
-                return false;
-            }
-            parent = handler.dom_ctx.parent_of(id);
-        }
-        true
+        parent = handler.dom_ctx.parent_of(id);
     }
-    #[cfg(not(feature = "visitor"))]
-    {
-        let _ = (node, parser, handler);
-        false
-    }
+    true
+}
+
+#[cfg(not(feature = "visitor"))]
+pub(super) const fn walks_kept_inert_element(
+    _node: &tl::NodeHandle,
+    _parser: &tl::Parser,
+    _handler: HandlerContext<'_>,
+) -> bool {
+    false
 }
 
 struct TagDispatcher<'a, 'output> {

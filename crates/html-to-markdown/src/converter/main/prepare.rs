@@ -123,18 +123,16 @@ pub(super) fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_c
     preprocess_html(&stripped).into_owned()
 }
 
+#[cfg(feature = "visitor")]
 pub(super) fn keep_inert_wrappers(options: &ConversionOptions, hidden_content: HiddenContent) -> bool {
-    #[cfg(feature = "visitor")]
-    {
-        options.visitor.is_some()
-            && hidden_content == HiddenContent::All
-            && options.output_format != crate::options::OutputFormat::Plain
-    }
-    #[cfg(not(feature = "visitor"))]
-    {
-        let _ = (options, hidden_content);
-        false
-    }
+    options.visitor.is_some()
+        && hidden_content == HiddenContent::All
+        && options.output_format != crate::options::OutputFormat::Plain
+}
+
+#[cfg(not(feature = "visitor"))]
+pub(super) const fn keep_inert_wrappers(_options: &ConversionOptions, _hidden_content: HiddenContent) -> bool {
+    false
 }
 
 fn repair_custom_elements(

@@ -731,10 +731,10 @@ impl TableWalk {
     }
 
     #[cfg(not(feature = "visitor"))]
-    fn start_inert(&mut self, _node: tl::NodeHandle, _depth: usize, _end: usize, _site: &HookSite<'_>) {}
+    const fn start_inert(&self, _node: tl::NodeHandle, _depth: usize, _end: usize, _site: &HookSite<'_>) {}
 
     #[cfg(not(feature = "visitor"))]
-    fn finish_inert(&mut self, _node: tl::NodeHandle, _depth: usize, _site: &HookSite<'_>) {}
+    const fn finish_inert(&self, _node: tl::NodeHandle, _depth: usize, _site: &HookSite<'_>) {}
 
     #[cfg(feature = "visitor")]
     fn restore_inert_data(&mut self, checkpoint: InertState) {
