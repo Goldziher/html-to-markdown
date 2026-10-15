@@ -35,6 +35,7 @@ struct MisnestState {
     blocked_by_inline_ancestor: bool,
     /// Result of a `has_p_ancestor` scan started at this node (used by its children).
     p_ancestor_state: bool,
+    parent_is_paragraph: bool,
     /// True if a strict ancestor is `<li>`/`<dt>`/`<dd>` with no intervening
     /// `<ul>`/`<ol>`/`<dl>` (i.e. we are still "inside" that same list item).
     list_item_ancestor_state: bool,
@@ -52,6 +53,7 @@ impl MisnestState {
         inside_preformatted: false,
         blocked_by_inline_ancestor: false,
         p_ancestor_state: false,
+        parent_is_paragraph: false,
         list_item_ancestor_state: false,
         cell_ancestor_state: false,
     };
@@ -94,9 +96,27 @@ fn child_misnest_state(name: &str, state: MisnestState, self_inside_preformatted
         blocked_by_inline_ancestor: state.blocked_by_inline_ancestor
             || (is_inline_element(name) && !inline_ancestor_allows_block(name)),
         p_ancestor_state: p_ancestor_state_for(name, state.p_ancestor_state),
+        parent_is_paragraph: name == "p",
         list_item_ancestor_state: list_item_ancestor_state_for(name, state.list_item_ancestor_state),
         cell_ancestor_state: cell_ancestor_state_for(name, state.cell_ancestor_state),
     }
+}
+
+/// Whether the first parse contains a structural misnest requiring tree repair.
+#[cfg(any(test, feature = "testkit"))]
+#[must_use]
+pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
+    tree_repair_reasons(dom, parser).misnest
+}
+
+/// Distinguish structural misnests from implicit paragraph closes in one DOM traversal.
+/// ~keep Paragraph-only repairs retain the text-loss and budget safeguards of omitted
+/// ~keep end tags: the HTML tree builder can discard authored text after a frameset.
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct TreeRepairReasons {
+    pub(super) misnest: bool,
+    pub(super) paragraph_close: bool,
+    pub(super) form_paragraph_close: bool,
 }
 
 /// Detect malformed nesting that requires HTML5 tree repair.
@@ -148,7 +168,8 @@ fn child_misnest_state(name: &str, state: MisnestState, self_inside_preformatted
 /// ~keep accounted for essentially all of it, confirmed via phase timing in
 /// ~keep `tools/benchmark-harness/examples/profile_deep_nesting_phases.rs`).
 #[must_use]
-pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
+pub(super) fn tree_repair_reasons(dom: &tl::VDom, parser: &tl::Parser) -> TreeRepairReasons {
+    let mut reasons = TreeRepairReasons::default();
     let mut stack: Vec<(tl::NodeHandle, MisnestState)> = dom
         .children()
         .iter()
@@ -165,7 +186,10 @@ pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
 
         let self_inside_preformatted = state.inside_preformatted || matches!(name, "pre" | "code");
         if node_is_misnested(name, is_block, state, self_inside_preformatted) {
-            return true;
+            return TreeRepairReasons {
+                misnest: true,
+                ..reasons
+            };
         }
 
         let tag_children = tag.children();
@@ -177,7 +201,10 @@ pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
                 .iter()
                 .any(|child| is_foster_parenting_candidate(*child, parser))
         {
-            return true;
+            return TreeRepairReasons {
+                misnest: true,
+                ..reasons
+            };
         }
 
         // ~keep A <tr>/<row> or table section (<thead>/<tbody>/<tfoot>) holding a
@@ -196,14 +223,21 @@ pub fn has_inline_block_misnest(dom: &tl::VDom, parser: &tl::Parser) -> bool {
         // ~keep text stays a separate, documented defect (see the CONTROL test in
         // ~keep `issue_489_regressions.rs`).
         if is_row_context_with_misplaced_element(name, children, parser) {
-            return true;
+            return TreeRepairReasons {
+                misnest: true,
+                ..reasons
+            };
         }
 
+        if state.parent_is_paragraph && !state.cell_ancestor_state && !self_inside_preformatted {
+            reasons.paragraph_close |= matches!(name, "dt" | "dd");
+            reasons.form_paragraph_close |= name == "form";
+        }
         let child_state = child_misnest_state(name, state, self_inside_preformatted);
         stack.extend(children.iter().map(|child| (*child, child_state)));
     }
 
-    false
+    reasons
 }
 
 /// True when an element with content is still open at the end of the input, so the HTML tree

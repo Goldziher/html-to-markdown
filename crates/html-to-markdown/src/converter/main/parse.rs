@@ -3,7 +3,7 @@ use super::trace_parse_complete;
 use crate::converter::DomContext;
 use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever_bounded};
 use crate::converter::preprocessing_helpers::{
-    has_discarded_end_tag, has_inline_block_misnest, has_omitted_end_tag, readable_text_len, written_title_len,
+    has_discarded_end_tag, has_omitted_end_tag, readable_text_len, tree_repair_reasons, written_title_len,
 };
 use crate::converter::utility::caching::build_dom_context;
 use crate::converter::utility::preprocessing::{KeptScripts, normalize_inert_bodies_with_preservation};
@@ -79,7 +79,7 @@ pub(super) fn parse_for_conversion<'a>(
     let dom = parse_html(input)?;
     let parser = dom.parser();
     let len = input.len();
-    let asked = Asked::of(&dom, parser, input);
+    let asked = Asked::of(&dom, parser, input, options);
     let misnest = asked.misnest;
     let for_narrower_choice = match as_written {
         Some(html) if !asked.any() => narrower_choice_asks(html, input, options, hidden_content)?,
@@ -179,13 +179,23 @@ struct Asked {
 }
 
 impl Asked {
-    fn of(dom: &tl::VDom, parser: &tl::Parser<'_>, input: &str) -> Self {
+    fn of(dom: &tl::VDom, parser: &tl::Parser<'_>, input: &str, options: &ConversionOptions) -> Self {
         let open_at_the_end = has_omitted_end_tag(dom, parser);
-        let misnest = has_inline_block_misnest(dom, parser);
+        let reasons = tree_repair_reasons(dom, parser);
+        let misnest = reasons.misnest;
+        // ~keep Retained forms intentionally remain in the surrounding plain-text flow (#814).
+        let form_paragraph_close = reasons.form_paragraph_close
+            && options.preprocessing.enabled
+            && options.preprocessing.remove_forms
+            && options.preprocessing.preset != crate::options::PreprocessingPreset::Minimal
+            && !options
+                .preserve_tags
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case("form"));
         // ~keep Both rules ask where the tree builder ends an element, so both have the text rule.
         let discarded_end_tag = !open_at_the_end && !misnest && has_discarded_end_tag(dom, parser, input);
         Self {
-            omitted_end_tag: open_at_the_end || discarded_end_tag,
+            omitted_end_tag: open_at_the_end || reasons.paragraph_close || form_paragraph_close || discarded_end_tag,
             discarded_end_tag,
             misnest,
         }
@@ -223,7 +233,7 @@ fn narrower_choice_asks(
     };
     let (narrower_html, _) = normalize_inert_bodies_with_preservation(html, false, narrower);
     let narrower_page = preprocess_initial_html(&narrower_html, options, narrower)?;
-    if narrower_page != page && asks_for_the_tree_builder(&narrower_page) {
+    if narrower_page != page && asks_for_the_tree_builder(&narrower_page, options) {
         return Ok(true);
     }
     narrower_choice_asks(html, &narrower_page, options, narrower)
@@ -254,15 +264,15 @@ fn loses_a_title_of_a_wider_choice(
     }
     let (emptied, _) = normalize_inert_bodies_with_preservation(html, false, HiddenContent::Drop);
     let page_of_drop = preprocess_initial_html(&emptied, options, HiddenContent::Drop)?;
-    Ok(!asks_for_the_tree_builder(&page_of_drop))
+    Ok(!asks_for_the_tree_builder(&page_of_drop, options))
 }
 
 /// Whether the conversion of `page`, a page before its first parse, runs the HTML tree builder.
-fn asks_for_the_tree_builder(page: &str) -> bool {
+fn asks_for_the_tree_builder(page: &str, options: &ConversionOptions) -> bool {
     has_custom_element_tags(page)
         || parse_html(page).is_ok_and(|dom| {
             let parser = dom.parser();
-            Asked::of(&dom, parser, page).any()
+            Asked::of(&dom, parser, page, options).any()
         })
 }
 

@@ -699,10 +699,6 @@ fn a_raw_text_element_in_an_attribute_value_is_a_part_of_the_value() {
 /// An apostrophe in an attribute value with no quotes opens no quote in the first pass: the
 /// `textarea` after the tag is an element and the tags inside it are text.
 ///
-/// ~keep The full converter only. The fast converter reads the tag of the link with a reader
-/// ~keep of its own, which opens a quote at the apostrophe. It did so before this rule; see
-/// ~keep the issue "an apostrophe in an attribute value with no quotes opens a quote on the
-/// ~keep fast converter".
 #[test]
 fn an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote() {
     let html = "<p>before</p><a href=/x title=it's>link</a><textarea><b>x</b></textarea><p>it's after</p>";
@@ -715,12 +711,8 @@ fn an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote() {
     }
 }
 
-/// Issue 277: the full converter closes a `script` or `style` start tag with no end tag at
-/// once and writes the markup after it. Each spelling of the start tag follows that rule.
-///
-/// ~keep The fast converter writes nothing after such a start tag. It did so before this rule;
-/// ~keep see the issue "a script or style start tag with no end tag ends the page on the fast
-/// ~keep converter only".
+/// Issue 277: both converters close a `script` or `style` start tag with no end tag at
+/// once and write the markup after it. Each spelling of the start tag follows that rule.
 #[test]
 fn a_raw_text_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
     let plain = content("<p>a</p><script><p>b</p>", TierStrategy::Tier2);
@@ -734,10 +726,9 @@ fn a_raw_text_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
         "<style\x0C>",
     ] {
         let html = format!("<p>a</p>{start_tag}<p>b</p>");
-        for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+        for tier_strategy in STRATEGIES {
             assert_eq!(content(&html, tier_strategy), plain, "{tier_strategy:?}: {html:?}");
         }
-        assert_eq!(content(&html, TierStrategy::Tier1), "a", "the fast converter: {html:?}");
     }
 }
 
@@ -757,8 +748,6 @@ fn a_textarea_start_tag_with_no_end_tag_follows_one_rule_in_every_spelling() {
 /// value ends at white space or at `>`. The `textarea` after the link is an element and the
 /// tags inside it are text, as they are with the same value in quotes.
 ///
-/// ~keep The full converter only, for the reason given at
-/// ~keep `an_apostrophe_in_an_unquoted_attribute_value_opens_no_quote`.
 #[test]
 fn an_equals_sign_in_an_unquoted_attribute_value_starts_no_value() {
     let no_quotes = "<a href=/search?q='tis>link</a><textarea><b>x</b></textarea><p>it's after</p>";

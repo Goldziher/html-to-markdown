@@ -29,7 +29,7 @@ pub use menu::{PRESERVED_MENU_ATTRIBUTE, normalize_menu_elements, restore_preser
 pub use raw_text::strip_script_and_style_tags_for_second_pass;
 pub use raw_text::{
     find_raw_text_end_tag, skip_opaque_region, strip_script_and_style_tags,
-    strip_script_and_style_tags_with_kept_scripts,
+    strip_script_and_style_tags_with_kept_scripts, tag_terminator_from_attributes,
 };
 pub use restoration::restore_inert_bodies;
 pub use structured_data::{repair_unclosed_structured_data_scripts, repair_unclosed_structured_data_scripts_reserving};

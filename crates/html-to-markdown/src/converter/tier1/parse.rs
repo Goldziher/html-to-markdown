@@ -49,30 +49,8 @@ pub fn skip_ws(bytes: &[u8], mut pos: usize) -> usize {
 /// with `/>`.  Returns `None` if no `>` was found before the end of input.
 #[must_use]
 pub fn find_tag_close(bytes: &[u8], start: usize) -> Option<(usize, bool)> {
-    let mut pos = start;
-    let len = bytes.len();
-    let mut in_quote: Option<u8> = None;
-
-    while pos < len {
-        match bytes[pos] {
-            b'"' | b'\'' => {
-                if let Some(q) = in_quote {
-                    if q == bytes[pos] {
-                        in_quote = None;
-                    }
-                } else {
-                    in_quote = Some(bytes[pos]);
-                }
-            }
-            b'>' if in_quote.is_none() => {
-                let self_closing = pos > 0 && bytes[pos - 1] == b'/';
-                return Some((pos, self_closing));
-            }
-            _ => {}
-        }
-        pos += 1;
-    }
-    None
+    crate::converter::utility::preprocessing::tag_terminator_from_attributes(bytes, start)
+        .map(|(end, self_closing)| (end - 1, self_closing))
 }
 
 /// Parse a single attribute starting at `pos` (after skipping any preceding
@@ -94,7 +72,7 @@ pub fn scan_attribute(bytes: &[u8], pos: usize) -> Option<(Range<usize>, Option<
     let mut key_end = pos;
     while key_end < bytes.len() {
         match bytes[key_end] {
-            b'=' | b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r' => break,
+            b'=' | b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\x0C' | b'\r' => break,
             _ => key_end += 1,
         }
     }
@@ -123,7 +101,7 @@ pub fn scan_attribute(bytes: &[u8], pos: usize) -> Option<(Range<usize>, Option<
     } else {
         let val_start = after_eq;
         let mut val_end = val_start;
-        while val_end < bytes.len() && !matches!(bytes[val_end], b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'/') {
+        while val_end < bytes.len() && !matches!(bytes[val_end], b' ' | b'\t' | b'\n' | b'\x0C' | b'\r' | b'>') {
             val_end += 1;
         }
         (val_start..val_end, val_end)

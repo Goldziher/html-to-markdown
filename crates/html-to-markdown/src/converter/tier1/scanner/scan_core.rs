@@ -495,7 +495,8 @@ impl<'a> Tier1Scanner<'a> {
         };
         // ~keep The rule for the end of raw text is the one Tier-2 uses.
         self.pos = crate::converter::utility::preprocessing::find_raw_text_end_tag(self.bytes, open_end, name_lower)
-            .map_or(self.bytes.len(), |(_, end)| end);
+            .map(|(_, end)| end)
+            .ok_or(BailReason::EofWithOpenBlock { open_count: 1 })?;
 
         // ~keep Tier-2 inserts a boundary space per removed style when its source neighbors
         // ~keep are non-whitespace. Adjacent raw-text tags can coalesce those spaces into a
@@ -527,7 +528,7 @@ impl<'a> Tier1Scanner<'a> {
         // produced by a preceding sibling is never doubled up; the "after"
         // check peeks the next source byte, matching Tier-2's boundary
         // condition exactly.
-        if name_lower == b"style" {
+        if name_lower == b"style" && !self.state.escape_ctx.contains(EscapeCtx::PRE) {
             let after_is_word = self.pos < self.bytes.len() && !self.bytes[self.pos].is_ascii_whitespace();
             if after_is_word {
                 let dest = self.state.cell_or_output_mut();
@@ -867,14 +868,5 @@ fn find_closing_bracket(bytes: &[u8], after_name: usize) -> Option<usize> {
 }
 
 fn tag_is_self_closing(bytes: &[u8], after_name: usize) -> bool {
-    let mut quote = None;
-    for (offset, byte) in bytes[after_name..].iter().copied().enumerate() {
-        match byte {
-            b'"' | b'\'' if quote == Some(byte) => quote = None,
-            b'"' | b'\'' if quote.is_none() => quote = Some(byte),
-            b'>' if quote.is_none() => return after_name + offset > 0 && bytes[after_name + offset - 1] == b'/',
-            _ => {}
-        }
-    }
-    false
+    parse::find_tag_close(bytes, after_name).is_some_and(|(_, self_closing)| self_closing)
 }

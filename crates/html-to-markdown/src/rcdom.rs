@@ -646,6 +646,16 @@ impl Serialize for SerializableHandle {
                         // ~keep The contents of a template are not its children.
                         let contents = template_contents.borrow().clone().filter(|_| self.1);
                         let parent = contents.as_ref().unwrap_or(&handle);
+                        // ~keep HTML parsing discards the first LF in these elements. Restore
+                        // ~keep it when serializing so reparsing does not discard a content LF (#850).
+                        if name.ns == html5ever::ns!(html)
+                            && matches!(&*name.local, "pre" | "textarea" | "listing")
+                            && parent.children.borrow().first().is_some_and(|child| {
+                                matches!(&child.data, NodeData::Text { contents } if contents.borrow().starts_with('\n'))
+                            })
+                        {
+                            serializer.write_text("\n")?;
+                        }
                         ops.reserve(1 + parent.children.borrow().len());
                         ops.push_front(SerializeOp::Close(name.clone()));
 
@@ -716,3 +726,36 @@ mod bounded_reparent_tests {
 
 #[cfg(test)]
 mod depth_cache_tests;
+
+#[cfg(test)]
+mod preformatted_serialization_tests {
+    use super::{RcDom, SerializableHandle};
+    use html5ever::serialize::{SerializeOpts, serialize};
+    use html5ever::tendril::TendrilSink;
+
+    #[test]
+    fn should_preserve_initial_text_line_feeds_when_reparsed() {
+        for name in ["pre", "textarea", "listing"] {
+            for leading in 0..=3 {
+                let input = format!("<{name}>{}x</{name}>", "\n".repeat(leading));
+                let dom = html5ever::parse_document(RcDom::default(), Default::default()).one(input);
+                let mut output = Vec::new();
+                serialize(
+                    &mut output,
+                    &SerializableHandle::from(dom.document),
+                    SerializeOpts::default(),
+                )
+                .expect("serialize preformatted element");
+                let serialized_feeds = if leading == 1 { 0 } else { leading };
+                assert_eq!(
+                    String::from_utf8(output).expect("serialized HTML is UTF-8"),
+                    format!(
+                        "<html><head></head><body><{name}>{}x</{name}></body></html>",
+                        "\n".repeat(serialized_feeds),
+                    ),
+                    "{name}: {leading} original line feeds",
+                );
+            }
+        }
+    }
+}

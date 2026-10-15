@@ -81,6 +81,7 @@ struct RawTextElement<'a> {
     last: usize,
     name: &'a str,
     content: RawTextContent,
+    preformatted: bool,
     mark: Option<usize>,
 }
 
@@ -88,7 +89,7 @@ struct RawTextElement<'a> {
 /// before it to `*output` (lazily allocated). `tag_end` is the end of its start tag;
 /// `close_start` and `close_idx` are the two ends of its end tag.
 ///
-/// A removed `style` leaves one space when the two characters around it are not white space.
+/// Outside preformatted content, a removed `style` leaves one space between non-whitespace neighbors.
 /// A removed script leaves none (#827). A kept element is written by `push_kept_element` and adds no space: the walker reads the
 /// white space on its two sides as if the element were not there.
 ///
@@ -120,6 +121,7 @@ fn strip_raw_text_element(
         return Outcome::Kept;
     }
     if element.content == RawTextContent::Removed
+        && !element.preformatted
         && element.idx > 0
         && close_idx < bytes.len()
         && !bytes[element.idx - 1].is_ascii_whitespace()
@@ -353,6 +355,7 @@ pub(super) struct FirstPass<'a, C: FnMut(PassRead)> {
     last: usize,
     output: Option<String>,
     svg_depth: usize,
+    pre_depth: usize,
     reads: PageReads<C>,
     kept_scripts: KeptScripts,
 }
@@ -369,6 +372,7 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
             last: 0,
             output: None,
             svg_depth: 0,
+            pre_depth: 0,
             reads: PageReads::new(count),
             kept_scripts,
         }
@@ -415,6 +419,11 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
         if let Some((slot, tag_end)) = self.reads.raw_text_start_tag_end(bytes, idx) {
             return self.read_raw_text_element(idx, slot, tag_end);
         }
+        if matches_tag_start(bytes, idx + 1, b"pre") {
+            self.pre_depth += 1;
+        } else if matches_end_tag_start(bytes, idx + 1, b"pre") {
+            self.pre_depth = self.pre_depth.saturating_sub(1);
+        }
         self.reads.tag_end(bytes, idx).unwrap_or(idx + 1)
     }
 
@@ -435,6 +444,7 @@ impl<'a, C: FnMut(PassRead)> FirstPass<'a, C> {
             last: self.last,
             name,
             content,
+            preformatted: self.pre_depth != 0,
             mark: None,
         };
         #[cfg(feature = "metadata")]
@@ -574,13 +584,28 @@ pub(super) fn tag_end_from_name(bytes: &[u8], name: usize) -> Option<usize> {
 /// ~keep byte of each tag is a cost on every page. The name of the tag is read only at the
 /// ~keep first `=` of a tag whose caller did not read it.
 fn whole_tag_end(bytes: &[u8], from: usize, attributes: Option<usize>, stops: &mut usize) -> Option<usize> {
+    whole_tag_terminator(bytes, from, attributes, stops).map(|(end, _)| end)
+}
+
+/// Read a tag from the end of its name and distinguish a closing slash from a value byte.
+/// ~keep A slash in an unquoted value belongs to that value, including immediately before `>`.
+pub fn tag_terminator_from_attributes(bytes: &[u8], attributes: usize) -> Option<(usize, bool)> {
+    whole_tag_terminator(bytes, attributes, Some(attributes), &mut 0)
+}
+
+fn whole_tag_terminator(
+    bytes: &[u8],
+    from: usize,
+    attributes: Option<usize>,
+    stops: &mut usize,
+) -> Option<(usize, bool)> {
     let mut idx = from;
     let mut names = attributes;
     loop {
         *stops += 1;
         idx += memchr::memchr2(b'>', b'=', bytes.get(idx..)?)?;
         if bytes[idx] == b'>' {
-            return Some(idx + 1);
+            return Some((idx + 1, idx > 0 && bytes[idx - 1] == b'/'));
         }
         let names_start = *names.get_or_insert_with(|| tag_name_end(bytes, from));
         if !ends_an_attribute_name(bytes, names_start, idx) {
@@ -590,10 +615,13 @@ fn whole_tag_end(bytes: &[u8], from: usize, attributes: Option<usize>, stops: &m
         let after_equals = &bytes[idx + 1..];
         let value = idx + 1 + after_equals.iter().position(|byte| !is_tag_white_space(*byte))?;
         idx = match bytes[value] {
-            b'>' => return Some(value + 1),
+            b'>' => return Some((value + 1, false)),
             quote @ (b'"' | b'\'') => value + 2 + memchr::memchr(quote, &bytes[value + 1..])?,
             _ => value + bytes[value..].iter().copied().position(ends_an_unquoted_value)?,
         };
+        if bytes.get(idx) == Some(&b'>') {
+            return Some((idx + 1, false));
+        }
         names = Some(idx);
     }
 }
