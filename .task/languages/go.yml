@@ -17,3 +17,19 @@ tasks:
       - cmd: |
           cd packages/go && go get -u ./... && go mod tidy
         ignore_error: false
+
+  manifest:verify:
+    desc: "Verify the tidy Go E2E manifest and its release version"
+    dir: "{{.ROOT_DIR}}/e2e/go"
+    cmds:
+      - go mod tidy -diff
+      - >-
+        python3 -c 'import json, pathlib, subprocess, tomllib;
+        version = tomllib.loads(pathlib.Path("../../Cargo.toml").read_text())["workspace"]["package"]["version"];
+        manifest = json.loads(subprocess.check_output(["go", "mod", "edit", "-json"]));
+        pins = [entry["Version"] for entry in manifest["Require"] if entry["Path"] == "github.com/xberg-io/html-to-markdown/packages/go/v3"];
+        assert pins == ["v" + version], f"Expected one Go E2E pin at v{version}, found {pins}";
+        assert manifest["Module"]["Path"] == "github.com/xberg-io/html-to-markdown/packages/go/v3/e2e", "Unexpected Go E2E module";
+        replacements = [entry["New"]["Path"] for entry in manifest["Replace"] if entry["Old"]["Path"] == "github.com/xberg-io/html-to-markdown/packages/go/v3"];
+        assert replacements == ["../../packages/go"], f"Expected one local Go binding replacement, found {replacements}";
+        print(f"Verified one Go E2E release pin: v{version}")'

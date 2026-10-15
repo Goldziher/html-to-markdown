@@ -252,13 +252,14 @@ fn head_element_metadata(
                 if name.eq_ignore_ascii_case(b"head") && std::mem::replace(&mut seen_head, true) {
                     continue;
                 }
+                if seen_head && name.contains(&b':') {
+                    continue;
+                }
                 if name.eq_ignore_ascii_case(b"html") || name.eq_ignore_ascii_case(b"head") {
                     let first = work.len();
                     let children_in_head = in_head || name.eq_ignore_ascii_case(b"head");
                     work.extend(tag.children().top().iter().map(|child| (*child, children_in_head)));
                     work[first..].reverse();
-                } else if seen_head && name.contains(&b':') {
-                    continue;
                 } else if starts_body(&name.to_ascii_lowercase()) {
                     break;
                 } else {

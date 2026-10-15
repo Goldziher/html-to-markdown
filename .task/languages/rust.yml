@@ -75,22 +75,20 @@ tasks:
         ignore_error: false
 
   test:ci:
-    desc: "Run tests with coverage for CI (generates lcov)"
+    desc: "Run CI tests; generate coverage on Linux and macOS"
     silent: false
     cmds:
       - cmd: |
           {{if eq OS "windows"}}
-          RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo llvm-cov --features metadata,visitor,inline-images --workspace --exclude html-to-markdown-py --exclude html-to-markdown-php --exclude html-to-markdown-rs-swift --exclude html-to-markdown-rs-dart --exclude html-to-markdown-bench --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
+          # ~keep llvm-cov's object list exceeds Windows' command-line limit; Linux and macOS collect coverage.
+          RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo test --features metadata,visitor,inline-images --workspace --exclude html-to-markdown-py --exclude html-to-markdown-php --exclude html-to-markdown-rs-swift --exclude html-to-markdown-rs-dart --exclude html-to-markdown-bench -j {{.NUM_CPUS}}
           {{else}}
           RUST_LOG={{.RUST_LOG}} RUST_BACKTRACE={{.RUST_BACKTRACE}} cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-php --exclude html-to-markdown-bench --lcov --output-path rust-coverage.lcov -j {{.NUM_CPUS}}
           {{end}}
         ignore_error: false
       - cmd: |
-          {{if eq OS "windows"}}
-          cargo llvm-cov --features metadata,visitor,inline-images --workspace --exclude html-to-markdown-py --exclude html-to-markdown-php --exclude html-to-markdown-rs-swift --exclude html-to-markdown-rs-dart --exclude html-to-markdown-bench --summary-only
-          {{else}}
           cargo llvm-cov --all-features --workspace --exclude html-to-markdown-py --exclude html-to-markdown-php --exclude html-to-markdown-bench --summary-only
-          {{end}}
+        platforms: [linux, darwin]
         ignore_error: false
 
   coverage:

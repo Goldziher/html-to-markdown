@@ -77,6 +77,7 @@ tasks:
       # to core, then regenerate the per-runtime bundles under plugin/ from it. ~keep
       - python3 scripts/sync_plugin_version.py
       - "{{.AI_RULEZ}} generate --plugin"
+      - python3 scripts/sync_public_skills.py
       # ~keep The gate. A bump is not finished because the commands above exited 0 -- each
       # reports only on what it writes. `alef verify` is the only step that looks at the whole
       # managed surface at once. Read its output: it exits 0 while still reporting frozen paths

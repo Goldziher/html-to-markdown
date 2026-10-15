@@ -11,6 +11,11 @@ on:
       - "packages/*/rust/**"
       - "tools/benchmark-harness/**"
       - "e2e/rust/**"
+      - "e2e/go/**"
+      - "packages/go/go.mod"
+      - "packages/go/go.sum"
+      - ".task/languages/go.yml"
+      - ".task/languages/rust.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -31,6 +36,11 @@ on:
       - "packages/*/rust/**"
       - "tools/benchmark-harness/**"
       - "e2e/rust/**"
+      - "e2e/go/**"
+      - "packages/go/go.mod"
+      - "packages/go/go.sum"
+      - ".task/languages/go.yml"
+      - ".task/languages/rust.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -119,6 +129,18 @@ jobs:
       # Without Poly it cannot validate those bytes and can report formatted Markdown as raw drift.
       - name: Install poly
         uses: Goldziher/poly@v0
+
+      - name: Setup Go for module freshness
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: e2e/go/go.mod
+          cache-dependency-path: e2e/go/go.sum
+
+      - name: Install Task
+        uses: xberg-io/actions/install-task@v1
+
+      - name: Verify Go E2E module freshness
+        run: task go:manifest:verify
 
       # ~keep Enforcement is the DEFAULT: `alef verify` returns a failure status on drift, and
       # `--report-only` is the opt-out — never add it here. The `--exit-code` flag this step

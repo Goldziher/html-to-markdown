@@ -56,7 +56,7 @@
       "median_ms": 4.2013817499999995,
       "mad_ms": 0.007192083333332988,
       "mb_per_s": 37.692703105715985,
-      "output_bytes": 40642
+      "output_bytes": 40643
     },
     {
       "fixture": "mdream/mdn-array.html",
@@ -92,7 +92,7 @@
       "median_ms": 20.702064166666666,
       "mad_ms": 0.23588433333333114,
       "mb_per_s": 44.81605854708142,
-      "output_bytes": 186304
+      "output_bytes": 186305
     },
     {
       "fixture": "real-world/wikipedia/lists_timeline.html",
@@ -101,7 +101,7 @@
       "median_ms": 9.131580333333334,
       "mad_ms": 0.026678916666666552,
       "mb_per_s": 26.314140525404298,
-      "output_bytes": 22243
+      "output_bytes": 22244
     },
     {
       "fixture": "real-world/wikipedia/tables_countries.html",
@@ -110,7 +110,7 @@
       "median_ms": 13.523123875,
       "mad_ms": 0.10901675000000033,
       "mb_per_s": 53.34222606784996,
-      "output_bytes": 183824
+      "output_bytes": 183825
     },
     {
       "fixture": "real-world/wikipedia/medium_python.html",
@@ -119,7 +119,7 @@
       "median_ms": 55.250820000000004,
       "mad_ms": 0.37981900000000124,
       "mb_per_s": 21.474769821837455,
-      "output_bytes": 256170
+      "output_bytes": 256171
     },
     {
       "fixture": "real-world/wikipedia/large_rust.html",
@@ -128,7 +128,7 @@
       "median_ms": 21.6927905,
       "mad_ms": 0.15314100000000153,
       "mb_per_s": 46.82765043913996,
-      "output_bytes": 190743
+      "output_bytes": 190744
     },
     {
       "fixture": "real-world/issues/gh-190/mitrade.html",
@@ -191,7 +191,7 @@
       "median_ms": 2.02843646,
       "mad_ms": 0.005187359999999863,
       "mb_per_s": 32.65208577172492,
-      "output_bytes": 24828
+      "output_bytes": 24829
     },
     {
       "fixture": "real-world/issues/gh-190/sjsu.html",
@@ -200,7 +200,7 @@
       "median_ms": 0.9403611851851852,
       "mad_ms": 0.005821030808080774,
       "mb_per_s": 136.60396815684774,
-      "output_bytes": 7682
+      "output_bytes": 7683
     },
     {
       "fixture": "real-world/issues/gh-190/kimbrain.html",
