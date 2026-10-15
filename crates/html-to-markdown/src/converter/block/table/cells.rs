@@ -68,6 +68,12 @@ pub struct RenderedWidths {
     edits: Vec<WidthEdit>,
 }
 
+#[cfg(feature = "visitor")]
+pub(super) struct RenderedWidthCheckpoint {
+    widths: Vec<usize>,
+    edits: usize,
+}
+
 enum WidthEdit {
     Cell {
         padding: Range<usize>,
@@ -81,6 +87,20 @@ enum WidthEdit {
 }
 
 impl RenderedWidths {
+    #[cfg(feature = "visitor")]
+    pub(super) fn checkpoint(&self) -> RenderedWidthCheckpoint {
+        RenderedWidthCheckpoint {
+            widths: self.widths.clone(),
+            edits: self.edits.len(),
+        }
+    }
+
+    #[cfg(feature = "visitor")]
+    pub(super) fn rollback(&mut self, checkpoint: RenderedWidthCheckpoint) {
+        self.widths = checkpoint.widths;
+        self.edits.truncate(checkpoint.edits);
+    }
+
     fn record_cell(&mut self, padding: Range<usize>, column: usize, text_len: usize) {
         if column >= MAX_TABLE_COLS {
             return;

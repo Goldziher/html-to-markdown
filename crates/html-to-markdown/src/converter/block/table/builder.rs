@@ -85,27 +85,27 @@ fn table_child_columns(
     ctx: &super::super::super::Context,
     cells: &mut Vec<tl::NodeHandle>,
 ) -> usize {
-    if ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
-        return 0;
+    let mut pending = vec![*child_handle];
+    let mut max_cols = 0;
+    while let Some(node) = pending.pop() {
+        if ctx.excluded_node_ids.contains(&node.get_inner()) {
+            continue;
+        }
+        let Some(tl::Node::Tag(tag)) = node.get(parser) else {
+            continue;
+        };
+        let name = dom_ctx
+            .tag_name_for(node, parser)
+            .unwrap_or_else(|| normalized_tag_name(tag.name().as_utf8_str()));
+        match name.as_ref() {
+            "thead" | "tbody" | "tfoot" | "template" | "noscript" => {
+                pending.extend(tag.children().top().iter().copied());
+            }
+            "tr" | "row" => max_cols = max_cols.max(row_columns(&node, parser, dom_ctx, ctx, cells)),
+            _ => {}
+        }
     }
-    let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) else {
-        return 0;
-    };
-    let tag_name = dom_ctx
-        .tag_name_for(*child_handle, parser)
-        .unwrap_or_else(|| normalized_tag_name(child_tag.name().as_utf8_str()));
-    match tag_name.as_ref() {
-        "thead" | "tbody" | "tfoot" => child_tag
-            .children()
-            .top()
-            .iter()
-            .filter(|row_handle| is_tag_name(row_handle, parser, dom_ctx, "tr"))
-            .map(|row_handle| row_columns(row_handle, parser, dom_ctx, ctx, cells))
-            .max()
-            .unwrap_or(0),
-        "tr" | "row" => row_columns(child_handle, parser, dom_ctx, ctx, cells),
-        _ => 0,
-    }
+    max_cols
 }
 
 fn row_columns(
@@ -382,6 +382,9 @@ struct WidthState<'a> {
 }
 
 fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: usize, state: &mut WidthState<'_>) {
+    if depth >= crate::converter::main_helpers::effective_max_depth(env.options) {
+        return;
+    }
     if env.ctx.excluded_node_ids.contains(&child_handle.get_inner()) {
         return;
     }
@@ -394,10 +397,17 @@ fn collect_width_child(child_handle: &tl::NodeHandle, env: RowEnv<'_>, depth: us
             for row_handle in child_tag.children().top().iter() {
                 if is_tag_name(row_handle, env.parser, env.dom_ctx, "tr") {
                     collect_width_row(row_handle, env, depth, state);
+                } else if env.options.hidden_content == crate::options::HiddenContent::All {
+                    collect_width_child(row_handle, env, depth, state);
                 }
             }
         }
         "tr" | "row" => collect_width_row(child_handle, env, depth, state),
+        "template" | "noscript" if env.options.hidden_content == crate::options::HiddenContent::All => {
+            for child in child_tag.children().top().iter() {
+                collect_width_child(child, env, depth + 1, state);
+            }
+        }
         _ => {}
     }
 }

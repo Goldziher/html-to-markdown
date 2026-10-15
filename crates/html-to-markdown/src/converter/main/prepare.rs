@@ -25,7 +25,12 @@ pub(super) fn prepare_html<'a>(html: &'a str, options: &ConversionOptions) -> Re
     let hidden_content = options.hidden_content;
     let (preprocessed, kept_scripts) = preprocess_initial_html_with_kept_scripts(html, options, hidden_content)?;
     if has_custom_element_tags(&preprocessed) {
-        let (repaired, limit) = repair_custom_elements(preprocessed, preserves_menu(options), hidden_content);
+        let (repaired, limit) = repair_custom_elements(
+            preprocessed,
+            preserves_menu(options),
+            hidden_content,
+            keep_inert_wrappers(options, hidden_content),
+        );
         return Ok((repaired, limit, None, kept_scripts));
     }
     Ok((preprocessed, None, Some(html), kept_scripts))
@@ -94,7 +99,11 @@ fn clean_up(first_pass: &str, options: &ConversionOptions, hidden_content: Hidde
     // ~keep Bogus comments must be removed before tag-shaped preprocessing examines them.
     let stripped = strip_bogus_comments(first_pass);
     let stripped = strip_hidden(&stripped, hidden_content);
-    let stripped = exclusions::remove_kept_tags(&stripped, hidden_content, &options.exclude_selectors)?;
+    let stripped = if keep_inert_wrappers(options, hidden_content) {
+        Cow::Borrowed(stripped.as_ref())
+    } else {
+        exclusions::remove_kept_tags(&stripped, hidden_content, &options.exclude_selectors)?
+    };
     let stripped = normalize_bogus_comment_endings(&stripped);
     let stripped = normalize_split_closing_tags(&stripped);
     // ~keep Implicit list-item closes prevent deeply nested parser output on large changelogs.
@@ -114,12 +123,32 @@ pub(super) fn preprocess_repaired_html(html: &str, preserve_menu: bool, hidden_c
     preprocess_html(&stripped).into_owned()
 }
 
+pub(super) fn keep_inert_wrappers(options: &ConversionOptions, hidden_content: HiddenContent) -> bool {
+    #[cfg(feature = "visitor")]
+    {
+        options.visitor.is_some()
+            && hidden_content == HiddenContent::All
+            && options.output_format != crate::options::OutputFormat::Plain
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        let _ = (options, hidden_content);
+        false
+    }
+}
+
 fn repair_custom_elements(
     preprocessed: String,
     preserve_menu: bool,
     hidden_content: HiddenContent,
+    keep_templates: bool,
 ) -> (String, Option<crate::types::WarningKind>) {
-    let Some((repaired, warning)) = repair_with_html5ever_bounded(&preprocessed) else {
+    let repair = if keep_templates {
+        crate::converter::main_helpers::repair_with_html5ever(&preprocessed, true)
+    } else {
+        repair_with_html5ever_bounded(&preprocessed)
+    };
+    let Some((repaired, warning)) = repair else {
         tracing::warn!(
             target: "html_to_markdown::convert",
             "custom element tags detected; html5ever repair failed, proceeding with unrepaired markup"
@@ -139,6 +168,19 @@ fn repair_custom_elements(
 #[cfg(test)]
 mod tests {
     use super::{ConversionOptions, HiddenContent, prepare_html, preprocess_initial_html, preprocess_repaired_html};
+
+    #[test]
+    fn should_keep_the_initial_inert_wrapper_as_a_metadata_boundary_after_cleanup() {
+        let html = r#"<template><p>inert</p></template><meta name="description" content="D"><p>body</p>"#;
+        let options = ConversionOptions::default();
+        let page = preprocess_initial_html(html, &options, HiddenContent::Drop).expect("cleaned page");
+        assert!(page.starts_with("<template>"), "{page}");
+        assert_eq!(
+            crate::converter::utility::preprocessing::metadata_prefix_end(&page),
+            0,
+            "{page}"
+        );
+    }
 
     /// The page of a choice is the page that the conversion of that choice reads, with the
     /// numbers of the second pass: a narrower page is compared with it byte by byte.

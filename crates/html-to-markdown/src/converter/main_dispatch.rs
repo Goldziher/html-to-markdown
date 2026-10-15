@@ -2,6 +2,37 @@ use crate::converter::block::container::HandlerContext;
 use crate::converter::handlers::{handle_graphic, handle_img, open_link};
 use crate::converter::walk::{CaptureEnd, Close, Open};
 
+pub(super) fn walks_kept_inert_element(
+    node: &tl::NodeHandle,
+    parser: &tl::Parser,
+    handler: HandlerContext<'_>,
+) -> bool {
+    #[cfg(feature = "visitor")]
+    {
+        if handler.ctx.visitor.is_none() || handler.options.hidden_content != crate::options::HiddenContent::All {
+            return false;
+        }
+        // ~keep Raw-text lookalikes inside these legacy containers were never unwrapped as HTML.
+        let mut parent = handler.dom_ctx.parent_of(node.get_inner());
+        while let Some(id) = parent {
+            if handler
+                .dom_ctx
+                .tag_info(id, parser)
+                .is_some_and(|info| matches!(info.name.as_str(), "plaintext" | "noembed" | "noframes"))
+            {
+                return false;
+            }
+            parent = handler.dom_ctx.parent_of(id);
+        }
+        true
+    }
+    #[cfg(not(feature = "visitor"))]
+    {
+        let _ = (node, parser, handler);
+        false
+    }
+}
+
 struct TagDispatcher<'a, 'output> {
     tag_name: &'a str,
     node_handle: &'a tl::NodeHandle,
@@ -834,9 +865,11 @@ impl TagDispatcher<'_, '_> {
                     },
                 );
             }
-            // ~keep Template content is inert, and noscript does not render in the
-            // scripting-enabled browser model used by conversion.
-            "template" | "noscript" => {}
+            "template" | "noscript" => {
+                if walks_kept_inert_element(self.node_handle, self.parser, self.handler) {
+                    self.open_children();
+                }
+            }
             _ => return false,
         }
         true

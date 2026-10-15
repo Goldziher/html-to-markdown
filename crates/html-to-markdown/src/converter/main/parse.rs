@@ -1,7 +1,7 @@
-use super::prepare::{preprocess_initial_html, preprocess_repaired_html};
+use super::prepare::{keep_inert_wrappers, preprocess_initial_html, preprocess_repaired_html};
 use super::trace_parse_complete;
 use crate::converter::DomContext;
-use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever_bounded};
+use crate::converter::main_helpers::{has_custom_element_tags, preserves_menu, repair_with_html5ever};
 use crate::converter::preprocessing_helpers::{
     has_discarded_end_tag, has_omitted_end_tag, readable_text_len, tree_repair_reasons, written_title_len,
 };
@@ -99,7 +99,7 @@ pub(super) fn parse_for_conversion<'a>(
     // ~keep reached a limit is not used: the first parse holds every word of the input and is
     // ~keep kept, with the warning. The first parse of a misnest can hide content, so a misnest
     // ~keep takes the tree up to the depth limit and the rest of the input as written.
-    let Some((repaired, repair_limit)) = repair_with_html5ever_bounded(input)
+    let Some((repaired, repair_limit)) = repair_with_html5ever(input, keep_inert_wrappers(options, hidden_content))
     else {
         tracing::warn!(
             target: "html_to_markdown::convert",

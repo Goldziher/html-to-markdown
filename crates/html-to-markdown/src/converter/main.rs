@@ -617,7 +617,7 @@ fn begin_tag<'a>(
 }
 
 #[cfg(feature = "visitor")]
-fn start_visitor_element(
+pub(super) fn start_visitor_element(
     state: &crate::converter::visitor_hooks::VisitorElementState<'_>,
     node_handle: &tl::NodeHandle,
     tag: &tl::HTMLTag<'_>,
