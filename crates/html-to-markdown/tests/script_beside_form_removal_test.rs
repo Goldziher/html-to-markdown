@@ -104,7 +104,7 @@ fn a_script_beside_a_hidden_base_gives_its_record_and_the_base_stays() {
             content_and_raw_json(&html, |options| {
                 options.base_url = Some("https://o.test/x/".to_string());
             }),
-            on_each_route("---\nbase: https://b.test/d/\n---\n[Tl](https://b.test/d/p)", &[JSON]),
+            on_each_route("---\nbase: https://b.test/d/\n---\n\n[Tl](https://b.test/d/p)", &[JSON]),
             "{html:?}"
         );
     }

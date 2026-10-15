@@ -74,10 +74,8 @@ fn should_limit_head_content_searches_to_input_before_the_head() {
     START_TAG_CANDIDATE_CHECKS.with(|checks| checks.set(0));
 
     assert_eq!(repair_head_content_outside_head(&html, HiddenContent::Drop), None);
-    // ~keep 20,002 checks find the last `<head>` from the end; the head content search reads
-    // ~keep the empty prefix and adds none. The search for a title after `</head>` adds 2
-    // ~keep checks to find `</head>` and one for each of the 20,001 tags from there.
-    START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 40_005));
+    // ~keep The body is outside every head probe, regardless of how many tags it contains.
+    START_TAG_CANDIDATE_CHECKS.with(|checks| assert!(checks.get() < 20));
 }
 
 #[test]
@@ -91,7 +89,7 @@ fn should_scan_only_markup_candidates_when_finding_head_tags() {
         super::last_start_tag(html.as_bytes(), b"head"),
         Some(padding.len() * 3 + "<head></head>".len())
     );
-    super::START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 2));
+    super::START_TAG_CANDIDATE_CHECKS.with(|checks| assert_eq!(checks.get(), 4));
 }
 
 #[test]

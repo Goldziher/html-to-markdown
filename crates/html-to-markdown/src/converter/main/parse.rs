@@ -38,6 +38,7 @@ fn invalid_length(input: &str) -> ConversionError {
 /// The tree that the converter reads, the length of the page that the tree is made of, and the
 /// limit that stopped the tree builder when the first parse was kept for that reason.
 pub(super) struct ParsedPage<'a> {
+    pub(super) source: &'a str,
     pub(super) dom: tl::VDom<'a>,
     pub(super) dom_ctx: DomContext,
     pub(super) len: usize,
@@ -45,9 +46,11 @@ pub(super) struct ParsedPage<'a> {
 }
 
 impl<'a> ParsedPage<'a> {
-    fn first_parse(dom: tl::VDom<'a>, len: usize) -> Self {
+    fn first_parse(dom: tl::VDom<'a>, source: &'a str) -> Self {
+        let len = source.len();
         let dom_ctx = build_dom_context(&dom, dom.parser(), len);
         Self {
+            source,
             dom,
             dom_ctx,
             len,
@@ -89,23 +92,25 @@ pub(super) fn parse_for_conversion<'a>(
     // ~keep for an omitted end tag: the first parse holds every word of the page.
     let omitted_end_tag = asked.omitted_end_tag || for_narrower_choice;
     if !omitted_end_tag && !misnest {
-        return Ok(ParsedPage::first_parse(dom, len));
+        return Ok(ParsedPage::first_parse(dom, input));
     }
     // ~keep Every route to the tree builder has the node budget and the depth limit (issues
     // ~keep #808 and #809). When only an omitted end tag asked for the repair, a tree that
     // ~keep reached a limit is not used: the first parse holds every word of the input and is
     // ~keep kept, with the warning. The first parse of a misnest can hide content, so a misnest
     // ~keep takes the tree up to the depth limit and the rest of the input as written.
-    let Some((repaired, repair_limit)) = repair_with_html5ever_bounded(input) else {
+    let Some((repaired, repair_limit)) = repair_with_html5ever_bounded(input)
+    else {
         tracing::warn!(
             target: "html_to_markdown::convert",
             "html5ever repair gave no tree (the document cannot be written back); proceeding with original structure"
         );
-        return Ok(ParsedPage::first_parse(dom, len));
+        return Ok(ParsedPage::first_parse(dom, input));
     };
     if repair_limit.is_some() && !misnest {
         let dom_ctx = build_dom_context(&dom, parser, len);
         return Ok(ParsedPage {
+            source: input,
             dom,
             dom_ctx,
             len,
@@ -125,12 +130,13 @@ pub(super) fn parse_for_conversion<'a>(
             target: "html_to_markdown::convert",
             "html5ever repair would lose text; proceeding with original structure"
         );
-        return Ok(ParsedPage::first_parse(dom, len));
+        return Ok(ParsedPage::first_parse(dom, input));
     }
     let for_omitted_end_tag = omitted_end_tag && !loses_text && repair_limit.is_none();
     log_the_second_parse(for_narrower_choice, asked.discarded_end_tag, for_omitted_end_tag);
     let dom_ctx = build_dom_context(&second, second.parser(), page.len());
     Ok(ParsedPage {
+        source: page,
         dom: second,
         dom_ctx,
         len: page.len(),

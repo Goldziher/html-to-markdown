@@ -113,6 +113,8 @@ impl HeadScan {
             (Place::Before { .. }, b"head") => self.at(Place::In),
             (_, b"head") => self,
             (_, b"html") => self.in_document(),
+            // ~keep Office XML namespace tags decorate an explicit head (#476).
+            (Place::In, name) if name.contains(&b':') => self,
             (_, name) if starts_body(name) => self.body(),
             // ~keep A fragment has no head: its first `<template>` is content. After the end
             // ~keep tag of the head, a browser puts a `<noscript>` in the body.
@@ -176,6 +178,11 @@ impl Inside {
             (inside, _) => inside,
         }
     }
+}
+
+/// The source prefix that may contain document metadata, before body content begins.
+pub fn metadata_prefix_end(input: &str) -> usize {
+    body_start(input, &mut TagEndScan::new(input.as_bytes())).unwrap_or(input.len())
 }
 
 /// Where the body of `input` starts: the offset of the tag that starts it, or of the text that

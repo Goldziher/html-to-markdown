@@ -87,6 +87,7 @@ pub fn convert_html_impl(
     let (preprocessed, prepare_limit, as_written, kept_scripts) = prepare_html(html, options)?;
     let repaired_page = std::cell::OnceCell::new();
     let ParsedPage {
+        source: parsed_source,
         mut dom,
         mut dom_ctx,
         len: preprocessed_len,
@@ -100,12 +101,16 @@ pub fn convert_html_impl(
     let frontmatter = prepare_frontmatter(
         &dom,
         parser,
+        parsed_source,
         options,
         document_base_href,
         #[cfg(feature = "metadata")]
         parameters.metadata_collector.as_ref(),
     );
     output.push_str(&frontmatter);
+    if !frontmatter.is_empty() {
+        output.push('\n');
+    }
 
     let reference_collector = create_reference_collector(options);
 
@@ -257,6 +262,7 @@ fn finalize_output(
 fn prepare_frontmatter(
     dom: &tl::VDom<'_>,
     parser: &tl::Parser<'_>,
+    parsed_source: &str,
     options: &ConversionOptions,
     document_base_href: Option<&str>,
     #[cfg(feature = "metadata")] metadata_collector: Option<&crate::metadata::MetadataCollectorHandle>,
@@ -269,7 +275,8 @@ fn prepare_frontmatter(
     if !wants_frontmatter && !wants_document {
         return String::new();
     }
-    let head_metadata = extract_head_metadata(dom.children(), parser, options, document_base_href);
+    let metadata_end = crate::converter::utility::preprocessing::metadata_prefix_end(parsed_source);
+    let head_metadata = extract_head_metadata(dom.children(), parser, options, document_base_href, metadata_end);
     let frontmatter = wants_frontmatter
         .then(|| format_metadata_frontmatter(&head_metadata))
         .flatten()

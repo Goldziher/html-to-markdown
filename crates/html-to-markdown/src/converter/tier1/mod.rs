@@ -5,7 +5,7 @@
 //! and the dispatcher in `lib.rs::convert` falls back to the Tier-2 path.
 //!
 //! When `options.extract_metadata` is true, `run` additionally re-parses the
-//! head slice captured by the prescan and prepends YAML frontmatter to the
+//! source prefix before body content and prepends YAML frontmatter to the
 //! scanner's output (matching Tier-2 behaviour byte-for-byte).
 
 // ~keep All submodules are declared `pub` here.  The `tier1` module itself lives
@@ -83,7 +83,7 @@ pub fn run(html: &str, report: &PrescanReport, options: &ConversionOptions) -> R
 /// handle.  The dispatcher falls back to Tier-2 transparently.
 pub fn run_with_base(
     html: &str,
-    report: &PrescanReport,
+    _report: &PrescanReport,
     options: &ConversionOptions,
     effective_base: Option<std::rc::Rc<url::Url>>,
     document_base_href: Option<&str>,
@@ -91,21 +91,10 @@ pub fn run_with_base(
     if !options.exclude_selectors.is_empty() {
         return Err(bail::BailReason::Classifier);
     }
-    let scanner::ScanOutput { body, head_range } = scanner::scan(html, options, effective_base)?;
-
-    // ~keep Phase C: prefer the head range the scanner discovered during its single
-    // ~keep walk over `html`.  Fall back to the prescan's range when the caller
-    // ~keep pre-walked the input and produced one (legacy / Tier-2 fallback path).
-    let scanner_range_for_call;
-    let head_range_ref = if head_range.is_some() {
-        scanner_range_for_call = head_range;
-        scanner_range_for_call.as_ref()
-    } else {
-        report.head_range.as_ref()
-    };
+    let scanner::ScanOutput { body, .. } = scanner::scan(html, options, effective_base)?;
 
     // ~keep Prepend YAML frontmatter when metadata extraction is requested.
-    // ~keep `head_metadata::extract_frontmatter` re-parses only the head slice (cheap).
+    // ~keep The metadata reader parses the shared head prefix, including an implicit head.
     // ~keep
     // ~keep The frontmatter returned by the shared Tier-2 formatter ends with a
     // ~keep single `\n` after the closing `---`.  Tier-2's walker subsequently
@@ -115,9 +104,7 @@ pub fn run_with_base(
     // ~keep separator, so insert one explicitly: emit `\n` between frontmatter
     // ~keep (`...---\n`) and the body (`first-paragraph...`) to land on
     // ~keep `...---\n\nfirst-paragraph...`.
-    if let Some(frontmatter) =
-        crate::converter::head_metadata::extract_frontmatter(html, head_range_ref, options, document_base_href)
-    {
+    if let Some(frontmatter) = crate::converter::head_metadata::extract_frontmatter(html, options, document_base_href) {
         let mut output = String::with_capacity(frontmatter.len() + body.len() + 1);
         output.push_str(&frontmatter);
         if !body.is_empty() && !body.starts_with('\n') && !frontmatter.ends_with("\n\n") {

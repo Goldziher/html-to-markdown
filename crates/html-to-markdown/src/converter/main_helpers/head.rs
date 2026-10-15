@@ -221,31 +221,62 @@ pub fn extract_head_metadata(
     parser: &tl::Parser,
     options: &ConversionOptions,
     document_base_href: Option<&str>,
+    metadata_end: usize,
 ) -> BTreeMap<String, String> {
-    let mut metadata = head_element_metadata(roots, parser, options);
+    let mut metadata = head_element_metadata(roots, parser, options, metadata_end);
     if let Some(href) = document_base_href {
         metadata.insert("base".to_string(), href.to_string());
     }
     metadata
 }
 
-/// The title, meta and canonical link fields of the [`document_head`] below `roots`.
+/// Title, meta and canonical link fields before the body starts, with optional head tags.
 fn head_element_metadata(
     roots: &[tl::NodeHandle],
     parser: &tl::Parser,
     options: &ConversionOptions,
+    metadata_end: usize,
 ) -> BTreeMap<String, String> {
     let mut metadata = BTreeMap::new();
-    let Some(tl::Node::Tag(head)) = document_head(roots, parser).and_then(|handle| handle.get(parser)) else {
-        return metadata;
-    };
     let mut seen_meta = HashSet::new();
     let mut seen_title = false;
-    for child_handle in head.children().top().iter() {
-        if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-            collect_meta_head_metadata(child_tag, options, &mut metadata, &mut seen_meta);
-            collect_title_head_metadata(child_tag, parser, options, &mut metadata, &mut seen_title);
-            collect_link_head_metadata(child_tag, &mut metadata);
+    let mut seen_head = false;
+    let mut work: Vec<_> = roots.iter().rev().map(|handle| (*handle, false)).collect();
+    while let Some((handle, in_head)) = work.pop() {
+        match handle.get(parser) {
+            Some(tl::Node::Tag(tag)) => {
+                if tag.boundaries(parser).0 >= metadata_end {
+                    break;
+                }
+                let name = tag.name().as_bytes();
+                if name.eq_ignore_ascii_case(b"head") && std::mem::replace(&mut seen_head, true) {
+                    continue;
+                }
+                if name.eq_ignore_ascii_case(b"html") || name.eq_ignore_ascii_case(b"head") {
+                    let first = work.len();
+                    let children_in_head = in_head || name.eq_ignore_ascii_case(b"head");
+                    work.extend(tag.children().top().iter().map(|child| (*child, children_in_head)));
+                    work[first..].reverse();
+                } else if seen_head && name.contains(&b':') {
+                    continue;
+                } else if starts_body(&name.to_ascii_lowercase()) {
+                    break;
+                } else {
+                    collect_meta_head_metadata(tag, options, &mut metadata, &mut seen_meta);
+                    if in_head {
+                        collect_title_head_metadata(tag, parser, options, &mut metadata, &mut seen_title);
+                    }
+                    collect_link_head_metadata(tag, &mut metadata);
+                }
+            }
+            Some(tl::Node::Raw(text)) => {
+                let next_is_html = matches!(work.last().and_then(|(next, _)| next.get(parser)),
+                    Some(tl::Node::Tag(tag)) if tag.name().as_bytes().eq_ignore_ascii_case(b"html"));
+                if !is_ignorable_before_head(&text.as_utf8_str(), next_is_html) {
+                    break;
+                }
+            }
+            _ => {}
         }
     }
     metadata
@@ -274,6 +305,7 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
     let mut content_before_head = false;
     let mut saw_head_content = false;
     let mut saw_title = false;
+    let mut misplaced_image = false;
     let mut work: Vec<_> = roots.iter().rev().copied().collect();
     while let Some(handle) = work.pop() {
         match handle.get(parser) {
@@ -293,6 +325,10 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
                         if head.is_none() {
                             head = Some(handle);
                             content_before_head = saw_head_content;
+                            misplaced_image = tag.children().top().iter().any(|child| {
+                                matches!(child.get(parser), Some(tl::Node::Tag(child))
+                                    if child.name().as_bytes().eq_ignore_ascii_case(b"img"))
+                            });
                         }
                     }
                     b"html" => {
@@ -312,7 +348,7 @@ pub(super) fn document_head_search(roots: &[tl::NodeHandle], parser: &tl::Parser
     }
     HeadSearch {
         head,
-        content_outside_head: content_before_head || saw_title,
+        content_outside_head: content_before_head || saw_title || misplaced_image,
     }
 }
 

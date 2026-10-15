@@ -251,10 +251,7 @@ fn should_write_every_word_of_a_narrower_choice_on_the_recorded_pages() {
 
 #[test]
 fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_takes_it() {
-    // ~keep The image is in the `<head>` as written, and the walk writes no image of a head. The
-    // ~keep tree builder moves it to the body. Under a narrower choice an element with no end
-    // ~keep tag, or an end tag that the first parse discarded, asks for the tree builder. A wider
-    // ~keep choice removes that tag and takes the tree builder all the same.
+    // ~keep The head repair moves an authored image into the body before each hidden choice.
     let image = "![A](p.gif)\n";
     let both = "![A](p.gif)\n\nEnd\n";
     for (html, expected) in [
@@ -270,11 +267,10 @@ fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_take
             r#"<head><img src="p.gif" alt="A"><noscript></head><p>End</p>"#,
             [image, image, both],
         ),
-        // ~keep The inert-body pass ends a `<template>` that has no end tag, so no narrower
-        // ~keep choice takes the tree builder here, and the image stays in the head.
+        // ~keep The image remains visible even when the following template has no end tag.
         (
             r#"<head><img src="p.gif" alt="A"></head><template><p>End</p>"#,
-            ["", "", "End\n"],
+            [image, image, both],
         ),
         (
             r#"<head><img src="p.gif" alt="A"></head><div><template></div></template><p>End</p>"#,
@@ -283,9 +279,8 @@ fn should_take_the_tree_builder_under_a_wider_choice_when_a_narrower_choice_take
     ] {
         assert_eq!(all_choices(html), expected, "{html}");
     }
-    // ~keep No choice sends this page to the tree builder, so it converts as it did before.
     let html = r#"<head><img src="p.gif" alt="A"></head><p>End</p><template><p>IN</p></template>"#;
-    assert_eq!(all_choices(html), ["End\n", "End\n", "End\n\nIN\n"]);
+    assert_eq!(all_choices(html), [both, both, "![A](p.gif)\n\nEnd\n\nIN\n"]);
 }
 
 #[test]

@@ -569,7 +569,10 @@ pub(super) fn repair_with_html5ever_bounded(input: &str) -> Option<(String, Opti
 
 /// As [`repair_with_html5ever_bounded`]. With `template_contents`, the page that the tree is
 /// written back to holds the content of each `<template>`; without, each `<template>` is empty.
-fn repair_with_html5ever(input: &str, template_contents: bool) -> Option<(String, Option<crate::types::WarningKind>)> {
+pub(super) fn repair_with_html5ever(
+    input: &str,
+    template_contents: bool,
+) -> Option<(String, Option<crate::types::WarningKind>)> {
     use crate::converter::anchor_origin::{RepairTree, collapse_split_anchors, parse_with_anchor_origins};
     use crate::rcdom::SerializableHandle;
     use html5ever::serialize::{SerializeOpts, serialize};
@@ -641,7 +644,7 @@ pub fn repair_head_content_outside_head(
 /// Whether head content precedes the `<head>` element of `input`, or a `<title>` precedes the
 /// body and is in no `<head>` element.
 pub fn has_head_content_outside_head(input: &str) -> bool {
-    may_hold_head_content_outside_head(input.as_bytes())
+    may_hold_head_content_outside_head(input)
         && tl::parse(input, tl::ParserOptions::default())
             .is_ok_and(|dom| document_head_search(dom.children(), dom.parser()).content_outside_head)
 }
@@ -649,10 +652,11 @@ pub fn has_head_content_outside_head(input: &str) -> bool {
 /// A cheap check of the source in front of the parse of [`repair_head_content_outside_head`];
 /// the parsed tree decides.
 ///
-/// ~keep The check reads bytes, not tags. A `<head>` or a `<body>` inside a comment makes it
-/// ~keep false for a page that the parsed tree would rebuild: that page keeps its title in the
-/// ~keep body.
-fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
+/// ~keep Opaque regions and quoted attributes must not contribute apparent head/body tags.
+fn may_hold_head_content_outside_head(input: &str) -> bool {
+    let prefix_end = crate::converter::utility::preprocessing::metadata_prefix_end(input);
+    let image_starts_body = is_start_tag_at(input.as_bytes(), b"img", prefix_end);
+    let bytes = &input.as_bytes()[..prefix_end];
     let Some(head_start) = last_start_tag(bytes, b"head") else {
         return first_start_tag(bytes, b"title").is_some();
     };
@@ -669,9 +673,10 @@ fn may_hold_head_content_outside_head(bytes: &[u8]) -> bool {
         b"template",
         b"title",
     ];
-    HEAD_CONTENT
-        .iter()
-        .any(|name| first_start_tag(&bytes[..head_start], name).is_some())
+    image_starts_body
+        || HEAD_CONTENT
+            .iter()
+            .any(|name| first_start_tag(&bytes[..head_start], name).is_some())
         || title_follows_head_end(bytes)
 }
 
@@ -689,13 +694,24 @@ fn title_follows_head_end(bytes: &[u8]) -> bool {
 }
 
 fn first_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    memchr::memchr_iter(b'<', bytes).find(|&start| is_start_tag_at(bytes, name, start))
+    source_tags(bytes).find(|&start| is_start_tag_at(bytes, name, start))
 }
 
 fn last_start_tag(bytes: &[u8], name: &[u8]) -> Option<usize> {
-    memchr::memchr_iter(b'<', bytes)
-        .rev()
-        .find(|&start| is_start_tag_at(bytes, name, start))
+    source_tags(bytes)
+        .filter(|&start| is_start_tag_at(bytes, name, start))
+        .last()
+}
+
+fn source_tags(bytes: &[u8]) -> impl Iterator<Item = usize> + '_ {
+    let mut position = 0;
+    std::iter::from_fn(move || {
+        let start = position + memchr::memchr(b'<', bytes.get(position..)?)?;
+        position = crate::converter::utility::preprocessing::skip_opaque_region(bytes, start)
+            .or_else(|| crate::converter::utility::preprocessing::find_tag_end(bytes, start + 1))
+            .unwrap_or(start + 1);
+        Some(start)
+    })
 }
 
 #[cfg(test)]

@@ -107,7 +107,7 @@ fn should_extract_real_metadata_without_interpreting_preserved_raw_body_markup()
         assert_eq!(
             result.content.as_deref(),
             Some(
-                "---\ntitle: real & title\n---\n<noscript><meta name='description' content='fake'><base href='/fake'><img src='fake'><h1>fake</h1></noscript>\n\nvisible\n"
+                "---\ntitle: real & title\n---\n\n<noscript><meta name='description' content='fake'><base href='/fake'><img src='fake'><h1>fake</h1></noscript>\n\nvisible\n"
             )
         );
     }

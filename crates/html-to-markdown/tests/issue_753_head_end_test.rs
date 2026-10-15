@@ -135,8 +135,8 @@ fn should_keep_a_template_after_text_that_ends_the_head() {
     assert_none(&wrong_outputs(&Kept {
         html: "<head><title>t</title>visible<template><p>BODY</p></template>",
         unwrapped: "<head><title>t</title>visible<p>BODY</p>",
-        drop: format!("{TITLE}visible\n"),
-        all: format!("{TITLE}visible\n\nBODY\n"),
+        drop: format!("{TITLE}\nvisible\n"),
+        all: format!("{TITLE}\nvisible\n\nBODY\n"),
     }));
 }
 
@@ -146,14 +146,14 @@ fn should_end_the_head_at_text_that_is_not_white_space() {
         Kept {
             html: "<head><title>t</title>visible<noscript><p>BODY</p></noscript>",
             unwrapped: "<head><title>t</title>visible<p>BODY</p>",
-            drop: format!("{TITLE}visible\n"),
-            all: format!("{TITLE}visible\n\nBODY\n"),
+            drop: format!("{TITLE}\nvisible\n"),
+            all: format!("{TITLE}\nvisible\n\nBODY\n"),
         },
         Kept {
             html: "<head><title>t</title> <!-- c -->\n visible<template><p>BODY</p></template>",
             unwrapped: "<head><title>t</title> <!-- c -->\n visible<p>BODY</p>",
-            drop: format!("{TITLE}visible\n"),
-            all: format!("{TITLE}visible\n\nBODY\n"),
+            drop: format!("{TITLE}\nvisible\n"),
+            all: format!("{TITLE}\nvisible\n\nBODY\n"),
         },
         Kept {
             html: r#"<head><meta charset="utf-8">visible<template><p>BODY</p></template>"#,
@@ -172,8 +172,8 @@ fn should_end_the_head_at_text_that_is_not_white_space() {
         Kept {
             html: "<head><title>t</title>1 < 2<template><p>BODY</p></template>",
             unwrapped: "<head><title>t</title>1 < 2<p>BODY</p>",
-            drop: format!("{TITLE}1 < 2\n"),
-            all: format!("{TITLE}1 < 2\n\nBODY\n"),
+            drop: format!("{TITLE}\n1 < 2\n"),
+            all: format!("{TITLE}\n1 < 2\n\nBODY\n"),
         },
     ];
     assert_none(&rows.iter().flat_map(wrong_outputs).collect::<Vec<_>>());

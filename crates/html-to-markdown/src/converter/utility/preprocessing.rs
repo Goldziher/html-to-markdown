@@ -15,6 +15,7 @@ mod structured_data;
 mod visibility;
 
 pub use form_boundaries::removes_closed_forms;
+pub use head_scan::metadata_prefix_end;
 pub use inert::{html_inert_starts, normalize_inert_bodies_with_preservation, remove_closed_form_bodies};
 pub use kept_scripts::{KeptScripts, owner_mark_numbers};
 pub use lists::normalize_unclosed_list_items;
