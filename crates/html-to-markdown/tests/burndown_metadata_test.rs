@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+#[cfg(feature = "testkit")]
+use html_to_markdown_rs::prescan::PrescanReport;
 use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
 
 fn routes() -> Vec<TierStrategy> {
@@ -73,7 +75,7 @@ fn should_extract_implicit_head_metadata_in_the_direct_fast_converter() {
         r#"<!-- <head> --><meta name="description" content="D"><p>one</p>"#,
     ] {
         let options = ConversionOptions::default();
-        let result = html_to_markdown_rs::tier1::run(html, &Default::default(), &options)
+        let result = html_to_markdown_rs::tier1::run(html, &PrescanReport::default(), &options)
             .expect("the fast converter supports metadata and paragraphs");
         assert_eq!(result, "---\nmeta-description: D\n---\n\none\n", "{html}");
     }
@@ -108,7 +110,7 @@ fn should_not_collect_metadata_after_inert_elements_that_start_the_body() {
             assert_eq!(actual, "body\n", "{tier:?}: {html}");
         }
         #[cfg(feature = "testkit")]
-        match html_to_markdown_rs::tier1::run(html, &Default::default(), &ConversionOptions::default()) {
+        match html_to_markdown_rs::tier1::run(html, &PrescanReport::default(), &ConversionOptions::default()) {
             Ok(output) => assert_eq!(output, "body\n", "{html}"),
             Err(html_to_markdown_rs::tier1::BailReason::Classifier) => {}
             Err(reason) => panic!("unexpected fast-route failure for {html}: {reason:?}"),

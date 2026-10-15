@@ -3,8 +3,6 @@
 
 use html_to_markdown_rs::{ConversionOptions, NewlineStyle, OutputFormat, TierStrategy, WhitespaceMode, convert};
 
-const TAGS: [&str; 1] = ["a"];
-
 fn markup_options() -> Vec<ConversionOptions> {
     let mut routes = Vec::new();
     for output_format in [OutputFormat::Markdown, OutputFormat::Djot] {
@@ -46,6 +44,8 @@ mod observed {
     use super::*;
     use html_to_markdown_rs::visitor::{HtmlVisitor, NodeContext, VisitResult};
     use std::sync::{Arc, Mutex};
+
+    const TAGS: [&str; 1] = ["a"];
 
     #[derive(Clone, Copy, Debug)]
     enum Action {
