@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve slashes and literal quotes in unquoted attributes on the fast converter, and use the
+  full converter's recovery for unclosed script and style tags (#853, #854, #855).
+- Preserve leading blank lines when rebuilding preformatted elements, remove styles without
+  adding spaces inside code blocks, and repair paragraph boundaries beside unusual raw-text tags
+  without discarding authored frameset text (#850, #858, #895).
+- Extract metadata before the body when the head is implicit, ignore commented head tags, retain
+  images that end the head, and separate front matter from bare body text consistently
+  (#847, #848, #849, #856, #866).
+- Let visitors skip retained template and noscript elements with `hidden_content: all`, while
+  preserving their content, exclusions and table rows for continuing visitors (#907).
+
 ## [3.18.0] - 2026-10-14
 
 ### Added
