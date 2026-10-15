@@ -254,7 +254,7 @@ abstract = "Fast, lossless HTML to Markdown engine."
 repository-code = "https://github.com/xberg-io/html-to-markdown"
 url = "https://xberg.io"
 license = "MIT"
-date-released = "2026-10-06"
+date-released = "2026-10-15"
 
 [[workspace.citation.authors]]
 family-names = "Hirschfeld"
