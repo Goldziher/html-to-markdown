@@ -185,15 +185,15 @@ dependencies = [
 
 [[package]]
 name = "html-escape"
-version = "0.2.15"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
+checksum = "491194d601b4fa9fac3c9571e014070a0ad1bc3392d1bc10419695196a8b3cc3"
 
 [[package]]
 name = "html-to-markdown-rs"
-version = "3.15.1"
+version = "3.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1287459abcb674d1fb9a54b2860630346183c38aae85fc57b69e5fbeff4e0d46"
+checksum = "36135ae2471a090d086837db2f4794dca3bf8ca0ba288b799a0bb85dd3f0acf0"
 dependencies = [
  "ahash",
  "astral-tl",
@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "html_to_markdown_rs-e2e-rust"
-version = "3.15.1"
+version = "3.18.1"
 dependencies = [
  "html-to-markdown-rs",
  "serde_json",

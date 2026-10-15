@@ -14,6 +14,8 @@ github.com/xberg-io/html-to-markdown/packages/go/v3 v3.12.4 h1:8yW9E6IOff61ss7/g
 github.com/xberg-io/html-to-markdown/packages/go/v3 v3.12.4/go.mod h1:B7tV2bp0ZdFmNmRlp+O0FrGDqpd82ROLssE2o40f66o=
 github.com/xberg-io/html-to-markdown/packages/go/v3 v3.13.0 h1:LgkygC8mnlr32XbliCxuxKMXtVgGdwMnnPxcplzvmq0=
 github.com/xberg-io/html-to-markdown/packages/go/v3 v3.13.0/go.mod h1:B7tV2bp0ZdFmNmRlp+O0FrGDqpd82ROLssE2o40f66o=
+github.com/xberg-io/html-to-markdown/packages/go/v3 v3.18.1 h1:Cqyoxx5cid0b7qWUFsY4gk25S965uRPJf8xkuzLJTqo=
+github.com/xberg-io/html-to-markdown/packages/go/v3 v3.18.1/go.mod h1:B7tV2bp0ZdFmNmRlp+O0FrGDqpd82ROLssE2o40f66o=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
