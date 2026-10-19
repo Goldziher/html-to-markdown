@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown",
-  "version": "3.18.2",
+  "version": "3.18.3",
   "description": "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {

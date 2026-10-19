@@ -6,7 +6,7 @@ name: html-to-markdown-extracting-metadata
 <!--
 AI-RULEZ :: GENERATED FILE — DO NOT EDIT
 Content-Hash: blake3:008ee34eae3d73ceed0d8a9c7fdb8ae8562558ccef3be60bac93f03dbf362e29
-Source-Hash: blake3:7e662928a377133db80416517ca5ca898da7db1aa50226baeafdabbc18d26436
+Source-Hash: blake3:19cc6443c4dd97d2a791647bcf704b109287ba501e3d97ac39763053eb584acd
 Schema-Version: v1
 -->
 

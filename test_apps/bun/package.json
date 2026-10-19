@@ -8,7 +8,7 @@
     "test:smoke": "bun test smoke.test.ts"
   },
   "dependencies": {
-    "@xberg-io/html-to-markdown": "^3.18.2"
+    "@xberg-io/html-to-markdown": "^3.18.3"
   },
   "devDependencies": {
     "@types/bun": "latest"

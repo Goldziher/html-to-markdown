@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .html_to_markdown = .{
-            .url = "https://github.com/xberg-io/html-to-markdown/releases/download/v3.18.2/html-to-markdown-rs-zig-v3.18.2.tar.gz",
-            .hash = "html_to_markdown_rs-3.18.2-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5",
+            .url = "https://github.com/xberg-io/html-to-markdown/releases/download/v3.18.3/html-to-markdown-rs-zig-v3.18.3.tar.gz",
+            .hash = "html_to_markdown_rs-3.18.3-QtXyW6p0AQARDHIsBKu1XVrpRf5J7ornocJZf2alzaq5",
         },
     },
     .paths = .{

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.3] - 2026-10-19
+
+### Fixed
+
+- Keep SVG labels and image alt text separate from neighboring words when rendered as text,
+  including inside links, headings and code (#918).
+- Preserve fallback text, nested images and captions inside picture elements (#919).
+- Preserve spaces before inline elements after blank lines in list items and after links (#920).
+- Preserve stray table text, explicit breaks in otherwise empty code elements, text following
+  an unclosed noscript inside noframes, and block boundaries inside subscript and superscript
+  elements. Retain the existing tested policies for metadata-only heads and malformed markup
+  (#921, #922).
+
 ## [3.18.2] - 2026-10-19
 
 ### Changed
