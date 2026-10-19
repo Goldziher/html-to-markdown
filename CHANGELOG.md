@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.4] - 2026-10-19
+
+### Changed
+
+- Raise the default conversion depth limit from 64 to 1024 so deeply nested pages retain
+  their text. Explicit lower limits remain supported, and skipped content still produces
+  a depth-limit warning (#924).
+
+### Fixed
+
+- Avoid stack overflows when searching deeply nested link children for tables (#923).
+- Use smaller GitHub API pages when collecting release-job results to avoid failed summaries
+  on large release workflows.
+
 ## [3.18.3] - 2026-10-19
 
 ### Fixed

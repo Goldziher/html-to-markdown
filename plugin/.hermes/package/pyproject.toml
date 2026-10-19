@@ -4,7 +4,7 @@ build-backend = 'hatchling.build'
 
 [project]
 name = 'html-to-markdown-hermes-plugin'
-version = '3.18.3'
+version = '3.18.4'
 description = 'Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.'
 license = 'MIT'
 requires-python = '>=3.11'

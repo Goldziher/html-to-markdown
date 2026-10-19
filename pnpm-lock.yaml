@@ -229,28 +229,28 @@ importers:
         version: 3.10.8(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.5)
     optionalDependencies:
       '@xberg-io/html-to-markdown-darwin-arm64':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/darwin-arm64
       '@xberg-io/html-to-markdown-darwin-x64':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/darwin-x64
       '@xberg-io/html-to-markdown-linux-arm64-gnu':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/linux-arm64-gnu
       '@xberg-io/html-to-markdown-linux-arm64-musl':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/linux-arm64-musl
       '@xberg-io/html-to-markdown-linux-x64-gnu':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/linux-x64-gnu
       '@xberg-io/html-to-markdown-linux-x64-musl':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/linux-x64-musl
       '@xberg-io/html-to-markdown-win32-arm64-msvc':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/win32-arm64-msvc
       '@xberg-io/html-to-markdown-win32-x64-msvc':
-        specifier: 3.18.3
+        specifier: 3.18.4
         version: link:npm/win32-x64-msvc
 
   crates/html-to-markdown-node/npm/darwin-arm64: {}

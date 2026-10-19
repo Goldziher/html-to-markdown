@@ -34,7 +34,7 @@ wheels = [
 
 [[package]]
 name = "html-to-markdown"
-version = "3.18.3"
+version = "3.18.4"
 source = { directory = "../../packages/python" }
 
 [package.metadata]

@@ -2,7 +2,7 @@
   "name": "html-to-markdown",
   "displayName": "html-to-markdown",
   "description": "Fast, lossless HTML→Markdown conversion with structured metadata, tables, and document-structure extraction.",
-  "version": "3.18.3",
+  "version": "3.18.4",
   "author": {
     "name": "Kreuzberg, Inc.",
     "email": "contact@xberg.io",
