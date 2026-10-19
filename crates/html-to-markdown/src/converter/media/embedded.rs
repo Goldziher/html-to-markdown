@@ -343,18 +343,9 @@ fn handle_video(
 
 /// Handle picture element conversion to Markdown.
 ///
-/// Finds and processes the first child img element, skipping source elements.
-///
-/// Lists that child in `children` for the walk.
+/// Lists image and fallback children for the walk, skipping source declarations.
 pub fn open_picture(tag: &HTMLTag, parser: &Parser, children: &mut Vec<NodeHandle>) -> crate::converter::walk::Open {
-    for child_handle in tag.children().top().iter() {
-        if let Some(tl::Node::Tag(child_tag)) = child_handle.get(parser) {
-            if tag_name_eq(child_tag.name().as_utf8_str(), "img") {
-                children.push(*child_handle);
-                break;
-            }
-        }
-    }
+    list_media_fallback(tag, parser, children);
     crate::converter::walk::Open::children_only()
 }
 

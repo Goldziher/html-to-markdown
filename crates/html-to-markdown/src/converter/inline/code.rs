@@ -39,6 +39,7 @@ pub fn open(handler: HandlerContext<'_>, children: &mut Vec<tl::NodeHandle>) -> 
 
     if !handler.context.in_code && crate::converter::handlers::code_block::contains_anchor(tag, handler.parser) {
         return Some(crate::converter::handlers::code_block::open_code(
+            handler.node_handle,
             tag,
             handler.parser,
             handler.context,

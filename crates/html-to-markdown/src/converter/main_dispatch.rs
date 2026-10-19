@@ -337,6 +337,7 @@ impl TagDispatcher<'_, '_> {
             }
             "code" => {
                 self.opened = Some(crate::converter::handlers::code_block::open_code(
+                    self.node_handle,
                     self.tag,
                     self.parser,
                     handler.ctx,

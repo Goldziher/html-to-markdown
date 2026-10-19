@@ -46,6 +46,23 @@ fn handle_structural_text(state: &mut Tier1State, raw: &str, br_in_tables: bool)
     Ok(false)
 }
 
+fn hand_over_list_blank_line(state: &Tier1State, raw: &str) -> Result<(), BailReason> {
+    // ~keep The full converter owns paragraph indentation after source blank lines inside list text (#920).
+    if !state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE)
+        && state
+            .stack
+            .iter()
+            .any(|frame| matches!(frame.spec.kind, TagKind::ListItem))
+        && raw
+            .split_inclusive('\n')
+            .skip(1)
+            .any(|line| line.ends_with('\n') && line.trim_matches([' ', '\t', '\r', '\n']).is_empty())
+    {
+        return Err(BailReason::Classifier);
+    }
+    Ok(())
+}
+
 fn normalize_unicode_whitespace(raw: &str, verbatim: bool) -> std::borrow::Cow<'_, str> {
     if verbatim {
         return std::borrow::Cow::Borrowed(raw);
@@ -662,6 +679,7 @@ fn flush_text(state: &mut Tier1State, request: TextFlush<'_>) -> Result<(), Bail
         raw
     };
 
+    hand_over_list_blank_line(state, raw)?;
     hand_over_unicode_space_after_space(state, raw, base_offset)?;
     let normalized_whitespace = normalize_unicode_whitespace(raw, in_pre || in_code);
     let raw = normalized_whitespace.as_ref();

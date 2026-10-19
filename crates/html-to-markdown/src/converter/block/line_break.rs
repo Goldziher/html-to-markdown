@@ -34,6 +34,16 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         return;
     }
 
+    // ~keep Nested-wrapper BRs keep the established empty-boundary policy (#868).
+    // ~keep Only a retained direct code child opts into the break-only correction (#921).
+    if ctx.in_code
+        && !ctx.in_code_block
+        && let Some((owner, breaks)) = &ctx.inline_code_breaks
+        && handler.dom_ctx.parent_of(node_handle.get_inner()) == Some(*owner)
+    {
+        breaks.set(breaks.get().saturating_add(1));
+    }
+
     if let Some(rule_like_text) = &ctx.djot_rule_like_text {
         rule_like_text.advance();
     }
@@ -87,7 +97,7 @@ fn write_special_break(output: &mut String, ctx: &Context) -> bool {
         // ~keep included: a `<br>` here is real content, so the byte pushed is a genuine
         // ~keep `\n`, not a marker -- `newline_style` is never consulted (issue #487).
         if let Some(ref offsets) = ctx.pre_cell_break_offsets {
-            offsets.borrow_mut().push(output.len());
+            offsets.borrow_mut().record(output);
         }
         output.push('\n');
         true

@@ -2,6 +2,30 @@ use super::normalize_inert_bodies;
 use std::borrow::Cow;
 
 #[test]
+fn should_detect_only_unclosed_noscript_markup_in_a_bounded_fragment() {
+    for source in [
+        "<noscript>",
+        "<NOSCRIPT data-x='>'>hidden",
+        "<noscript>x</noscript><noscript>",
+        "<script>const s = '<noscript>';</script><noscript>",
+    ] {
+        assert!(super::has_unclosed_noscript(source), "{source}");
+    }
+    for source in [
+        "<noscript>x</noscript>",
+        "<!-- <noscript> -->",
+        "<p data-x='<noscript>'>x</p>",
+        "<script>const s = '<noscript>';</script>",
+        "<style>/* <noscript> */</style>",
+        "<xmp><noscript></xmp>",
+        "<textarea><noscript></textarea>",
+        "<title><noscript></title>",
+        "<iframe><noscript></iframe>",
+    ] {
+        assert!(!super::has_unclosed_noscript(source), "{source}");
+    }
+}
+#[test]
 fn should_skip_bogus_end_tag_comments_before_protected_bodies() {
     for next in [" ", "\t", "\n", "0", "!", "?", "/", "'", "é", " data='"] {
         for tag in ["title", "xmp", "iframe", "noscript", "template", "plaintext", "script"] {

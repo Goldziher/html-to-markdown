@@ -108,14 +108,36 @@ impl DjotRuleLikeText {
 }
 
 pub(super) struct InlineCodeLink {
+    pub(super) buffer: usize,
     pub(super) range: std::ops::Range<usize>,
     pub(super) markdown: String,
+}
+
+#[derive(Default)]
+pub struct CapturedOffsets(Vec<(usize, usize)>);
+
+impl CapturedOffsets {
+    pub(crate) fn record(&mut self, output: &String) {
+        self.0.push((std::ptr::from_ref(output) as usize, output.len()));
+    }
+
+    pub(crate) fn positions(&self) -> Vec<usize> {
+        self.0.iter().map(|(_, position)| *position).collect()
+    }
+
+    fn insert_space(&mut self, buffer: usize, at: usize) {
+        for (owner, position) in &mut self.0 {
+            if *owner == buffer && *position >= at {
+                *position += 1;
+            }
+        }
+    }
 }
 
 /// ~keep Transactional rendered edges distinguish formatted punctuation from delimiter bytes.
 #[derive(Clone, Copy, Default)]
 pub struct MediaBoundaryState {
-    /// ~keep A default player label owes separation from the next emitted word.
+    /// ~keep A media label owes separation from the next emitted word.
     pub pending: bool,
     /// ~keep The first surviving child edge, before a wrapper adds its Markdown delimiters.
     pub first_edge: Option<char>,
@@ -146,10 +168,12 @@ pub struct Context {
     pub(crate) in_code_block: bool,
     /// ~keep Link ranges refer to the raw inline-code buffer, before delimiters are emitted (#813).
     pub(super) inline_code_links: Option<Rc<RefCell<Vec<InlineCodeLink>>>>,
-    /// ~keep Only a link label shares rendered media boundaries; each recursive walk saves its parent state.
+    /// ~keep Direct BR emissions distinguish code split markers from authored newlines (#921, #868).
+    pub(crate) inline_code_breaks: Option<(u32, Rc<Cell<usize>>)>,
+    /// ~keep Rendered media labels own a word boundary; recursive walks save their parent state.
     pub(crate) media_boundary: Option<Rc<Cell<MediaBoundaryState>>>,
     /// Output offsets of real `<br>` nodes while a table-cell `<pre>` is collected. ~keep
-    pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<Vec<usize>>>>,
+    pub(crate) pre_cell_break_offsets: Option<Rc<RefCell<CapturedOffsets>>>,
     /// Current list item counter for ordered lists.
     ///
     /// Signed so a negative `start` attribute (permitted by the HTML spec and honored by
@@ -414,6 +438,26 @@ pub struct Context {
 }
 
 impl Context {
+    // ~keep CaptureText boxes keep the String object stable even when its byte storage reallocates.
+    // ~keep Raw code ranges must follow edits to their buffer, never edits to the emitted Markdown.
+    pub(crate) fn insert_media_space(&self, output: &mut String, at: usize) {
+        let buffer = std::ptr::from_ref::<String>(output) as usize;
+        output.insert(at, ' ');
+        if let Some(links) = self.inline_code_links.as_ref() {
+            for link in links.borrow_mut().iter_mut().filter(|link| link.buffer == buffer) {
+                if link.range.start >= at {
+                    link.range.start += 1;
+                }
+                if link.range.end > at || link.range.start > at {
+                    link.range.end += 1;
+                }
+            }
+        }
+        if let Some(offsets) = self.pre_cell_break_offsets.as_ref() {
+            offsets.borrow_mut().insert_space(buffer, at);
+        }
+    }
+
     pub(crate) fn with_inline_break_owner(&self, output: &String) -> Self {
         Self {
             inline_break_owner: Some((std::ptr::from_ref(output) as usize, output.len())),

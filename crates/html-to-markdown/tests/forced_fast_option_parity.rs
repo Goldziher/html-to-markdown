@@ -62,6 +62,16 @@ fn selector_fallback_row(source: &str, config: &ConversionOptions, failures: &mu
     1
 }
 
+fn media_label_fallback_row(source: &str, config: &ConversionOptions, failures: &mut Vec<String>) -> usize {
+    if !matches!(
+        tier1::run(source, &PrescanReport::default(), config),
+        Err(BailReason::Classifier)
+    ) {
+        failures.push(format!("media labels must request DOM boundary handling: {source}"));
+    }
+    1
+}
+
 fn finish_rows(label: &str, rows: usize, expected: usize, failures: &[String]) {
     println!("ROW_COUNT {label} actual={rows} expected={expected}");
     assert_eq!(rows, expected, "nonzero route coverage");
@@ -275,11 +285,15 @@ fn should_skip_images_in_normal_link_and_heading_text() {
                         "[t](/x)\n",
                         "[t![pic](/i.png)](/x)\n",
                     ),
-                    ("<h2>a<img src=\"/i.png\" alt=\"pic\">b</h2>", "## ab\n", "## apicb\n"),
+                    ("<h2>a<img src=\"/i.png\" alt=\"pic\">b</h2>", "## ab\n", "## a pic b\n"),
                 ] {
                     let expected = if skip { skipped } else { retained };
                     rows += public_rows(source, expected, &config, &mut failures);
-                    rows += fast_row(source, expected, &config, &mut failures);
+                    rows += if !skip && source.starts_with("<h2>") {
+                        media_label_fallback_row(source, &config, &mut failures)
+                    } else {
+                        fast_row(source, expected, &config, &mut failures)
+                    };
                 }
             }
         }
@@ -296,7 +310,7 @@ fn should_preserve_literal_code_images_and_skip_false() {
             for skip in [false, true] {
                 let mut config = options(format, metadata);
                 config.skip_images = skip;
-                let literal = if skip { "ab" } else { "apicb" };
+                let literal = if skip { "ab" } else { "a pic b" };
                 for (source, expected) in [
                     (
                         "<p><code>a<img src=\"/i.png\" alt=\"pic\">b</code></p>",
@@ -308,7 +322,11 @@ fn should_preserve_literal_code_images_and_skip_false() {
                     ),
                 ] {
                     rows += public_rows(source, &expected, &config, &mut failures);
-                    rows += fast_row(source, &expected, &config, &mut failures);
+                    rows += if skip {
+                        fast_row(source, &expected, &config, &mut failures)
+                    } else {
+                        media_label_fallback_row(source, &config, &mut failures)
+                    };
                 }
             }
         }

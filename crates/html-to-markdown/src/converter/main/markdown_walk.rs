@@ -79,7 +79,7 @@ struct CaptureText(String);
 
 fn end_media_boundary(scope: &Context, media_state: Option<MediaBoundaryState>, output: &mut String, start: usize) {
     if let (Some(boundary), Some(incoming)) = (scope.media_boundary.as_ref(), media_state) {
-        super::finish_media_boundary(output, start, boundary, incoming);
+        super::finish_media_boundary(output, start, boundary, incoming, scope);
     }
 }
 
@@ -319,7 +319,7 @@ impl<'a> Walker for MarkdownWalk<'a, '_> {
         end_fresh_block_start(&frame.scope, output, frame.output_start);
         leave_node(frame.node, self.parser, output, &frame.scope, frame.first_writer_start);
         if let (Some(boundary), Some(incoming)) = (frame.scope.media_boundary.as_ref(), frame.media_state) {
-            super::finish_media_boundary(output, frame.media_start, boundary, incoming);
+            super::finish_media_boundary(output, frame.media_start, boundary, incoming, &frame.scope);
         }
         if let Some(mut buffer) = captured {
             buffer.0.0.clear();

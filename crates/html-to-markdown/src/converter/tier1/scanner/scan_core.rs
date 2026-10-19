@@ -220,6 +220,7 @@ impl<'a> Tier1Scanner<'a> {
             if cell_needs_tier2(&mut self.state, spec, name_lower) {
                 return Err(BailReason::TableBlockChildInCell);
             }
+            self.bail_for_image_label(name_lower, &attrs)?;
             emit_void(&mut self.state, spec, name_lower, &attrs, self.html, self.options)?;
             self.record_heading_break_place(spec);
             self.text_start = self.pos;
@@ -280,6 +281,57 @@ impl<'a> Tier1Scanner<'a> {
             return Err(BailReason::Classifier);
         }
         Ok(())
+    }
+
+    // ~keep Labels that touch surrounding content need the DOM walk's rendered boundaries (#918).
+    fn bail_for_image_label(&mut self, name: &[u8], attrs: &[(&[u8], Option<&[u8]>)]) -> Result<(), BailReason> {
+        if name != b"img" || self.options.skip_images {
+            return Ok(());
+        }
+        if self.options.inline_data_media != crate::options::InlineDataMedia::Keep {
+            let src = decode_attr(find_attr(attrs, b"src").unwrap_or_default())?;
+            if crate::converter::media::is_inline_data(&src) {
+                return Err(BailReason::Classifier);
+            }
+        }
+        let is_label = self.state.escape_ctx.intersects(EscapeCtx::CODE | EscapeCtx::PRE)
+            || !should_keep_image_as_markdown(self.html, &self.state.stack, self.options);
+        if !is_label {
+            return Ok(());
+        }
+        let alt = decode_attr(find_attr(attrs, b"alt").unwrap_or_default())?;
+        if !alt.chars().any(char::is_alphanumeric) {
+            return Ok(());
+        }
+        let before_touches = self.state.cell_or_output_mut().ends_with(|c: char| !c.is_whitespace())
+            && alt.starts_with(|c: char| !c.is_whitespace());
+        let after_touches = alt.ends_with(|c: char| !c.is_whitespace())
+            && self.html[self.pos..].starts_with(|c: char| !c.is_whitespace())
+            && !self.image_ends_heading();
+        if before_touches || after_touches {
+            return Err(BailReason::Classifier);
+        }
+        Ok(())
+    }
+
+    // ~keep A matching heading close ends the word; nested tags and entity edges remain uncertain (#918).
+    fn image_ends_heading(&self) -> bool {
+        let Some(heading) = self
+            .state
+            .stack
+            .last()
+            .filter(|frame| matches!(frame.spec.kind, TagKind::Heading(_)))
+        else {
+            return false;
+        };
+        let Some(tail) = self.bytes[self.pos..].strip_prefix(b"</") else {
+            return false;
+        };
+        let name_end = parse::scan_tag_name(tail, 0);
+        let close = parse::skip_ws(tail, name_end);
+        tail[..name_end].eq_ignore_ascii_case(&self.bytes[heading.name_range.clone()])
+            && tail.get(close) == Some(&b'>')
+            && tail[close + 1..].iter().all(u8::is_ascii_whitespace)
     }
 
     fn prepare_open_tag(&mut self, name_lower: &[u8]) -> Result<(), BailReason> {

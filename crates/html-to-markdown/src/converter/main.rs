@@ -115,6 +115,14 @@ pub fn convert_html_impl(
     let reference_collector = create_reference_collector(options);
 
     let mut ctx = create_conversion_context(html, options, parameters, reference_collector.as_ref(), kept_scripts);
+    if !options.skip_images
+        && dom.nodes().iter().any(|node| {
+            matches!(node, tl::Node::Tag(tag) if tag.name().as_utf8_str().eq_ignore_ascii_case("img")
+                || tag.name().as_utf8_str().eq_ignore_ascii_case("svg"))
+        })
+    {
+        ctx.media_boundary = Some(std::rc::Rc::new(std::cell::Cell::new(Default::default())));
+    }
 
     apply_exclusions(&dom, options, &mut ctx);
     walk_document(&dom, parser, &mut output, options, &ctx, &dom_ctx);
@@ -511,6 +519,7 @@ fn finish_media_boundary(
     start: usize,
     boundary: &std::cell::Cell<super::context::MediaBoundaryState>,
     incoming: super::context::MediaBoundaryState,
+    ctx: &Context,
 ) {
     let Some(chunk) = output.get(start..).filter(|chunk| !chunk.is_empty()) else {
         boundary.set(incoming);
@@ -529,7 +538,7 @@ fn finish_media_boundary(
         && !incoming.last_edge.is_some_and(|character| "([{".contains(character))
         && edge.is_some_and(|character| !character.is_whitespace() && !".,;:!?)]}".contains(character))
     {
-        output.insert(start, ' ');
+        ctx.insert_media_space(output, start);
     }
     if incoming.first_edge.is_some() {
         current.first_is_media = incoming.first_is_media;
@@ -546,6 +555,8 @@ struct TagCapture<'a> {
     node_id: u32,
     #[cfg(feature = "visitor")]
     output_start: usize,
+    #[cfg(feature = "visitor")]
+    code_break_start: Option<usize>,
     #[cfg(not(feature = "visitor"))]
     marker: std::marker::PhantomData<&'a ()>,
 }
@@ -611,6 +622,8 @@ fn begin_tag<'a>(
         node_id: node_handle.get_inner(),
         #[cfg(feature = "visitor")]
         output_start: element_output_start,
+        #[cfg(feature = "visitor")]
+        code_break_start: ctx.inline_code_breaks.as_ref().map(|(_, breaks)| breaks.get()),
         #[cfg(not(feature = "visitor"))]
         marker: std::marker::PhantomData,
     })
@@ -700,6 +713,16 @@ fn finish_tag(
             })
         {
             use crate::converter::visitor_hooks::VisitAction;
+            // ~keep A direct BR can be erased after its line-break callback emitted it (#921).
+            // ~keep Restore its checkpoint rather than counting replacement source whitespace.
+            if tag_name == "br"
+                && matches!(action, VisitAction::Skip | VisitAction::Custom)
+                && let Some(((owner, breaks), before)) =
+                    handler.ctx.inline_code_breaks.as_ref().zip(capture.code_break_start)
+                && handler.dom_ctx.parent_of(capture.node_id) == Some(*owner)
+            {
+                breaks.set(before);
+            }
             // ~keep Only replacing leading output invalidates a label's first-button boundary.
             if matches!(action, VisitAction::Skip | VisitAction::Custom)
                 && output.get(..safe_start).is_some_and(|before| before.trim().is_empty())

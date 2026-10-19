@@ -250,6 +250,7 @@ pub(super) fn emit_code_link(
             handler.output.push_str(&raw);
             if let Some(links) = handler.context.inline_code_links.as_ref() {
                 links.borrow_mut().push(crate::converter::context::InlineCodeLink {
+                    buffer: std::ptr::from_ref::<String>(handler.output) as usize,
                     range: start..handler.output.len(),
                     markdown,
                 });

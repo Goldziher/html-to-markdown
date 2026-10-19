@@ -215,14 +215,10 @@ pub(super) fn tree_repair_reasons(dom: &tl::VDom, parser: &tl::Parser) -> TreeRe
         // ~keep attaches as a child of that `<tr>` instead of becoming `<table>`'s
         // ~keep sibling. `collect_table_cells` only walks `td`/`th`/`cell`
         // ~keep children, so the misattached element -- and everything after it --
-        // ~keep is silently dropped (issue #489). Deliberately element-only:
-        // ~keep `is_foster_parenting_candidate`'s text arm decodes entities and
-        // ~keep treats `&nbsp;` as non-whitespace, so widening this to text would
-        // ~keep route every Outlook/newsletter `<tr>&nbsp;</tr>` through a full
-        // ~keep html5ever re-parse for no benefit. `<tr>stray text</tr>` losing its
-        // ~keep text stays a separate, documented defect (see the CONTROL test in
-        // ~keep `issue_489_regressions.rs`).
-        if is_row_context_with_misplaced_element(name, children, parser) {
+        // ~keep is silently dropped (issue #489). Meaningful text needs the same
+        // ~keep repair (#921), but Unicode whitespace such as newsletter `&nbsp;`
+        // ~keep placeholders must not trigger an otherwise unnecessary re-parse.
+        if is_row_context_with_misplaced_content(name, children, parser) {
             return TreeRepairReasons {
                 misnest: true,
                 ..reasons
@@ -513,11 +509,10 @@ fn is_table_structural_child(tag_name: &str) -> bool {
     )
 }
 
-/// True when `name` is a `<tr>`/`<row>` or table section (`<thead>`/`<tbody>`/`<tfoot>`) with an
-/// element child outside the set valid in that context (see [`is_row_structural_child`] and
-/// [`is_section_structural_child`]). Element children only -- see the call site's doc comment for
-/// why text is deliberately excluded.
-fn is_row_context_with_misplaced_element(name: &str, children: &[tl::NodeHandle], parser: &tl::Parser) -> bool {
+/// True when `name` is a `<tr>`/`<row>` or table section (`<thead>`/`<tbody>`/`<tfoot>`) with a
+/// child outside the set valid in that context (see [`is_row_structural_child`] and
+/// [`is_section_structural_child`]), including meaningful text that needs foster-parenting.
+fn is_row_context_with_misplaced_content(name: &str, children: &[tl::NodeHandle], parser: &tl::Parser) -> bool {
     let valid: fn(&str) -> bool = match name {
         "tr" | "row" => is_row_structural_child,
         "thead" | "tbody" | "tfoot" => is_section_structural_child,
@@ -525,6 +520,11 @@ fn is_row_context_with_misplaced_element(name: &str, children: &[tl::NodeHandle]
     };
     children.iter().any(|child| match child.get(parser) {
         Some(tl::Node::Tag(tag)) => !valid(&normalized_tag_name(tag.name().as_utf8_str())),
+        Some(tl::Node::Raw(bytes)) => {
+            let raw = bytes.as_utf8_str();
+            let decoded = crate::text::decode_html_entities_cow(raw.as_ref());
+            decoded.chars().any(|character| !character.is_whitespace())
+        }
         _ => false,
     })
 }

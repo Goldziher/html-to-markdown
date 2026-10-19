@@ -866,7 +866,7 @@ mod visitor_in_code {
             seen,
             ["link /x link", "mark hot", "image i.png pic", "link /y `two`"].map(String::from)
         );
-        assert_eq!(content, "```\nlink hotpic end\n```\n\n`b `[`two`](/y)\n");
+        assert_eq!(content, "```\nlink hot pic end\n```\n\n`b `[`two`](/y)\n");
     }
 
     #[test]

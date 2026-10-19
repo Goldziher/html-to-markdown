@@ -30,6 +30,10 @@ fn emit_svg_from_slice(
     if options.skip_images {
         return Ok(());
     }
+    // ~keep The full walk preserves boundaries and options for text-rendered graphics (#918).
+    if options.inline_data_media != crate::options::InlineDataMedia::Keep {
+        return Err(BailReason::Classifier);
+    }
 
     // ~keep Tier-2 removes a hidden element before it parses, also inside a graphic. The slice
     // ~keep still holds it, and its text would be read as text of the graphic.

@@ -150,7 +150,7 @@ pub fn separate_block_in_cell(output: &mut String, br_in_tables: bool) {
 pub fn emit_table_cell_break_in_context(output: &mut String, br_in_tables: bool, ctx: &crate::converter::Context) {
     if br_in_tables && let Some(ref offsets) = ctx.pre_cell_break_offsets {
         trim_trailing_whitespace(output);
-        offsets.borrow_mut().push(output.len());
+        offsets.borrow_mut().record(output);
         output.push('\n');
     } else {
         emit_table_cell_break(output, br_in_tables);
@@ -749,6 +749,7 @@ pub fn is_inline_element(tag_name: &str) -> bool {
             | "data"
             | "dfn"
             | "em"
+            | "font"
             | "i"
             | "kbd"
             | "mark"

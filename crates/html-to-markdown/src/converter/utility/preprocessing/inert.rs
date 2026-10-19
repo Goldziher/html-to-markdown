@@ -98,6 +98,7 @@ struct BodyNormalizer<'a> {
     fed_end: Cell<usize>,
     fed_start: Cell<usize>,
     opaque: RefCell<Option<LocalName>>,
+    opaque_start: Cell<usize>,
     remove_closed_forms: bool,
     rewrite_bodies: bool,
     closed_forms: RefCell<ClosedForms>,
@@ -148,15 +149,17 @@ impl BodyNormalizer<'_> {
     }
 
     fn closing_start(&self, body: &Body, end: usize) -> Option<usize> {
+        self.closing_start_for(&body.name, body.start, end)
+    }
+
+    fn closing_start_for(&self, name: &LocalName, body_start: usize, end: usize) -> Option<usize> {
         // ~keep The previous tag/comment token ends before this closing token starts;
         // ~keep tag-shaped strings inside attributes and comments are already behind it.
-        let start = self.token_boundary.get().max(body.start);
+        let start = self.token_boundary.get().max(body_start);
         let bytes = self.source.as_bytes();
         memchr::memchr_iter(b'<', &bytes[start..end])
             .map(|index| start + index)
-            .find(|index| {
-                bytes.get(index + 1) == Some(&b'/') && matches_body_name(bytes, index + 2, body.name.as_bytes())
-            })
+            .find(|index| bytes.get(index + 1) == Some(&b'/') && matches_body_name(bytes, index + 2, name.as_bytes()))
     }
 
     fn track_namespace(&self, tag: &Tag) -> bool {
@@ -259,9 +262,24 @@ impl BodyNormalizer<'_> {
         }
     }
 
+    fn bound_noscript_child(&self, tag: &Tag) {
+        if &*tag.name == "noframes"
+            && self.rewrite_bodies
+            && let Some(end) = self.closing_start_for(&tag.name, self.opaque_start.get(), self.position())
+            && has_unclosed_noscript(&self.source[self.opaque_start.get()..end])
+        {
+            // ~keep Noframes children convert as markup, but an unclosed inert child must
+            // ~keep not consume content outside the authored parent boundary (#921).
+            self.replacements
+                .borrow_mut()
+                .push((end..end, "</noscript>".to_owned()));
+        }
+    }
+
     fn process_tag(&self, tag: Tag) -> TokenSinkResult<()> {
         let name = &*tag.name;
         if tag.kind == TagKind::EndTag && self.opaque.borrow().as_ref() == Some(&tag.name) {
+            self.bound_noscript_child(&tag);
             self.opaque.replace(None);
             return TokenSinkResult::Script(());
         }
@@ -321,6 +339,7 @@ impl BodyNormalizer<'_> {
             "textarea" | "script" | "style" | "noembed" | "noframes" | "plaintext"
         ) {
             self.opaque.replace(Some(tag.name.clone()));
+            self.opaque_start.set(self.position());
         }
         match name {
             "title" | "textarea" => TokenSinkResult::RawData(RawKind::Rcdata),
@@ -332,6 +351,53 @@ impl BodyNormalizer<'_> {
             _ => TokenSinkResult::Continue,
         }
     }
+}
+
+#[derive(Default)]
+struct NoscriptBoundary {
+    unclosed: Cell<bool>,
+}
+
+impl TokenSink for NoscriptBoundary {
+    type Handle = ();
+
+    fn process_token(&self, token: Token, _: u64) -> TokenSinkResult<()> {
+        let Token::TagToken(tag) = token else {
+            return TokenSinkResult::Continue;
+        };
+        if tag.kind == TagKind::EndTag {
+            if &*tag.name == "noscript" {
+                self.unclosed.set(false);
+            }
+            return TokenSinkResult::Continue;
+        }
+        match &*tag.name {
+            "noscript" => {
+                self.unclosed.set(true);
+                TokenSinkResult::RawData(RawKind::Rawtext)
+            }
+            "title" | "textarea" => TokenSinkResult::RawData(RawKind::Rcdata),
+            "script" => TokenSinkResult::RawData(RawKind::ScriptData),
+            "style" | "xmp" | "iframe" | "noembed" => TokenSinkResult::RawData(RawKind::Rawtext),
+            _ => TokenSinkResult::Continue,
+        }
+    }
+}
+
+fn has_unclosed_noscript(source: &str) -> bool {
+    if !source
+        .as_bytes()
+        .windows(b"noscript".len())
+        .any(|name| name.eq_ignore_ascii_case(b"noscript"))
+    {
+        return false;
+    }
+    let input = BufferQueue::default();
+    input.push_back(StrTendril::from(source));
+    let tokenizer = Tokenizer::new(NoscriptBoundary::default(), TokenizerOpts::default());
+    let _ = tokenizer.feed(&input);
+    tokenizer.end();
+    tokenizer.sink.unclosed.get()
 }
 
 fn is_math_text_integration(name: &str) -> bool {
@@ -613,6 +679,7 @@ fn body_replacements(
             fed_end: Cell::new(0),
             fed_start: Cell::new(0),
             opaque: RefCell::new(None),
+            opaque_start: Cell::new(0),
             remove_closed_forms,
             rewrite_bodies,
             closed_forms: RefCell::new(ClosedForms::default()),

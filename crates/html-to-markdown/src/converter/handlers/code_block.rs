@@ -78,6 +78,7 @@ fn min_safe_code_span_delimiter_length(content: &str) -> usize {
 /// In code the element writes nothing of its own. Else the walk captures the text of the
 /// children for [`close_code`], with the links that they hold.
 pub fn open_code(
+    node_handle: &tl::NodeHandle,
     tag: &tl::HTMLTag,
     parser: &tl::Parser,
     context: &Context,
@@ -88,8 +89,10 @@ pub fn open_code(
         return Open::children_only();
     }
     let links = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let breaks = Rc::new(std::cell::Cell::new(0));
     let code_ctx = Context {
         in_code: true,
+        inline_code_breaks: Some((node_handle.get_inner(), breaks.clone())),
         inline_code_links: if context.in_code {
             context.inline_code_links.clone()
         } else if contains_anchor(tag, parser) {
@@ -101,13 +104,14 @@ pub fn open_code(
     };
     Open {
         scope: Some(Rc::new(code_ctx)),
-        close: Close::Capture(CaptureEnd::Code(CodeEnd { links })),
+        close: Close::Capture(CaptureEnd::Code(CodeEnd { links, breaks })),
     }
 }
 
 /// What [`open_code`] leaves for [`close_code`]: the links that the children wrote.
 pub struct CodeEnd {
     links: Rc<std::cell::RefCell<Vec<crate::converter::context::InlineCodeLink>>>,
+    breaks: Rc<std::cell::Cell<usize>>,
 }
 
 /// Write `content`, the text of the children of a code element, as inline code:
@@ -128,6 +132,14 @@ pub fn close_code(end: &CodeEnd, content: &str, mut handler: HandlerContext<'_>)
                 return;
             }
         }
+    }
+    // ~keep Empty source line endings also reach this buffer (#868). Only retained BR
+    // ~keep emissions can turn a newline-only body into actual hard breaks (#921).
+    if content.bytes().all(|byte| byte == b'\n') && end.breaks.get() > 0 {
+        for _ in 0..end.breaks.get() {
+            emit_collected_code_break(&mut handler);
+        }
+        return;
     }
     emit_inline_code_with_links(content, &end.links.borrow(), &mut handler);
 }
@@ -323,8 +335,11 @@ pub(in crate::converter) fn emit_inline_code(
 /// - Invoking visitor callbacks when the visitor feature is enabled
 /// - Generating appropriate markdown output
 pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
-    let cell_break_offsets = (handler.context.in_table_cell && handler.options.br_in_tables)
-        .then(|| std::rc::Rc::new(std::cell::RefCell::new(Vec::new())));
+    let cell_break_offsets = (handler.context.in_table_cell && handler.options.br_in_tables).then(|| {
+        std::rc::Rc::new(std::cell::RefCell::new(
+            crate::converter::context::CapturedOffsets::default(),
+        ))
+    });
     let code_ctx = Context {
         in_code: true,
         in_code_block: true,
@@ -360,7 +375,7 @@ pub fn handle_pre(tag: &tl::HTMLTag, handler: HandlerContext<'_>) {
 
     let offsets = cell_break_offsets
         .as_ref()
-        .map(|offsets| offsets.borrow().clone())
+        .map(|offsets| offsets.borrow().positions())
         .unwrap_or_default();
     let segmented = (!offsets.is_empty()).then(|| content.clone());
     let processed = process_pre_content(content, handler.options.whitespace_mode, false);
@@ -856,7 +871,7 @@ fn format_code_block_in_list_item(
 }
 
 pub struct PreEnd {
-    offsets: Option<Rc<std::cell::RefCell<Vec<usize>>>>,
+    offsets: Option<Rc<std::cell::RefCell<crate::converter::context::CapturedOffsets>>>,
     language: Option<String>,
 }
 
@@ -867,7 +882,11 @@ pub fn open_pre(
     options: &ConversionOptions,
     children: &mut Vec<tl::NodeHandle>,
 ) -> Open {
-    let offsets = (context.in_table_cell && options.br_in_tables).then(|| Rc::new(std::cell::RefCell::new(Vec::new())));
+    let offsets = (context.in_table_cell && options.br_in_tables).then(|| {
+        Rc::new(std::cell::RefCell::new(
+            crate::converter::context::CapturedOffsets::default(),
+        ))
+    });
     let code_ctx = Context {
         in_code: true,
         in_code_block: true,
@@ -918,7 +937,7 @@ pub fn close_pre(end: &PreEnd, captured: &str, handler: HandlerContext<'_>) {
 
     let offsets = cell_break_offsets
         .as_ref()
-        .map(|offsets| offsets.borrow().clone())
+        .map(|offsets| offsets.borrow().positions())
         .unwrap_or_default();
     let segmented = (!offsets.is_empty()).then(|| content.clone());
     let processed = process_pre_content(content, handler.options.whitespace_mode, false);

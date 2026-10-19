@@ -98,13 +98,8 @@ fn should_still_pad_a_ragged_row_that_has_at_least_one_cell() {
 
 #[test]
 fn should_keep_a_row_holding_only_an_entity_space_out_of_the_repair_path() {
-    // ~keep Text-only content inside <tr> deliberately does not trip the new gate (see the
-    // ~keep module doc): `&nbsp;` decodes to non-whitespace, so a naive text check would
-    // ~keep route every Outlook/newsletter `<tr>&nbsp;</tr>` through a full html5ever
-    // ~keep re-parse. The row still collects zero <td>/<th> cells, so Edit B's cell-less-row
-    // ~keep skip still applies -- orthogonal to, and independent of, the repair-path gate
-    // ~keep this test pins. Losing the entity-space text is the pre-existing, documented,
-    // ~keep out-of-scope defect this control exists to freeze.
+    // ~keep Meaningful row text is foster-parented (#921), but Unicode whitespace alone
+    // ~keep must not route Outlook/newsletter placeholder rows through a full HTML5 repair.
     assert_eq!(content("<table><tr>&nbsp;</tr></table>"), "");
 }
 

@@ -428,10 +428,10 @@ fn no_metadata() -> ConversionOptions {
 
 #[test]
 fn should_write_the_alt_text_of_an_image_in_a_code_span_as_code_text() {
-    assert_literal_on_both(
+    assert_handed_to_full(
         &[
-            ("<p><code>a<img src=\"/i.png\" alt=\"pic\">b</code></p>", "`apicb`\n"),
-            ("<p><code>a<img src=\"/i.png\" alt=\"*p*\">b</code></p>", "`a*p*b`\n"),
+            ("<p><code>a<img src=\"/i.png\" alt=\"pic\">b</code></p>", "`a pic b`\n"),
+            ("<p><code>a<img src=\"/i.png\" alt=\"*p*\">b</code></p>", "`a *p* b`\n"),
         ],
         &no_metadata(),
     );
@@ -450,10 +450,10 @@ fn should_write_nothing_for_an_image_with_no_alt_text_in_a_code_span() {
 
 #[test]
 fn should_write_the_alt_text_of_an_image_in_keyboard_and_sample_text_as_code_text() {
-    assert_literal_on_both(
+    assert_handed_to_full(
         &[
-            ("<p><kbd>a<img src=\"/i.png\" alt=\"pic\">b</kbd></p>", "`apicb`\n"),
-            ("<p><samp>a<img src=\"/i.png\" alt=\"pic\">b</samp></p>", "`apicb`\n"),
+            ("<p><kbd>a<img src=\"/i.png\" alt=\"pic\">b</kbd></p>", "`a pic b`\n"),
+            ("<p><samp>a<img src=\"/i.png\" alt=\"pic\">b</samp></p>", "`a pic b`\n"),
         ],
         &no_metadata(),
     );
@@ -461,18 +461,18 @@ fn should_write_the_alt_text_of_an_image_in_keyboard_and_sample_text_as_code_tex
 
 #[test]
 fn should_write_the_alt_text_of_an_image_in_preformatted_text_as_code_text() {
-    assert_literal_on_both(
-        &[("<pre>a<img src=\"/i.png\" alt=\"pic\">b</pre>", "```\napicb\n```\n")],
+    assert_handed_to_full(
+        &[("<pre>a<img src=\"/i.png\" alt=\"pic\">b</pre>", "```\na pic b\n```\n")],
         &no_metadata(),
     );
 }
 
 #[test]
 fn should_write_the_alt_text_of_each_of_two_images_in_a_code_span() {
-    assert_literal_on_both(
+    assert_handed_to_full(
         &[(
             "<p><code><img src=\"/i.png\" alt=\"one\">+<img src=\"/j.png\" alt=\"two\"></code></p>",
-            "`one+two`\n",
+            "`one + two`\n",
         )],
         &no_metadata(),
     );
@@ -543,7 +543,8 @@ fn should_write_the_text_after_a_code_span_that_holds_only_an_image_as_the_full_
     let html = "<p><code><img src=\"/i.png\" alt=\"pic\"></code> y</p>";
     let full = full_only(html, &options);
     let fast = fast_direct(html, &options);
-    assert_eq!(fast.as_deref().map(str::trim_end), Ok(full.trim_end()));
+    assert_eq!(fast, Err("Classifier".to_owned()));
+    assert_eq!(full, "`pic` y\n");
 }
 
 #[test]

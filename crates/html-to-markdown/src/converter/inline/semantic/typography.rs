@@ -93,6 +93,11 @@ pub fn close_script(end: &ScriptEnd, content: &str, handler: HandlerContext<'_>)
         },
         site,
     );
+    // ~keep A captured block ends with a blank line. Inline chomping must not erase its
+    // ~keep boundary and join the next sibling's word to the block's last word (#921).
+    if content.ends_with("\n\n") && !handler.context.convert_as_inline && !handler.context.in_table_cell {
+        handler.output.push_str("\n\n");
+    }
 }
 
 #[cfg(feature = "visitor")]

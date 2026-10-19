@@ -765,12 +765,18 @@ fn push_processed_text(output: &mut String, final_text: &str, site: TextSite<'_>
         return;
     }
     let indent = " ".repeat(4 * ctx.list_depth);
-    for (index, part) in final_text.split("\n\n").enumerate() {
+    let mut parts = final_text.split("\n\n").enumerate().peekable();
+    while let Some((index, part)) = parts.next() {
         if index > 0 {
             output.push_str("\n\n");
             output.push_str(&indent);
         }
-        output.push_str(part.trim());
+        // ~keep The last text fragment can owe its trailing space to the next inline element (#920).
+        output.push_str(if parts.peek().is_none() {
+            part.trim_start()
+        } else {
+            part.trim()
+        });
     }
 }
 

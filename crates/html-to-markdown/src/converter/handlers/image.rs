@@ -225,6 +225,12 @@ fn render_image(
     }
     // ~keep Code has no image marks. An image in code is its alt text as literal code text, as
     // ~keep where a heading or a table cell cannot hold an image. A visitor is asked first.
+    if !handler.options.skip_images
+        && inline_data != InlineDataMedia::DropElement
+        && (context.in_code || should_use_alt_text)
+    {
+        crate::converter::media::record_text_label(&data.alt, context);
+    }
     if context.in_code {
         return (inline_data != InlineDataMedia::DropElement).then(|| data.alt.to_string());
     }
