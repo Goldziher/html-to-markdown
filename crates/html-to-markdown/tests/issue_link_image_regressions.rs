@@ -125,8 +125,8 @@ fn should_write_empty_destinations_as_text_and_resolve_empty_href_against_base()
             "[empty](https://example.test/page) and no href\n"
         );
         let images = "<p>a <img alt=\"logo\"> b <img src=\"\" alt=\"blank\"> c <img src=\"\" alt=\"\"> d</p>";
-        assert_eq!(content(images, options), "a logo b blank c d\n");
-        assert_eq!(content(images, based), "a logo b blank c d\n");
+        assert_eq!(content(images, options), "a ![logo](<>) b ![blank](<>) c d\n");
+        assert_eq!(content(images, based), "a ![logo](<>) b ![blank](<>) c d\n");
     }
 }
 

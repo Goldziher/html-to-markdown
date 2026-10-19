@@ -215,7 +215,7 @@ fn render_image(
         || context.cell_allow_inline_images
         || context.link_allow_inline_images;
 
-    let should_use_alt_text = data.src.is_empty()
+    let should_use_alt_text = (data.src.is_empty() && data.alt.is_empty())
         || inline_data == InlineDataMedia::AltTextOnly
         || (!keep_as_markdown
             && (context.convert_as_inline || (context.in_heading && !context.heading_allow_inline_images)));

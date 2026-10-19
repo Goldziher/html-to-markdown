@@ -132,10 +132,9 @@ fn should_keep_a_pure_data_uri_src_when_no_fallback_attribute_exists() {
 }
 
 #[test]
-fn should_use_alt_text_when_an_img_has_no_usable_source() {
-    // ~keep With no usable source, the alternative text stands for the image (#756).
+fn should_keep_image_markup_when_an_img_has_no_usable_source() {
     let html = r#"<img alt="No source anywhere" />"#;
-    assert_eq!(convert(html), "No source anywhere\n");
+    assert_eq!(convert(html), "![No source anywhere](<>)\n");
 }
 
 #[test]
