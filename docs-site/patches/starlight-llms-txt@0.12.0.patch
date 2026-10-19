@@ -1,0 +1,36 @@
+diff --git a/generator.ts b/generator.ts
+index 3a076f3d8b5070980f89e0601cfa11a6583a4ee5..d3bfd125ecfa0b8d1b369ab05f86b46d6af7776c 100644
+--- a/generator.ts
++++ b/generator.ts
+@@ -1,6 +1,6 @@
+ import type { APIContext } from 'astro';
+ import { getCollection } from 'astro:content';
+-import micromatch from 'micromatch';
++import picomatch from 'picomatch';
+ import { starlightLllmsTxtContext } from 'virtual:starlight-llms-txt/context';
+ import { entryToSimpleMarkdown } from './entryToSimpleMarkdown';
+ import { defaultLang, isDefaultLocale } from './utils';
+@@ -29,10 +29,10 @@ export async function generateLlmsTxt(
+ ): Promise<string> {
+ 	let docs = await getCollection('docs', (doc) => isDefaultLocale(doc) && !doc.data.draft);
+ 	if (include) {
+-		docs = docs.filter((doc) => micromatch.isMatch(doc.id, include));
++		docs = docs.filter((doc) => picomatch(include)(doc.id));
+ 	}
+ 	if (exclude) {
+-		docs = docs.filter((doc) => !micromatch.isMatch(doc.id, exclude));
++		docs = docs.filter((doc) => !picomatch(exclude)(doc.id));
+ 	}
+ 	const { promote, demote, pageSeparator } = starlightLllmsTxtContext;
+ 	/** Processes page IDs by prepending underscores to influence the sorting order. */
+@@ -40,8 +40,8 @@ export async function generateLlmsTxt(
+ 		// Match the page ID against the patterns listed in the `promote` and `demote`
+ 		// config options and return the index of the first match. If a page matches
+ 		// a `demote` pattern, we don't check `promote` as demotions take precedence.
+-		const demoted = demote.findIndex((expr) => micromatch.isMatch(id, expr));
+-		const promoted = demoted > -1 ? -1 : promote.findIndex((expr) => micromatch.isMatch(id, expr));
++		const demoted = demote.findIndex((expr) => picomatch(expr)(id));
++		const promoted = demoted > -1 ? -1 : promote.findIndex((expr) => picomatch(expr)(id));
+ 		// Calculate the number of underscores to prefix the page ID with
+ 		// to influence the sorting order. The more underscores, the earlier
+ 		// the page will appear in the list. The amount of underscores added by

@@ -10,7 +10,7 @@
     }
   ],
   "name": "@xberg-io/html-to-markdown-wasm",
-  "version": "3.18.1",
+  "version": "3.18.2",
   "private": false,
   "description": "High-performance HTML to Markdown converter",
   "license": "MIT",
@@ -53,8 +53,8 @@
     "clean": "rm -rf pkg dist"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^5.0.3",
-    "vitest": "^5.0.3"
+    "@vitest/coverage-v8": "^5.0.5",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@12.11.2"
 }

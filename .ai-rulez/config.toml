@@ -86,3 +86,7 @@ self_server_command = ["ai-rulez", "mcp"]
 
 [lock]
 include_outputs = false
+
+[lint]
+# ~keep Alef publishes the canonical html-to-markdown MCP reference as the mcp skill.
+allow_overrides = ["claude:mcp"]

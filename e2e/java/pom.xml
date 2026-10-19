@@ -33,20 +33,20 @@
     <dependency>
       <groupId>io.xberg</groupId>
       <artifactId>html-to-markdown</artifactId>
-      <version>3.18.1</version>
+      <version>3.18.2</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/../../packages/java/target/html-to-markdown-3.18.1.jar</systemPath>
+      <systemPath>${project.basedir}/../../packages/java/target/html-to-markdown-3.18.2.jar</systemPath>
     </dependency>
 
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.22.3</version>
+      <version>2.22.4</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jdk8</artifactId>
-      <version>2.22.3</version>
+      <version>2.22.4</version>
     </dependency>
     <dependency>
       <groupId>org.jetbrains</groupId>

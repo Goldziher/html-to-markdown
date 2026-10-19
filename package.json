@@ -1,6 +1,6 @@
 {
   "name": "html-to-markdown-monorepo",
-  "version": "3.18.1",
+  "version": "3.18.2",
   "private": true,
   "description": "HTML to Markdown converter - monorepo root",
   "scripts": {
@@ -32,7 +32,7 @@
     "textlint-rule-terminology": "^5.2.16",
     "textlint-rule-write-good": "^2.0.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=22.12",

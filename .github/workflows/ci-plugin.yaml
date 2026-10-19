@@ -75,7 +75,7 @@ jobs:
       # Pinned to the ai-rulez version that generates them; bump in lockstep. ~keep
       - name: Verify generated plugin bundles are current
         run: ai-rulez verify --recursive --plugin --if-configured
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - name: Verify OpenCode tools and bundled content

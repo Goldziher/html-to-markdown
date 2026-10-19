@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
-use mdream::{HTMLToMarkdownOptions, html_to_markdown as mdream_convert};
+use mdream::{HtmlToMarkdownOptions, html_to_markdown as mdream_convert};
 
 fn main() -> anyhow::Result<()> {
     let arg = std::env::args()
@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
         ..ConversionOptions::default()
     };
     let h2m = convert(&html, Some(h2m_opts))?.content.unwrap_or_default();
-    let md = mdream_convert(&html, HTMLToMarkdownOptions::default());
+    let md = mdream_convert(&html, HtmlToMarkdownOptions::default());
 
     println!("=== h2m ({} bytes) ===", h2m.len());
     println!("{}", &h2m[..h2m.len().min(2000)]);

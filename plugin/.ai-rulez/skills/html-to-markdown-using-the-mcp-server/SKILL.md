@@ -25,8 +25,8 @@ the runtime supports MCP.
 
 ## How it runs in this plugin
 
-The plugin auto-registers the server. Its command is the bundled launcher
-`scripts/mcp-launch.sh`, which execs `html-to-markdown mcp`. On first run the
+The plugin auto-registers the server through its bundled MCP launcher, which execs
+`html-to-markdown mcp`. On first run the
 launcher resolves an `html-to-markdown` binary: it reuses one already on `PATH`
 or cached in the plugin's `bin/`, then tries `npx`/`uvx`, then Homebrew, then
 downloads a prebuilt from the tool's latest GitHub release. Override the channel

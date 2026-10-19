@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use html_to_markdown_bench::fixture::{Fixture, Loader};
 use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
-use mdream::{HTMLToMarkdownOptions, html_to_markdown as mdream_convert};
+use mdream::{HtmlToMarkdownOptions, html_to_markdown as mdream_convert};
 
 const ITERS: u32 = 5;
 type FixtureResult = (String, f64, f64, f64, f64);
@@ -27,7 +27,7 @@ type FixtureResult = (String, f64, f64, f64, f64);
 fn benchmark_fixture(
     fixture: &Fixture,
     h2m_options: &ConversionOptions,
-    mdream_options: &HTMLToMarkdownOptions,
+    mdream_options: &HtmlToMarkdownOptions,
 ) -> anyhow::Result<FixtureResult> {
     let html = std::fs::read_to_string(&fixture.path)?;
     let bytes = html.len() as f64;
@@ -84,7 +84,7 @@ fn main() -> anyhow::Result<()> {
         extract_metadata: false,
         ..ConversionOptions::default()
     };
-    let md_opts = HTMLToMarkdownOptions::default();
+    let md_opts = HtmlToMarkdownOptions::default();
     let totals = fixtures
         .iter()
         .map(|fixture| benchmark_fixture(fixture, &h2m_opts, &md_opts))

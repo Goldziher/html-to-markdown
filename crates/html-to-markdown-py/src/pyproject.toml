@@ -8,7 +8,7 @@ maintainers = [
   { name = "Tobias Perlstein", email = "tobias@xberg.io" },
 ]
 name = "html-to-markdown"
-version = "3.18.1"
+version = "3.18.2"
 description = "High-performance HTML to Markdown converter"
 keywords = ["converter", "html", "markdown"]
 license = "MIT"

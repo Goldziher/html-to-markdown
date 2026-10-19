@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use html_to_markdown_bench::fixture::Loader;
 use html_to_markdown_rs::{ConversionOptions, TierStrategy, convert};
-use mdream::{HTMLToMarkdownOptions, html_to_markdown as mdream_convert};
+use mdream::{HtmlToMarkdownOptions, html_to_markdown as mdream_convert};
 
 fn main() -> anyhow::Result<()> {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures");
@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
         extract_metadata: false,
         ..ConversionOptions::default()
     };
-    let md_opts = HTMLToMarkdownOptions::default();
+    let md_opts = HtmlToMarkdownOptions::default();
 
     println!(
         "{:<48} {:>10} {:>10} {:>9} {:>8} {:>9}",

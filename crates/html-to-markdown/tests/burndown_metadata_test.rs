@@ -339,6 +339,7 @@ mod visitor {
             assert_eq!(actual.as_deref(), Some(expected));
             let observed = recorder.lock().expect("visitor lock");
             assert_eq!((observed.starts, observed.ends), (1, ends));
+            drop(observed);
         }
     }
 
@@ -480,6 +481,7 @@ mod visitor {
                 assert_eq!(actual.as_deref(), Some(expected), "{tier:?}: skip {skipped}");
                 let seen = recorder.lock().expect("visitor lock");
                 assert_eq!(seen.seen.iter().filter(|tag| *tag == skipped).count(), 1);
+                drop(seen);
             }
         }
     }
@@ -537,6 +539,7 @@ mod visitor {
                 depths.spans.iter().all(|depth| depths.rows[0] < *depth),
                 "{html}: {depths:?}"
             );
+            drop(depths);
         }
     }
 

@@ -131,7 +131,7 @@ jobs:
         uses: Goldziher/poly@v0
 
       - name: Setup Go for module freshness
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: e2e/go/go.mod
           cache-dependency-path: e2e/go/go.sum
