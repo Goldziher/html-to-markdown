@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.2] - 2026-10-19
+
+### Changed
+
+- Upgrade Rust and language-package dependencies, including PyO3 0.30.1, ext-php-rs 0.16.3,
+  Jackson 2.22.4 and Vitest 5.0.5, and regenerate bindings and documentation with Alef 0.111.0.
+- Upgrade the documentation site to Astro 7.4.0 and remove vulnerable transitive dependencies
+  from its Markdown discovery and CSS selector tooling.
+
+### Fixed
+
+- Preserve Markdown image syntax for images with alt text and no source, restoring the behavior
+  from 3.17.2 (#917).
+
 ## [3.18.1] - 2026-10-15
 
 ### Fixed
