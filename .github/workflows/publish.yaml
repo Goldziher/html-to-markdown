@@ -3614,7 +3614,7 @@ jobs:
           set -euo pipefail
 
           gh api --paginate \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=50" \
             --jq '.jobs[] | select(.conclusion == "failure") | .name' >/tmp/failed-jobs.txt
 
           # ~keep Same correction as the gate below: PROMOTED is empty whenever promote-release
