@@ -1,7 +1,7 @@
 // ~keep Rust inner attributes below are crate-level attributes, not a shell shebang.
 #![allow(missing_docs)]
 
-//! Tests for the `max_depth` recursion-safety option.
+//! Tests for the `max_depth` traversal budget.
 
 use html_to_markdown_rs::options::{OutputFormat, TierStrategy};
 use html_to_markdown_rs::{ConversionOptions, ConversionResult, WarningKind};
@@ -28,8 +28,8 @@ fn nested_divs(depth: usize, inner: &str) -> String {
     html
 }
 
-/// With the default `max_depth: None`, ordinary nesting below the native stack
-/// safety limit should be fully converted.
+/// With the default `max_depth: None`, ordinary nesting below the traversal
+/// limit should be fully converted.
 #[test]
 fn test_max_depth_none_converts_reasonably_nested_content() {
     let mut html = String::from("<p>deep</p>");
@@ -76,7 +76,7 @@ fn test_max_depth_truncates_at_limit() {
     assert_depth_warning(&result, 3);
 }
 
-/// Issue #434: callers can raise the ceiling above the native default (64) by
+/// Issue #434: callers can raise the ceiling above the former native default (64) by
 /// setting an explicit `max_depth`, recovering content in deeply-nested email HTML.
 #[test]
 fn test_max_depth_can_be_raised_above_native_default_issue_434() {
@@ -109,14 +109,14 @@ fn test_depth_truncation_emits_warning_issue_434() {
 
     let options = ConversionOptions {
         extract_metadata: false,
-        max_depth: None, // ~keep native default 64 truncates at depth 64
+        max_depth: Some(64),
         ..Default::default()
     };
 
     let result = convert_with_options(&html, options);
     assert!(
         !result.content.as_deref().unwrap_or_default().contains("deep-content"),
-        "Content nested beyond the native default should be truncated."
+        "Content nested beyond the explicit depth budget should be truncated."
     );
     assert_depth_warning(&result, 64);
 }
@@ -158,10 +158,10 @@ fn test_max_depth_zero_produces_empty() {
     assert_depth_warning(&result, 0);
 }
 
-/// Tier-2 applies its native stack-safe limit when no explicit limit is configured.
+/// Tier-2 applies its bounded traversal default when no explicit limit is configured.
 #[test]
 fn test_tier2_default_limit_truncates_and_warns() {
-    let html = format!("{}leaf{}", "<div>".repeat(65), "</div>".repeat(65));
+    let html = format!("{}leaf{}", "<div>".repeat(1025), "</div>".repeat(1025));
     let options = ConversionOptions {
         extract_metadata: false,
         max_depth: None,
@@ -172,13 +172,13 @@ fn test_tier2_default_limit_truncates_and_warns() {
     let result = convert_with_options(&html, options);
     let content = result.content.as_deref().unwrap_or_default();
     assert!(!content.contains("leaf"));
-    assert_depth_warning(&result, 64);
+    assert_depth_warning(&result, 1024);
 }
 
 /// Tier-2 processes every node below the default limit without warning.
 #[test]
 fn test_tier2_default_limit_boundary_does_not_warn() {
-    let html = format!("{}leaf{}", "<div>".repeat(63), "</div>".repeat(63));
+    let html = format!("{}leaf{}", "<div>".repeat(1023), "</div>".repeat(1023));
     let options = ConversionOptions {
         extract_metadata: false,
         max_depth: None,
@@ -191,16 +191,10 @@ fn test_tier2_default_limit_boundary_does_not_warn() {
     assert!(result.warnings.is_empty());
 }
 
-// ~keep The configurable backstop (`MAX_CONFIGURABLE_DEPTH` = 1024) clamps out-of-range explicit
-// ~keep limits, but it cannot be asserted directly: observing the clamp requires nesting past 1024,
-// ~keep which recurses deep enough to overflow a non-main thread's stack in debug builds — the very
-// ~keep condition the cap exists to bound. `test_max_depth_can_be_raised_above_native_default_issue_434`
-// ~keep covers the caller-facing behavior (raising the ceiling above the native 64 default).
-
 /// Plain-text output reports the same default Tier-2 truncation as Markdown output.
 #[test]
 fn test_plain_text_default_limit_truncates_and_warns() {
-    let html = format!("{}leaf{}", "<div>".repeat(65), "</div>".repeat(65));
+    let html = format!("{}leaf{}", "<div>".repeat(1025), "</div>".repeat(1025));
     let options = ConversionOptions {
         extract_metadata: false,
         max_depth: None,
@@ -210,7 +204,7 @@ fn test_plain_text_default_limit_truncates_and_warns() {
 
     let result = convert_with_options(&html, options);
     assert!(!result.content.as_deref().unwrap_or_default().contains("leaf"));
-    assert_depth_warning(&result, 64);
+    assert_depth_warning(&result, 1024);
 }
 
 /// A tree whose deepest node is below the configured limit is not truncated.

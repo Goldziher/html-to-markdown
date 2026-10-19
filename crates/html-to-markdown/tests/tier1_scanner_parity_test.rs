@@ -117,9 +117,9 @@ fn should_use_single_backtick_tier1_delimiter_when_inline_code_has_only_a_double
 
 // ~keep ── B. Depth ceiling (audit #57) ──────────────────────────────────────────────
 
-/// Mirrors `NATIVE_STACK_SAFE_DEPTH` (options/conversion.rs) — the default
+/// Mirrors `DEFAULT_MAX_DEPTH` (options/conversion.rs) — the default
 /// `effective_max_depth` when the caller does not set `max_depth`.
-const NATIVE_STACK_SAFE_DEPTH: usize = 64;
+const DEFAULT_MAX_DEPTH: usize = 1024;
 
 fn nested_divs(count: usize) -> String {
     let mut html = "<div>".repeat(count);
@@ -129,25 +129,25 @@ fn nested_divs(count: usize) -> String {
 }
 
 #[test]
-fn should_bail_with_depth_limit_exceeded_when_tier1_nesting_reaches_the_native_stack_safe_depth() {
-    // ~keep One level past the limit: the (NATIVE_STACK_SAFE_DEPTH + 1)-th `<div>`
-    // ~keep opens at stack depth == NATIVE_STACK_SAFE_DEPTH, matching Tier-2's
+fn should_bail_with_depth_limit_exceeded_when_tier1_nesting_reaches_the_default_depth() {
+    // ~keep One level past the limit: the (DEFAULT_MAX_DEPTH + 1)-th `<div>`
+    // ~keep opens at stack depth == DEFAULT_MAX_DEPTH, matching Tier-2's
     // ~keep `depth >= effective_max_depth` skip condition exactly.
-    let html = nested_divs(NATIVE_STACK_SAFE_DEPTH + 1);
+    let html = nested_divs(DEFAULT_MAX_DEPTH + 1);
     let report = PrescanReport::default();
     let result = tier1::run(&html, &report, &base_options());
     match result {
         Err(tier1::BailReason::DepthLimitExceeded { depth, max_depth }) => {
-            assert_eq!(depth, NATIVE_STACK_SAFE_DEPTH);
-            assert_eq!(max_depth, NATIVE_STACK_SAFE_DEPTH);
+            assert_eq!(depth, DEFAULT_MAX_DEPTH);
+            assert_eq!(max_depth, DEFAULT_MAX_DEPTH);
         }
         other => panic!("expected Err(BailReason::DepthLimitExceeded {{ .. }}), got {other:?}"),
     }
 }
 
 #[test]
-fn should_not_bail_when_tier1_nesting_is_exactly_at_the_native_stack_safe_depth() {
-    let html = nested_divs(NATIVE_STACK_SAFE_DEPTH);
+fn should_not_bail_when_tier1_nesting_is_exactly_at_the_default_depth() {
+    let html = nested_divs(DEFAULT_MAX_DEPTH);
     let report = PrescanReport::default();
     let result = tier1::run(&html, &report, &base_options());
     assert!(
@@ -178,11 +178,11 @@ fn should_respect_custom_max_depth_when_tier1_nesting_reaches_it() {
 #[test]
 fn should_match_tier2_output_when_auto_routing_hits_a_pathologically_deep_dom() {
     // ~keep Before the fix, Tier-1 had no ceiling and would fully render all
-    // ~keep NATIVE_STACK_SAFE_DEPTH + 16 levels, while Tier-2 truncates at
-    // ~keep NATIVE_STACK_SAFE_DEPTH — a silent byte-equality violation on any
+    // ~keep DEFAULT_MAX_DEPTH + 16 levels, while Tier-2 truncates at
+    // ~keep DEFAULT_MAX_DEPTH — a silent byte-equality violation on any
     // ~keep pathologically deep document. After the fix, Tier-1 bails and the
     // ~keep Tier-2 fallback (truncated, authoritative) output is returned instead.
-    let html = nested_divs(NATIVE_STACK_SAFE_DEPTH + 16);
+    let html = nested_divs(DEFAULT_MAX_DEPTH + 16);
 
     let tier2_options = ConversionOptions {
         tier_strategy: TierStrategy::Tier2,

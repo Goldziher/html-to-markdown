@@ -569,7 +569,10 @@ fn write_graphic_as_image(
     use base64::{Engine as _, engine::general_purpose::STANDARD};
 
     let MediaContext { options, depth, .. } = context;
-    let svg_html = serialize_element_at_depth(&node_handle, parser, depth, effective_max_depth(options));
+    // ~keep The recursive serializer gets 64 levels from this SVG's root, bounded also
+    // ~keep by the remaining conversion budget; outer HTML consumes no native frames (#924).
+    let max_depth = effective_max_depth(options).min(depth.saturating_add(NATIVE_STACK_SAFE_DEPTH));
+    let svg_html = serialize_element_at_depth(&node_handle, parser, depth, max_depth);
     let base64_svg = STANDARD.encode(svg_html.as_bytes());
 
     output.push_str("![");

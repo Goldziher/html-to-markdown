@@ -6,15 +6,14 @@ use crate::options::validation::{
     NewlineStyle, OutputFormat, UrlEscapeStyle, WhitespaceMode,
 };
 
-/// Native recursion guard used as the default when the caller does not set an
-/// explicit `max_depth`. Kept conservative so untrusted input cannot overflow
-/// the process stack.
+/// Separate conservative guard for raw HTML preservation and serialization helpers.
 pub(crate) const NATIVE_STACK_SAFE_DEPTH: usize = 64;
 
-/// Absolute ceiling a caller may raise `max_depth` to. Callers can exceed the
-/// conservative native default (issue #434) but not this backstop, which still
-/// guards the recursive walker against a genuine stack overflow.
+/// Absolute ceiling for conversion traversal, including explicit `max_depth` values.
 pub(crate) const MAX_CONFIGURABLE_DEPTH: usize = 1024;
+
+/// ~keep Heap-based conversion traversal permits the full bounded depth budget (#852, #924).
+pub(crate) const DEFAULT_MAX_DEPTH: usize = MAX_CONFIGURABLE_DEPTH;
 
 /// Default HTML input limit for WebAssembly builds: 2 MiB. ~keep
 pub const DEFAULT_WASM_MAX_INPUT_SIZE: u64 = 2 * 1024 * 1024;
@@ -211,11 +210,14 @@ pub struct ConversionOptions {
     pub capture_svg: bool,
     /// Infer image dimensions from data.
     pub infer_dimensions: bool,
-    /// Maximum DOM traversal depth.
+    /// Maximum conversion traversal depth (default: 1024).
     ///
-    /// `None` uses the library's internal native-stack safety limit. Explicit
-    /// values above that safety limit are clamped to prevent process-aborting
-    /// stack overflows on pathologically deep DOM trees.
+    /// `None` uses 1024; explicit values are clamped to that same ceiling. Nodes at
+    /// or beyond the limit, including their text and descendants, are skipped and
+    /// a `DepthLimitExceeded` warning is returned. Structural elements such as
+    /// `html` and `body` count toward the depth.
+    ///
+    /// Raw HTML preservation and SVG serialization use separate 64-level guards.
     pub max_depth: Option<usize>,
     /// CSS selectors for elements to exclude entirely (element + all content).
     ///

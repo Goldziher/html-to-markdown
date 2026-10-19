@@ -8,7 +8,7 @@ use crate::options::CodeBlockStyle;
 use crate::options::ConversionOptions;
 use crate::options::HiddenContent;
 use crate::options::NewlineStyle;
-use crate::options::conversion::{MAX_CONFIGURABLE_DEPTH, NATIVE_STACK_SAFE_DEPTH};
+use crate::options::conversion::{DEFAULT_MAX_DEPTH, MAX_CONFIGURABLE_DEPTH};
 
 mod head;
 
@@ -20,13 +20,11 @@ pub use head::{
 
 /// Resolve the effective traversal-depth ceiling.
 ///
-/// When the caller does not set `max_depth`, the conservative native default is
-/// used. An explicit `max_depth` is honored — allowing callers to raise the
-/// ceiling above the native default (issue #434) — but is clamped to
-/// [`MAX_CONFIGURABLE_DEPTH`] so the recursive walker cannot overflow the stack.
+/// The heap-based traversal defaults to [`DEFAULT_MAX_DEPTH`]. Explicit values
+/// can lower the budget, but cannot exceed [`MAX_CONFIGURABLE_DEPTH`].
 pub fn effective_max_depth(options: &ConversionOptions) -> usize {
     match options.max_depth {
-        None => NATIVE_STACK_SAFE_DEPTH,
+        None => DEFAULT_MAX_DEPTH,
         Some(explicit) => explicit.min(MAX_CONFIGURABLE_DEPTH),
     }
 }

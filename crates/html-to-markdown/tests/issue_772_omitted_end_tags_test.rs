@@ -9,9 +9,14 @@ use std::fmt::Write;
 use html_to_markdown_rs::{ConversionOptions, ConversionResult, TierStrategy, WarningKind, convert};
 
 fn convert_with(html: &str, tier_strategy: TierStrategy) -> ConversionResult {
+    convert_with_depth(html, tier_strategy, None)
+}
+
+fn convert_with_depth(html: &str, tier_strategy: TierStrategy, max_depth: Option<usize>) -> ConversionResult {
     let options = ConversionOptions {
         tier_strategy,
         extract_metadata: false,
+        max_depth,
         ..ConversionOptions::default()
     };
     convert(html, Some(options)).expect("conversion must succeed")
@@ -370,11 +375,18 @@ fn a_page_that_nests_past_the_limit_is_still_cut_and_reports_it() {
         "<div>".repeat(70),
         "</div>".repeat(70)
     );
-    let default = convert(&html, None).expect("conversion must succeed");
+    let default = convert(
+        &html,
+        ConversionOptions {
+            max_depth: Some(64),
+            ..Default::default()
+        },
+    )
+    .expect("conversion must succeed");
     let routes = [
         default,
-        convert_with(&html, TierStrategy::Tier2),
-        convert_with(&html, TierStrategy::Tier1),
+        convert_with_depth(&html, TierStrategy::Tier2, Some(64)),
+        convert_with_depth(&html, TierStrategy::Tier1, Some(64)),
     ];
     for result in routes {
         assert_eq!(result.content.as_deref(), Some("Shallow text.\n"));
@@ -385,8 +397,19 @@ fn a_page_that_nests_past_the_limit_is_still_cut_and_reports_it() {
 
 /// The content and the number of depth warnings on the default route and on tier 2.
 fn content_and_depth_warnings(html: &str) -> [(Option<String>, usize); 2] {
-    let default = convert(html, None).expect("conversion must succeed");
-    [default, convert_with(html, TierStrategy::Tier2)].map(|result| {
+    content_and_depth_warnings_at_depth(html, None)
+}
+
+fn content_and_depth_warnings_at_depth(html: &str, max_depth: Option<usize>) -> [(Option<String>, usize); 2] {
+    let default = convert(
+        html,
+        ConversionOptions {
+            max_depth,
+            ..Default::default()
+        },
+    )
+    .expect("conversion must succeed");
+    [default, convert_with_depth(html, TierStrategy::Tier2, max_depth)].map(|result| {
         let depth_warnings = result
             .warnings
             .iter()
@@ -401,13 +424,13 @@ fn content_and_depth_warnings(html: &str) -> [(Option<String>, usize); 2] {
 fn the_deepest_fragment_that_converts_still_converts_with_an_omitted_end_tag() {
     // ~keep The second parse must not make the tree deeper than the input wrote it: the tree
     // ~keep builder gives every document an `<html>` and a `<body>`, and the depth limit counts
-    // ~keep each level. The outputs are those of 3.17.2.
+    // ~keep each level. An explicit 64-level budget preserves the boundary tested in 3.17.2.
     let nested = |depth: usize| format!("{}<p>x", "<div>".repeat(depth));
-    for (content, depth_warnings) in content_and_depth_warnings(&nested(62)) {
+    for (content, depth_warnings) in content_and_depth_warnings_at_depth(&nested(62), Some(64)) {
         assert_eq!(content.as_deref(), Some("x\n"));
         assert_eq!(depth_warnings, 0);
     }
-    for (content, depth_warnings) in content_and_depth_warnings(&nested(63)) {
+    for (content, depth_warnings) in content_and_depth_warnings_at_depth(&nested(63), Some(64)) {
         assert_eq!(content.as_deref(), Some(""));
         assert_eq!(depth_warnings, 1);
     }
@@ -415,11 +438,11 @@ fn the_deepest_fragment_that_converts_still_converts_with_an_omitted_end_tag() {
 
 #[test]
 fn a_list_that_nests_past_the_limit_keeps_every_bullet_above_the_limit() {
-    // ~keep The output of 3.17.2: one empty bullet for each of the 32 lists above the limit.
+    // ~keep The output of 3.17.2 with a 64-level budget: one empty bullet for each of 32 lists.
     let bullets: Vec<&str> = ["-", "*", "+"].into_iter().cycle().take(32).collect();
     let expected = format!("{}\n", bullets.join(" "));
     let html = format!("{}x", "<ul><li>".repeat(100));
-    for (content, depth_warnings) in content_and_depth_warnings(&html) {
+    for (content, depth_warnings) in content_and_depth_warnings_at_depth(&html, Some(64)) {
         assert_eq!(content.as_deref(), Some(expected.as_str()));
         assert_eq!(depth_warnings, 1);
     }
@@ -432,14 +455,15 @@ fn an_omitted_end_tag_leaves_the_depth_limit_where_the_page_with_every_end_tag_h
         for depth in 54..=68 {
             let open = "<div>".repeat(depth);
             let close = "</div>".repeat(depth);
-            let closed = content_and_depth_warnings(&format!("{document_start}{open}<p>x</p>{close}"));
+            let closed =
+                content_and_depth_warnings_at_depth(&format!("{document_start}{open}<p>x</p>{close}"), Some(64));
             converted_depths += usize::from(closed[0].1 == 0);
             for omitted in [
                 format!("{document_start}{open}<p>x"),
                 format!("{document_start}{open}<p>x{close}"),
             ] {
                 assert_eq!(
-                    content_and_depth_warnings(&omitted),
+                    content_and_depth_warnings_at_depth(&omitted, Some(64)),
                     closed,
                     "{document_start:?} at depth {depth}: {:?}",
                     &omitted[omitted.len() - 12..]
@@ -477,8 +501,15 @@ fn a_deep_page_that_took_the_second_parse_before_keeps_its_text_and_its_warning(
         (format!("<x-note><p>one</x-note>{open}x"), "one\n"),
     ];
     for (html, expected) in &pages {
-        let default = convert(html, None).expect("conversion must succeed");
-        for result in [default, convert_with(html, TierStrategy::Tier2)] {
+        let default = convert(
+            html,
+            ConversionOptions {
+                max_depth: Some(64),
+                ..Default::default()
+            },
+        )
+        .expect("conversion must succeed");
+        for result in [default, convert_with_depth(html, TierStrategy::Tier2, Some(64))] {
             assert_eq!(result.content.as_deref(), Some(*expected), "{:?}", &html[..40]);
             assert_eq!(result.warnings.len(), 1, "warnings: {:?}", result.warnings);
             assert!(matches!(result.warnings[0].kind, WarningKind::DepthLimitExceeded));

@@ -558,10 +558,21 @@ mod tests {
     #[test]
     fn should_keep_the_first_parse_when_the_second_parse_nests_past_its_limit() {
         let html = format!("<p>kept</p>{}deep", "<div>".repeat(600));
-        let (calls, content) = parse_calls_for(&html);
+        // ~keep This tests repair fallback with a deliberately low traversal budget, independent
+        // ~keep of the default conversion depth (#924).
+        PARSE_CALLS.with(|calls| calls.set(0));
+        let result = convert(
+            &html,
+            ConversionOptions {
+                tier_strategy: TierStrategy::Tier2,
+                max_depth: Some(64),
+                ..Default::default()
+            },
+        )
+        .expect("convert unrepaired HTML");
 
-        assert_eq!(content.as_deref(), Some("kept\n"));
-        assert_eq!(calls, 1);
+        assert_eq!(result.content.as_deref(), Some("kept\n"));
+        assert_eq!(PARSE_CALLS.with(std::cell::Cell::get), 1);
     }
 
     #[test]

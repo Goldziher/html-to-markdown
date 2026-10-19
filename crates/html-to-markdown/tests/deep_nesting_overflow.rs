@@ -89,7 +89,7 @@ fn deep_link_descendant_text_does_not_overflow_stack() {
 }
 
 #[test]
-fn default_depth_uses_stack_safe_limit() {
+fn default_depth_preserves_deep_content_on_a_small_stack() {
     let _guard = test_lock();
     let mut html = String::from("<html><body>");
     for _ in 0..1_000 {
@@ -101,14 +101,10 @@ fn default_depth_uses_stack_safe_limit() {
     }
     html.push_str("</body></html>");
 
-    // ~keep MSVC debug frames need more than the helper's 256 KiB budget even when the
-    // converter correctly stops at the native stack-safe depth. One MiB remains far below
-    // what an unfixed 1,000-frame traversal requires, so the regression still fails.
-    assert!(converts_without_overflow_on_stack(
-        html,
-        ConversionOptions::default(),
-        1024 * 1024
-    ));
+    // ~keep The heap walker must preserve the leaf within the original 1 MiB stack budget (#924).
+    let result = convert_without_overflow_on_stack(html, ConversionOptions::default(), 1024 * 1024);
+    assert_eq!(result.content.as_deref(), Some("deep\n"));
+    assert!(result.warnings.is_empty(), "{:?}", result.warnings);
 }
 
 #[test]

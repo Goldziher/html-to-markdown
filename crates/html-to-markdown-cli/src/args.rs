@@ -498,7 +498,7 @@ pub struct ExtendedConversionArgs {
     /// Maximum DOM traversal depth
     ///
     /// Truncate subtrees beyond this nesting depth. Records a processing warning;
-    /// use --show-warnings to print it. Omission uses the native-stack safety limit.
+    /// use --show-warnings to print it. Defaults to 1024; higher values are capped at 1024.
     #[arg(long, value_name = "N")]
     #[arg(help_heading = "Element Handling")]
     pub max_depth: Option<usize>,

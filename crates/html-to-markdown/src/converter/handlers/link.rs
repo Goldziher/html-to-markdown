@@ -972,18 +972,22 @@ fn should_defer_table_blocks(
 /// ~keep first `<table>` found regardless of subtree size.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn subtree_has_table(handle: &tl::NodeHandle, parser: &tl::Parser, dom_ctx: &DomContext) -> bool {
-    let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
-        return false;
-    };
-    if normalized_tag_name(tag.name().as_utf8_str()) == "table" {
-        return true;
+    // ~keep Rendering's max_depth does not bound the raw DOM scanned here (issue #923).
+    let mut pending = vec![*handle];
+    while let Some(handle) = pending.pop() {
+        let Some(tl::Node::Tag(tag)) = handle.get(parser) else {
+            continue;
+        };
+        if normalized_tag_name(tag.name().as_utf8_str()) == "table" {
+            return true;
+        }
+        let descendants_start = pending.len();
+        if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
+            pending.extend(children.iter().copied());
+        } else {
+            pending.extend(tag.children().top().iter().copied());
+        }
+        pending[descendants_start..].reverse();
     }
-    if let Some(children) = dom_ctx.children_of(handle.get_inner()) {
-        children.iter().any(|child| subtree_has_table(child, parser, dom_ctx))
-    } else {
-        tag.children()
-            .top()
-            .iter()
-            .any(|child| subtree_has_table(child, parser, dom_ctx))
-    }
+    false
 }
