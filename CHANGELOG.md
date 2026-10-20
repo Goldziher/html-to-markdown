@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.5] - 2026-10-20
+
+### Fixed
+
+- Ignore source-layout whitespace between MathML elements so inline formulas stay within their paragraph (#925).
+- Escape literal asterisks inside bold table text to preserve the intended formatting (#926).
+- Omit presentation tables whose cells contain only line breaks (#927).
+- Preserve link destinations inside preformatted blocks (#928).
+
 ## [3.18.4] - 2026-10-19
 
 ### Changed
