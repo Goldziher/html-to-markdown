@@ -56,10 +56,10 @@ fn should_keep_backticks_spaces_and_nested_styles_inside_link_code_labels() {
 }
 
 #[test]
-fn should_keep_code_blocks_literal_and_links_without_destinations_as_code() {
+fn should_preserve_preformatted_links_and_keep_links_without_destinations_as_code() {
     assert_paths(
         r#"<pre><code>list.<a href="/api/append">append</a>(x)</code></pre>"#,
-        "```\nlist.append(x)\n```\n",
+        "```\nlist.[append](/api/append)(x)\n```\n",
     );
     assert_paths("<p><code>list.<a>append</a>(x)</code></p>", "`list.append(x)`\n");
     assert_paths(

@@ -5,8 +5,8 @@
 
 //! The calls a visitor gets for a link, a highlight and an image in code.
 //!
-//! Code writes a link and a highlight as their text. The visitor still gets the calls it gets for
-//! the same markup outside code, in the same order: none for a link that is left out (an empty
+//! Code preserves link destinations and writes highlights as their text. The visitor still gets
+//! the calls for the same markup outside code, in the same order: none for a link that is left out (an empty
 //! anchor into its own page, which a highlighter writes for each line of code), none for a link in
 //! the `<address>` form, none for a link around one heading.
 
@@ -509,13 +509,13 @@ fn a_link_in_code_whose_image_the_options_remove_gets_the_same_calls_as_before()
 }
 
 #[test]
-fn an_anchor_that_gets_no_call_still_writes_its_text_in_code() {
+fn an_anchor_that_gets_no_call_still_preserves_its_destination_in_code() {
     for (html, code, output) in [
         ("<pre>a<a href=\"#x\"> </a>b</pre>", "a b", "```\na b\n```\n"),
         (
             "<pre>see <a href=\"https://e.org/x\">https://e.org/x</a> end</pre>",
-            "see https://e.org/x end",
-            "```\nsee https://e.org/x end\n```\n",
+            "see [https://e.org/x](https://e.org/x) end",
+            "```\nsee [https://e.org/x](https://e.org/x) end\n```\n",
         ),
         (
             "<pre><a id=\"l1\" href=\"#l1\"></a>a = 1\n<a id=\"l2\" href=\"#l2\"></a>  b = 2\n</pre>",
@@ -536,8 +536,12 @@ fn the_text_argument_of_a_link_in_code_is_the_text_the_code_shows() {
         CodeBlockStyle::Backticks,
     );
     assert_eq!(seen.link_texts, ["hot link"]);
-    assert_eq!(seen.code, ["a hot link b"], "the code argument holds no link marks");
-    assert_eq!(content, "```\na hot link b\n```\n");
+    assert_eq!(
+        seen.code,
+        ["a [hot link](/x) b"],
+        "the code argument preserves the link destination"
+    );
+    assert_eq!(content, "```\na [hot link](/x) b\n```\n");
 }
 
 #[test]

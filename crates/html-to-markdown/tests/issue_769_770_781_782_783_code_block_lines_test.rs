@@ -255,12 +255,12 @@ const CASES: &[Case] = &[
     case(
         "issue 781, a link in a block",
         "<pre>author: Guido &lt;<a href=\"/mail\">guido</a>&gt;</pre>",
-        "```\nauthor: Guido <guido>\n```\n",
+        "```\nauthor: Guido <[guido](/mail)>\n```\n",
     ),
     case(
         "issue 781, a link in pre and code",
         "<pre><code>see <a href=\"/api\">the API</a> first</code></pre>",
-        "```\nsee the API first\n```\n",
+        "```\nsee [the API](/api) first\n```\n",
     ),
     // ~keep Issue #813 decides: a link in a code span stays a link. Before the sync: "`see the API`\n".
     case(
@@ -292,7 +292,7 @@ const CASES: &[Case] = &[
     case(
         "issue 781, a link around an inline graphic in a block",
         "<pre>go <a href=\"/p\"><svg width=\"1\" height=\"1\"><text>there</text></svg></a> now</pre>",
-        "```\ngo there now\n```\n",
+        "```\ngo [there](/p) now\n```\n",
     ),
     case(
         "issue 781, highlighted text and an abbreviation in a block",
@@ -379,7 +379,7 @@ const CASES: &[Case] = &[
     case(
         "a link in code whose text is its address",
         "<pre>see <a href=\"https://example.com/a_b\">https://example.com/a_b</a></pre>",
-        "```\nsee https://example.com/a_b\n```\n",
+        "```\nsee [https://example.com/a_b](https://example.com/a_b)\n```\n",
     ),
     tier1_case(
         "a line of three backticks in the code, then a second block",
@@ -866,7 +866,7 @@ mod visitor_in_code {
             seen,
             ["link /x link", "mark hot", "image i.png pic", "link /y `two`"].map(String::from)
         );
-        assert_eq!(content, "```\nlink hot pic end\n```\n\n`b `[`two`](/y)\n");
+        assert_eq!(content, "```\n[link](/x) hot pic end\n```\n\n`b `[`two`](/y)\n");
     }
 
     #[test]
@@ -883,7 +883,10 @@ mod visitor_in_code {
 fn should_keep_a_link_of_a_code_block_in_the_metadata() {
     let html = "<pre>author: Guido &lt;<a href=\"/mail\">guido</a>&gt;</pre>";
     let result = convert(html, None).expect("conversion must succeed");
-    assert_eq!(result.content.as_deref(), Some("```\nauthor: Guido <guido>\n```\n"));
+    assert_eq!(
+        result.content.as_deref(),
+        Some("```\nauthor: Guido <[guido](/mail)>\n```\n")
+    );
     let links: Vec<(String, String)> = result
         .metadata
         .links

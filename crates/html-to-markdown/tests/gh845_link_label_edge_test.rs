@@ -310,7 +310,10 @@ fn code_and_strict_mode_keep_their_text() {
         "<p>See <code>Press<a href=\"/p\"> Go </a>now</code> end</p>",
         "See `Press`[` Go `](/p)`now` end\n",
     );
-    assert_row_of_full_converter("<pre>Press<a href=\"/p\"> Go </a>now</pre>", "```\nPress Go now\n```\n");
+    assert_row_of_full_converter(
+        "<pre>Press<a href=\"/p\"> Go </a>now</pre>",
+        "```\nPress[ Go ](/p)now\n```\n",
+    );
     // ~keep The strict mode keeps the white space of the source inside the link: the full
     // ~keep converter writes every such page, on the default route too.
     for tier_strategy in [TierStrategy::Tier2, TierStrategy::default()] {

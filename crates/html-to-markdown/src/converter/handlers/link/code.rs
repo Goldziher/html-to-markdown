@@ -148,8 +148,10 @@ impl CodeText {
                         .unwrap_or_else(|| label.is_some_and(|content| !normalize_link_label(&content).is_empty()));
                     if shown {
                         emit_link(tag, data, &self.text, &LabelEdges::NONE, false, element);
-                    } else {
+                    } else if data.is_dropped(&normalize_link_label(&self.text), element) {
                         element.output.push_str(&self.text);
+                    } else {
+                        super::write_link(element.output, tag, data, &self.text, element.options, element.context);
                     }
                     #[cfg(feature = "metadata")]
                     record_link_metadata(tag, data, self.text.trim(), element.context);

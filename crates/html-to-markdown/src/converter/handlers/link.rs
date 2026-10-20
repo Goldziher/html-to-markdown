@@ -80,9 +80,7 @@ pub fn open_link(
             }),
         }
     } else if handler.context.in_code {
-        // ~keep A code block shows every character as text, so a link there writes its text and no
-        // ~keep marks (#781). A visitor sees the links that it sees outside code, and decides what
-        // ~keep they write.
+        // ~keep A preformatted link preserves its destination (#928); the code walk keeps its label's whitespace.
         handler.context.inline_data_replaced.set(false);
         LinkFlow::Code(CodeText::open(&data, handler, children))
     } else {
@@ -785,7 +783,11 @@ fn write_link(
     options: &ConversionOptions,
     context: &Context,
 ) {
-    if data.href_addr_dropped || data.href.is_empty() || context.in_code || context.in_code_block {
+    if data.href_addr_dropped
+        || data.href.is_empty()
+        || (context.in_code && !context.in_code_block)
+        || (context.in_code_block && normalize_link_label(label).is_empty())
+    {
         output.push_str(label);
         return;
     }

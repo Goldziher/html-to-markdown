@@ -61,9 +61,18 @@ fn wrapper_preserves_content_after_nested_table() {
 }
 
 #[test]
-fn preformatted_nested_anchors_keep_literal_content() {
+fn preformatted_nested_anchors_preserve_both_destinations() {
     let html = r#"<pre><a href="/outer">Outer <a href="/inner">Inner</a></a></pre>"#;
-    assert_eq!(convert(html, None).unwrap().content.unwrap(), "```\nOuter Inner\n```\n");
+    for tier_strategy in [TierStrategy::Auto, TierStrategy::Tier2] {
+        let options = ConversionOptions {
+            tier_strategy,
+            ..Default::default()
+        };
+        assert_eq!(
+            convert(html, Some(options)).unwrap().content.unwrap(),
+            "```\n[Outer \\[Inner\\](/inner)](/outer)\n```\n"
+        );
+    }
 }
 
 #[cfg(feature = "visitor")]
