@@ -595,10 +595,10 @@ pub fn handle_math(
     let MediaContext {
         options, ctx, dom_ctx, ..
     } = context;
-    use crate::converter::utility::content::get_text_content;
+    use crate::converter::utility::content::get_math_text_content;
     use crate::text;
 
-    let text_content = get_text_content(node_handle, parser, dom_ctx).trim().to_string();
+    let text_content = get_math_text_content(node_handle, parser, dom_ctx);
 
     if text_content.is_empty() {
         return;

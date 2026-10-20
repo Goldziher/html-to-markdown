@@ -130,9 +130,9 @@ pub use self::main_helpers::document_head;
 pub use self::main_helpers::{emit_table_cell_break, strip_trailing_backslash_breaks, trim_trailing_whitespace};
 pub use self::main_helpers::{has_head_content_outside_head, repair_head_content_outside_head};
 
-pub use crate::converter::utility::content::{
-    chomp_inline, get_text_content, merge_adjacent_emphasis, normalized_tag_name,
-};
+#[cfg(feature = "visitor")]
+pub use crate::converter::utility::content::get_text_content;
+pub use crate::converter::utility::content::{chomp_inline, merge_adjacent_emphasis, normalized_tag_name};
 // ~keep reason: serialize_node and serialize_node_to_html are only used when the visitor
 // ~keep or inline-images features are active; re-exported here so call sites don't need
 // ~keep to know the internal utility path.

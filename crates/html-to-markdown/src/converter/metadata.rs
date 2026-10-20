@@ -165,9 +165,7 @@ fn handle_math(
     ctx: &Context,
     dom_ctx: &DomContext,
 ) {
-    let text_content = crate::converter::get_text_content(node_handle, parser, dom_ctx)
-        .trim()
-        .to_string();
+    let text_content = crate::converter::utility::content::get_math_text_content(node_handle, parser, dom_ctx);
 
     if text_content.is_empty() {
         return;
