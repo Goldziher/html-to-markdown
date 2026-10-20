@@ -154,7 +154,9 @@ impl TextProcessor<'_, '_, '_> {
     }
 
     fn escape_asterisks(&self) -> bool {
+        // ~keep A literal asterisk can close bold table markup even with optional prose escaping off (#926).
         self.handler.options.escape_asterisks
+            || (self.handler.ctx.in_table_cell && self.handler.ctx.in_strong)
             || self
                 .handler
                 .ctx

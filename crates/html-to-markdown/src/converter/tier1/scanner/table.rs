@@ -20,6 +20,10 @@ fn validate_table_layout(
     table: &crate::converter::tier1::state::TableState,
     probe: &TableLayoutProbe,
 ) -> Result<(), BailReason> {
+    // ~keep The DOM content scan distinguishes blank presentation spacers from break-only data tables (#927).
+    if probe.presentation {
+        return Err(BailReason::Classifier);
+    }
     // ~keep Safety checks: ensure Tier-2 would also use the GFM path.
     // ~keep
     // ~keep Tier-2 uses the layout (non-GFM) path when ALL of these hold:

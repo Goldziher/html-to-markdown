@@ -203,7 +203,7 @@ fn content_summary(
         return cached;
     }
 
-    let mut acc_stack: Vec<(u32, TableContentSummary)> = Vec::new();
+    let mut acc_stack: Vec<(TableContentSummary, bool)> = Vec::new();
     let mut work = vec![ContentFrame::Enter(table_handle)];
     while let Some(frame) = work.pop() {
         match frame {
@@ -227,19 +227,24 @@ fn visit_content_node(
     handle: tl::NodeHandle,
     parser: &tl::Parser,
     dom_ctx: &super::super::super::DomContext,
-    acc_stack: &mut Vec<(u32, TableContentSummary)>,
+    acc_stack: &mut Vec<(TableContentSummary, bool)>,
     work: &mut Vec<ContentFrame>,
     br_in_tables: bool,
 ) {
     let content = ContentTest {
-        br_in_tables,
+        br_in_tables: br_in_tables && !acc_stack.last().is_some_and(|(_, presentation)| *presentation),
         checkboxes: true,
     };
-    let acc = acc_stack.last_mut().map(|(_, acc)| acc);
+    let acc = acc_stack.last_mut().map(|(acc, _)| acc);
     match fold_node_content(handle, parser, dom_ctx, acc, content) {
         Some(Element::Table(tag)) => {
             let id = handle.get_inner();
-            acc_stack.push((id, TableContentSummary::default()));
+            let presentation = tag
+                .attributes()
+                .get("role")
+                .flatten()
+                .is_some_and(|role| role.as_utf8_str().eq_ignore_ascii_case("presentation"));
+            acc_stack.push((TableContentSummary::default(), presentation));
             work.push(ContentFrame::ExitTable(id));
             work.extend(tag.children().top().iter().copied().map(ContentFrame::Enter));
         }
@@ -396,13 +401,13 @@ fn apply_tag_content(
 fn finish_table_accumulator(
     id: u32,
     dom_ctx: &super::super::super::DomContext,
-    acc_stack: &mut Vec<(u32, TableContentSummary)>,
+    acc_stack: &mut Vec<(TableContentSummary, bool)>,
 ) {
-    let Some((_finished_id, finished)) = acc_stack.pop() else {
+    let Some((finished, _)) = acc_stack.pop() else {
         return;
     };
     dom_ctx.cache_table_content_summary(id, finished);
-    if let Some((_, parent)) = acc_stack.last_mut() {
+    if let Some((parent, _)) = acc_stack.last_mut() {
         parent.merge(finished);
     }
 }

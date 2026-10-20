@@ -452,6 +452,11 @@ struct TextEmission<'a> {
 
 fn emit_normal_text(state: &mut Tier1State, emission: TextEmission<'_>) -> Result<(), BailReason> {
     let in_cell = state.in_table_cell();
+    let escape_asterisks = in_cell
+        && state
+            .stack
+            .iter()
+            .any(|frame| matches!(frame.spec.kind, TagKind::Strong));
     let folds_lines = in_cell
         || state
             .stack
@@ -481,6 +486,10 @@ fn emit_normal_text(state: &mut Tier1State, emission: TextEmission<'_>) -> Resul
     )?;
     indent_list_item_text_continuation_lines(dest, emitted_from, list_indent_width);
     escape_backslash_run(dest, emitted_from, in_cell);
+    if escape_asterisks && dest[emitted_from..].contains('*') {
+        let escaped = dest[emitted_from..].replace('*', r"\*");
+        dest.replace_range(emitted_from.., &escaped);
+    }
     escape_emitted_text(
         dest,
         EmittedTextContext {

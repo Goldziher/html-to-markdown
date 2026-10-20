@@ -880,6 +880,7 @@ struct TableLayoutProbe {
     has_span: bool,
     /// True when the `<table>` tag carried `border="0"` exactly.
     border_zero: bool,
+    presentation: bool,
 }
 
 fn open_table(state: &mut Tier1State, attrs: &[(&[u8], Option<&[u8]>)], table_probes: &mut Vec<TableLayoutProbe>) {
@@ -898,6 +899,7 @@ fn open_table(state: &mut Tier1State, attrs: &[(&[u8], Option<&[u8]>)], table_pr
     // border-zero there, so they must not be here either.
     table_probes.push(TableLayoutProbe {
         border_zero: find_attr(attrs, b"border").is_some_and(|value| value == b"0".as_slice()),
+        presentation: find_attr(attrs, b"role").is_some_and(|value| value.eq_ignore_ascii_case(b"presentation")),
         ..TableLayoutProbe::default()
     });
 }
