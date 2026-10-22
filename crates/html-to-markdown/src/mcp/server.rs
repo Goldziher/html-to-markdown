@@ -213,10 +213,7 @@ impl ServerHandler for HtmlToMarkdownMcp {
             .with_website_url("https://github.com/xberg-io/html-to-markdown");
 
         InitializeResult::new(capabilities)
-            // Advertise the newest supported MCP revision; rmcp negotiates down for older
-            // clients. `ProtocolVersion::LATEST`/`default()` still resolves to 2025-11-25 as of
-            // rmcp 3.4.0 (`LATEST = V_2025_11_25`), so select 2026-07-28 explicitly. Re-check
-            // this on every rmcp bump: if LATEST advances, this pin becomes the older choice. ~keep
+            // ~keep Pin the advertised revision so an SDK upgrade cannot change protocol compatibility implicitly.
             .with_protocol_version(ProtocolVersion::V_2026_07_28)
             .with_server_info(server_info)
             .with_instructions(

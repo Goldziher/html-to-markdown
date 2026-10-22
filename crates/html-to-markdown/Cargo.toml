@@ -54,7 +54,7 @@ memchr = "2"
 once_cell.workspace = true
 phf = { version = "0.14", features = ["macros"] }
 regex.workspace = true
-rmcp = { version = "3.5.1", features = [
+rmcp = { version = "3.6.0", features = [
     "server",
     "macros",
     "transport-io",
@@ -73,7 +73,7 @@ tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-comrak = { version = "0.55.0", default-features = false }
+comrak = { version = "0.57.0", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml.workspace = true
