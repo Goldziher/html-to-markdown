@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Separate the text on either side of a `<br>` in the document structure, with a line break in a paragraph or list
+  item and a space in a heading, so `Loose words<br>next line` is no longer recorded as `Loose wordsnext line`.
+
 ## [3.18.6] - 2026-10-22
 
 ### Fixed

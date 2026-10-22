@@ -48,10 +48,21 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         rule_like_text.advance();
     }
 
+    record_structure_break(ctx);
     if write_special_break(output, ctx) {
         return;
     }
     write_flow_break(output, options, ctx);
+}
+
+/// Add the break to the paragraph, heading or list item being recorded for the document
+/// structure: a line break, or a space in a heading, which holds one line. Code and table cells
+/// get their text from their own nodes.
+fn record_structure_break(ctx: &Context) {
+    if ctx.in_code || ctx.in_code_block || ctx.in_table_cell || ctx.in_layout_cell {
+        return;
+    }
+    crate::converter::structure_capture::append_text(ctx, if ctx.in_heading { " " } else { "\n" });
 }
 
 fn write_special_break(output: &mut String, ctx: &Context) -> bool {
