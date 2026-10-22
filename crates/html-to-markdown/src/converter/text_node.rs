@@ -112,6 +112,7 @@ impl TextProcessor<'_, '_, '_> {
         }
         let decoded = self.without_line_end_before_zero_width_space(decoded);
         let escape_asterisks = self.escape_asterisks();
+        crate::converter::structure_capture::begin_loose_paragraph(self.handler.ctx);
         let capture_semantic = crate::converter::structure_capture::is_text_capture_active(self.handler.ctx);
         let processed = self.process_content(decoded, escape_asterisks, facts.was_fresh_block_start, capture_semantic);
         #[cfg(feature = "visitor")]

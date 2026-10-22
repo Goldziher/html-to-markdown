@@ -2,8 +2,8 @@ use crate::converter::context::{
     INLINE_BUFFER_COLUMN_CHAR_READS, INLINE_BUFFER_CONTEXT_CALLS, INLINE_BUFFER_LINE_SEARCH_CALLS,
 };
 use crate::{
-    ConversionOptions, ConversionResult, DocumentNode, DocumentStructure, HighlightStyle, NodeContent, OutputFormat,
-    TierStrategy, WhitespaceMode, convert,
+    AnnotationKind, ConversionOptions, ConversionResult, DocumentNode, DocumentStructure, HighlightStyle, NodeContent,
+    OutputFormat, TextAnnotation, TierStrategy, WhitespaceMode, convert,
 };
 
 fn assert_side_data(result: &ConversionResult, title: Option<&str>, nodes: Vec<DocumentNode>) {
@@ -32,6 +32,22 @@ fn assert_side_data(result: &ConversionResult, title: Option<&str>, nodes: Vec<D
     }
     #[cfg(not(feature = "metadata"))]
     let _ = title;
+}
+
+/// The paragraph the visible text of a `<div>` or `<code>` case leaves in the document structure.
+fn paragraph(id: &str, text: &str, annotations: Vec<TextAnnotation>) -> DocumentNode {
+    DocumentNode {
+        id: id.to_string(),
+        content: NodeContent::Paragraph { text: text.to_string() },
+        parent: None,
+        children: vec![],
+        annotations,
+        attributes: None,
+    }
+}
+
+fn z_paragraph() -> DocumentNode {
+    paragraph("paragraph-74cbc0cc85b75978", "z", vec![])
 }
 
 #[test]
@@ -70,7 +86,7 @@ fn blank_marks_should_preserve_styles_tags_wrapping_and_side_data() {
             "---\ntitle: T\n---\n\n\u{2000} \u{2000} z\n\n".to_string()
         };
         assert_eq!(result.content.as_deref(), Some(expected.as_str()));
-        assert_side_data(&result, Some("T"), vec![]);
+        assert_side_data(&result, Some("T"), vec![z_paragraph()]);
     }
 }
 
@@ -133,7 +149,16 @@ fn blank_marks_should_keep_parent_and_plain_text_callback_results() {
                 format!("---\ntitle: T\n---\n\n\u{2000}{markup}\u{2000}{markup}z\n")
             };
             assert_eq!(result.content.as_deref(), Some(expected.as_str()));
-            assert_side_data(&result, Some("T"), vec![]);
+            let visible = match &answer {
+                VisitResult::Custom(_) => paragraph("paragraph-11a3b271d5981cb4", "C\u{2000}Cz", vec![]),
+                VisitResult::PreserveHtml => paragraph(
+                    "paragraph-2c3453a82d982cc9",
+                    "<mark>\u{2000}</mark>\u{2000}<mark>\u{2000}</mark>z",
+                    vec![],
+                ),
+                _ => z_paragraph(),
+            };
+            assert_side_data(&result, Some("T"), vec![visible]);
             let rec = recorder.lock().expect("visitor recorder");
             assert_eq!(rec.marks, ["\u{2000}", "\u{2000}"]);
             let texts = if output_format == OutputFormat::Plain {
@@ -203,8 +228,28 @@ fn blank_marks_should_keep_line_break_code_and_fallback_policies() {
                 annotations: vec![],
                 attributes: None,
             }]
+        } else if html.starts_with("<div>x<br>") {
+            vec![paragraph(
+                "paragraph-4fed1c9f442a0a5e",
+                "x\n\n z",
+                vec![TextAnnotation {
+                    start: 2,
+                    end: 4,
+                    kind: AnnotationKind::Highlight,
+                }],
+            )]
+        } else if html.starts_with("<code>") {
+            vec![paragraph(
+                "paragraph-74cbc0cc85b75978",
+                "z",
+                vec![TextAnnotation {
+                    start: 0,
+                    end: 1,
+                    kind: AnnotationKind::Code,
+                }],
+            )]
         } else {
-            vec![]
+            vec![z_paragraph()]
         };
         assert_side_data(&result, None, nodes);
     }

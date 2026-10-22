@@ -281,3 +281,52 @@ fn heading_breaks_preserve_spaces_inside_inline_code() {
         );
     }
 }
+
+#[test]
+fn strict_mark_newlines_and_breaks_match_paragraph_and_loose_text_captures() {
+    use html_to_markdown_rs::{HighlightStyle, TierStrategy, WhitespaceMode};
+
+    let mut checked = 0;
+    for (mark_text, expected) in [
+        ("\r\n ", [("x\n z", 1, 3), ("x\n\n z", 2, 4), ("x\n\n\n z", 3, 5)]),
+        (" ", [("x z", 1, 2), ("x\n z", 2, 3), ("x\n\n z", 3, 4)]),
+        ("\r\n1. ", [("x\n1. z", 1, 5), ("x\n1. z", 2, 5), ("x\n\n\n1. z", 3, 7)]),
+        ("1. ", [("x1. z", 1, 4), ("x\n1. z", 2, 5), ("x\n\n1. z", 3, 6)]),
+    ] {
+        for tag in ["p", "div"] {
+            for (breaks, (text, start, end)) in expected.into_iter().enumerate() {
+                let html = format!("<{tag}>x{}<mark>{mark_text}</mark>z</{tag}>", "<br>".repeat(breaks));
+                let document = convert(
+                    &html,
+                    Some(ConversionOptions {
+                        include_document_structure: true,
+                        whitespace_mode: WhitespaceMode::Strict,
+                        highlight_style: HighlightStyle::None,
+                        tier_strategy: TierStrategy::Tier2,
+                        ..ConversionOptions::default()
+                    }),
+                )
+                .expect("conversion should succeed")
+                .document
+                .expect("document structure should be populated");
+                assert_eq!(document.nodes.len(), 1, "input: {html:?}");
+                assert_eq!(
+                    document.nodes[0].content,
+                    NodeContent::Paragraph { text: text.to_string() },
+                    "input: {html:?}"
+                );
+                assert_eq!(
+                    document.nodes[0].annotations,
+                    [TextAnnotation {
+                        start,
+                        end,
+                        kind: AnnotationKind::Highlight
+                    }],
+                    "input: {html:?}"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert_eq!(checked, 24);
+}
