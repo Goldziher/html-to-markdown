@@ -87,6 +87,8 @@ pub struct StructureCollector {
     tables: Vec<TableData>,
     text_captures: Vec<TextCapture>,
     element_captures: Vec<ElementCapture>,
+    /// The paragraph collecting text that no paragraph, heading or list item holds.
+    loose_paragraph: Option<TextCaptureId>,
     next_capture_id: u64,
     next_annotation_token: u64,
 }
@@ -116,6 +118,7 @@ impl StructureCollector {
             tables: Vec::new(),
             text_captures: Vec::new(),
             element_captures: Vec::new(),
+            loose_paragraph: None,
             next_capture_id: 0,
             next_annotation_token: 0,
         }
@@ -151,6 +154,28 @@ impl StructureCollector {
 
     pub(crate) fn has_active_text_capture(&self) -> bool {
         self.text_captures.iter().any(|capture| !capture.suspended)
+    }
+
+    /// Start a paragraph for text outside any paragraph, heading or list item, such as the text
+    /// of `<div>Words</div>` or the text after a list. A list container keeps its own text, so
+    /// nothing starts inside one.
+    pub(crate) fn begin_loose_paragraph(&mut self) {
+        if self.has_active_text_capture() || !self.list_stack.is_empty() {
+            return;
+        }
+        self.loose_paragraph = Some(self.begin_text_capture(TextCaptureKind::Paragraph));
+    }
+
+    /// Record the open loose paragraph, if it holds any text. A block element begins or ends
+    /// here, so the loose text before it is a paragraph of its own.
+    pub(crate) fn finish_loose_paragraph(&mut self) {
+        let Some(id) = self.loose_paragraph.take() else {
+            return;
+        };
+        let (text, annotations) = self.finish_text_capture(id);
+        if !text.is_empty() {
+            self.push_paragraph_with_annotations(&text, annotations);
+        }
     }
 
     pub(crate) fn begin_element(&mut self, kind: Option<super::document::AnnotationKind>) {
@@ -526,7 +551,8 @@ impl StructureCollector {
     /// Returns `(DocumentStructure, Vec<TableData>)`.  The tables vec contains one entry per
     /// `<table>` element that was processed via [`Self::push_table_data`].
     #[must_use]
-    pub fn finish(self) -> (DocumentStructure, Vec<TableData>) {
+    pub fn finish(mut self) -> (DocumentStructure, Vec<TableData>) {
+        self.finish_loose_paragraph();
         let doc = DocumentStructure {
             nodes: self.nodes,
             source_format: Some("html".to_string()),

@@ -24,10 +24,16 @@ pub(super) fn is_text_capture_active(ctx: &Context) -> bool {
 }
 
 pub(super) fn begin_element(tag_name: &str, tag: &tl::HTMLTag<'_>, ctx: &Context) -> ElementTextCapture {
+    let kind = crate::types::structure_builder::annotation_kind_for_tag(tag_name, tag);
+    if crate::converter::utility::content::is_block_level_element(tag_name) {
+        finish_loose_paragraph(ctx);
+    } else if kind.is_some() {
+        // ~keep Started before the element so that its annotation is recorded.
+        begin_loose_paragraph(ctx);
+    }
     let suspended = suspend_parent_list_item(tag_name, ctx);
     let block = begin_block(tag_name, ctx);
     if let Some(collector) = ctx.structure_collector.as_ref() {
-        let kind = crate::types::structure_builder::annotation_kind_for_tag(tag_name, tag);
         collector.borrow_mut().begin_element(kind);
     }
     ElementTextCapture { suspended, block }
@@ -39,6 +45,26 @@ pub(super) fn finish_element(capture: ElementTextCapture, tag_name: &str, tag: &
     }
     resume(ctx, &capture.suspended);
     finish_block(capture.block, tag_name, tag, ctx);
+    if crate::converter::utility::content::is_block_level_element(tag_name) {
+        finish_loose_paragraph(ctx);
+    }
+}
+
+/// Start collecting text that no paragraph, heading or list item holds as a paragraph of its
+/// own. Table cells and code blocks have their own nodes, and inline conversion has no blocks.
+pub(super) fn begin_loose_paragraph(ctx: &Context) {
+    if ctx.in_table_cell || ctx.in_code_block || ctx.convert_as_inline {
+        return;
+    }
+    if let Some(collector) = ctx.structure_collector.as_ref() {
+        collector.borrow_mut().begin_loose_paragraph();
+    }
+}
+
+fn finish_loose_paragraph(ctx: &Context) {
+    if let Some(collector) = ctx.structure_collector.as_ref() {
+        collector.borrow_mut().finish_loose_paragraph();
+    }
 }
 
 pub(super) fn replace_element(ctx: &Context, replacement: Option<&str>) {

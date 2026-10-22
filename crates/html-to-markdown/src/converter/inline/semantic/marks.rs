@@ -750,7 +750,14 @@ mod line_state_cost_tests {
                     assert_eq!(
                         result.document,
                         Some(crate::DocumentStructure {
-                            nodes: vec![],
+                            nodes: vec![crate::DocumentNode {
+                                id: "paragraph-74cbc0cc85b75978".to_string(),
+                                content: crate::NodeContent::Paragraph { text: "z".to_string() },
+                                parent: None,
+                                children: vec![],
+                                annotations: vec![],
+                                attributes: None,
+                            }],
                             source_format: Some("html".to_string())
                         })
                     );
