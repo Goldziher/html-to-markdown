@@ -12,6 +12,7 @@ CONSUMER_PINS = (
     ("test_apps/dart/pubspec.yaml", r"(h2m: \^)[^\s]+", 1),
     ("test_apps/elixir/mix.exs", r'(html_to_markdown, "~> )[^\"]+', 1),
     ("test_apps/kotlin_android/build.gradle.kts", r'(io.xberg:html-to-markdown-android:)[^"\s]+', 2),
+    ("e2e/go/go.mod", r"(github\.com/xberg-io/html-to-markdown/packages/go/v3[ \t]+v)[^\s]+", 1),
 )
 
 
