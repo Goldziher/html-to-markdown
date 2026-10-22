@@ -29,7 +29,7 @@ classifiers = [
 urls.repository = "https://github.com/xberg-io/html-to-markdown"
 
 [dependency-groups]
-dev = ["mypy>=1.19", "ruff>=0.14.8"]
+dev = ["pyrefly>=1.4", "ruff>=0.14.8"]
 
 [tool.maturin]
 module-name = "html_to_markdown._html_to_markdown"
@@ -80,17 +80,6 @@ lint.pylint.max-args = 10
 lint.pylint.max-branches = 15
 lint.pylint.max-returns = 10
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-show_error_codes = true
-implicit_reexport = false
-namespace_packages = true
-overrides = [
-  { module = "html_to_markdown.api", disable_error_code = [
-    "call-arg",
-    "arg-type",
-    "return-value",
-    "attr-defined",
-  ] },
-]
+[tool.pyrefly]
+python-version = "3.10"
+preset = "strict"

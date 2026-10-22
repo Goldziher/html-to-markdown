@@ -69,7 +69,7 @@ tasks:
       - cmd: |
           cd {{.PYTHON_PKG}} && python -c "
           import shutil, glob
-          dirs = ['__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'dist', 'build', '.maturin']
+          dirs = ['__pycache__', '.pytest_cache', '.ruff_cache', 'dist', 'build', '.maturin']
           for d in dirs:
               shutil.rmtree(d, ignore_errors=True)
           for f in glob.glob('*.egg-info'):

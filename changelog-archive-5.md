@@ -84,7 +84,7 @@
 - Comprehensive metadata extraction API across all language bindings (Python, TypeScript, Ruby, PHP, WASM).
 - New `convert_with_metadata()` function returning both markdown and extracted metadata in a single pass.
 - Metadata extraction includes: document metadata (title, description, keywords, author, language, Open Graph, Twitter Card), header hierarchy (h1-h6 with IDs and nesting), link classification (internal/external/anchor/email/phone), image metadata with type detection (data URIs, inline SVGs, external, relative), and structured data (JSON-LD, Microdata, RDFa).
-- Python: 51 comprehensive integration tests with full TypedDict type stubs and mypy validation.
+- Python: 51 comprehensive integration tests with full TypedDict type stubs and static type validation.
 - TypeScript: 14 vitest tests with auto-generated NAPI types, runtime feature detection via `hasMetadataSupport()`, and 600+ lines of documentation.
 - Ruby: 40+ RSpec tests with complete RBS type signatures and comprehensive API documentation.
 - PHP: 21 PHPUnit tests with PHPStan level max compliance and readonly Value Objects.
@@ -148,7 +148,7 @@
 
 ### Fixed
 
-- Cleaned up the Python API’s inline-image helper to avoid redundant casts flagged by `mypy --strict`.
+- Cleaned up the Python API’s inline-image helper to avoid redundant casts flagged by strict type checking.
 - Tightened PHP docblocks and psalm/phpstan annotations so option arrays use strongly typed shapes instead of `array<string, mixed>`.
 - Hardened the WASM, Node, and Python bindings so their `options` argument is fully typed end-to-end (no `any` escapes in `.d.ts` files or placeholder `Any` annotations).
 
