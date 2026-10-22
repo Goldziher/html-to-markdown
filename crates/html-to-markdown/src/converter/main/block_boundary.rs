@@ -137,6 +137,7 @@ pub(super) fn separate_words_at_block_boundary(
                 .is_some_and(|block| !ctx.preserve_tags.contains(block)));
     if at_boundary {
         output.push(' ');
+        crate::converter::structure_capture::append_text(ctx, " ");
     }
 }
 

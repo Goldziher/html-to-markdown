@@ -441,15 +441,26 @@ fn assert_wrapper_rollback(mode: WrapperVisitorMode) {
     let document = result.document.expect("document structure should be populated");
 
     assert!(result.tables.is_empty());
-    assert_eq!(document.nodes.len(), 1);
+    let expected_text = match mode {
+        WrapperVisitorMode::Custom => vec!["replacement", "after"],
+        WrapperVisitorMode::Skip => vec!["after"],
+    };
+    let expected: Vec<_> = expected_text
+        .into_iter()
+        .map(|text| NodeContent::Paragraph { text: text.to_string() })
+        .collect();
     assert_eq!(
-        document.nodes[0].content,
-        NodeContent::Paragraph {
-            text: "after".to_string()
-        }
+        document
+            .nodes
+            .iter()
+            .map(|node| node.content.clone())
+            .collect::<Vec<_>>(),
+        expected
     );
-    assert_eq!(document.nodes[0].parent, None);
-    assert!(document.nodes[0].children.is_empty());
+    for node in &document.nodes {
+        assert_eq!(node.parent, None);
+        assert!(node.children.is_empty());
+    }
 }
 
 #[cfg(feature = "visitor")]
