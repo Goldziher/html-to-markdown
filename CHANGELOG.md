@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Record text outside a paragraph, heading or list item in the document structure, such as the text of
+  `<div>Words</div>` or the text after a list or a table, so a consumer of the structure no longer loses it.
+
 ## [3.18.6] - 2026-10-22
 
 ### Fixed
