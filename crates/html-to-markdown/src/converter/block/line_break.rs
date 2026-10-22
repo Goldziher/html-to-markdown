@@ -55,14 +55,22 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
     write_flow_break(output, options, ctx);
 }
 
-/// Add the break to the paragraph, heading or list item being recorded for the document
-/// structure: a line break, or a space in a heading, which holds one line. Code and table cells
-/// get their text from their own nodes.
+// ~keep Inline code belongs to its enclosing capture; blocks and cells collect their own text.
 fn record_structure_break(ctx: &Context) {
-    if ctx.in_code || ctx.in_code_block || ctx.in_table_cell || ctx.in_layout_cell {
+    if ctx.in_code_block || ctx.in_table_cell || ctx.in_layout_cell {
         return;
     }
-    crate::converter::structure_capture::append_text(ctx, if ctx.in_heading { " " } else { "\n" });
+    let Some(collector) = ctx.structure_collector.as_ref() else {
+        return;
+    };
+    let mut collector = collector.borrow_mut();
+    if ctx.in_heading && ctx.in_code {
+        collector.append_text(" ");
+    } else if ctx.in_heading {
+        collector.append_heading_break();
+    } else {
+        collector.append_text("\n");
+    }
 }
 
 fn write_special_break(output: &mut String, ctx: &Context) -> bool {

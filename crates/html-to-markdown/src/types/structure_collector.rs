@@ -41,6 +41,7 @@ struct TextCapture {
     annotations: Vec<TextAnnotation>,
     open_annotations: Vec<OpenAnnotation>,
     suspended: bool,
+    after_heading_break: bool,
 }
 
 struct CaptureSnapshot {
@@ -49,6 +50,7 @@ struct CaptureSnapshot {
     annotations_len: usize,
     open_annotations_len: usize,
     suspended: bool,
+    after_heading_break: bool,
 }
 
 enum ElementCaptureResult {
@@ -131,6 +133,7 @@ impl StructureCollector {
             annotations: Vec::new(),
             open_annotations: Vec::new(),
             suspended: false,
+            after_heading_break: false,
         });
         id
     }
@@ -146,6 +149,32 @@ impl StructureCollector {
     pub(crate) fn append_text(&mut self, text: &str) {
         for capture in self.text_captures.iter_mut().filter(|capture| !capture.suspended) {
             capture.text.push_str(text);
+            if !text.is_empty() {
+                capture.after_heading_break = false;
+            }
+        }
+    }
+
+    pub(crate) fn append_heading_text(&mut self, text: &str) {
+        for capture in self.text_captures.iter_mut().filter(|capture| !capture.suspended) {
+            let text = if capture.after_heading_break {
+                text.trim_start_matches([' ', '\t', '\n', '\r'])
+            } else {
+                text
+            };
+            capture.text.push_str(text);
+            if !text.is_empty() {
+                capture.after_heading_break = false;
+            }
+        }
+    }
+
+    pub(crate) fn append_heading_break(&mut self) {
+        for capture in self.text_captures.iter_mut().filter(|capture| !capture.suspended) {
+            if !capture.text.ends_with([' ', '\t']) {
+                capture.text.push(' ');
+            }
+            capture.after_heading_break = true;
         }
     }
 
@@ -163,6 +192,7 @@ impl StructureCollector {
                 annotations_len: capture.annotations.len(),
                 open_annotations_len: capture.open_annotations.len(),
                 suspended: capture.suspended,
+                after_heading_break: capture.after_heading_break,
             })
             .collect();
         let annotation_token = kind.map(|kind| self.begin_annotation(kind));
@@ -578,6 +608,7 @@ impl StructureCollector {
             capture.annotations.truncate(snapshot.annotations_len);
             capture.open_annotations.truncate(snapshot.open_annotations_len);
             capture.suspended = snapshot.suspended;
+            capture.after_heading_break = snapshot.after_heading_break;
             restored.push(capture);
         }
         self.text_captures = restored;

@@ -5,7 +5,7 @@
 //! The Markdown gets a hard break for a `<br>`, but the recorded text of a paragraph, heading or
 //! list item got nothing, so `Loose words<br>next line` was recorded as `Loose wordsnext line`.
 
-use html_to_markdown_rs::types::NodeContent;
+use html_to_markdown_rs::types::{AnnotationKind, NodeContent, TextAnnotation};
 use html_to_markdown_rs::{ConversionOptions, convert};
 
 fn nodes(html: &str) -> Vec<NodeContent> {
@@ -71,4 +71,213 @@ fn code_blocks_keep_their_own_line_breaks() {
             language: None
         }]
     );
+}
+
+#[test]
+fn inline_code_breaks_separate_the_enclosing_paragraph_text() {
+    for tag in ["code", "kbd", "samp"] {
+        let html = format!("<p>a<{tag}>b<br>c</{tag}>d</p>");
+        assert_eq!(
+            nodes(&html),
+            [NodeContent::Paragraph {
+                text: "ab\ncd".to_string()
+            }],
+            "inline tag: {tag}"
+        );
+    }
+}
+
+#[test]
+fn heading_breaks_collapse_adjacent_whitespace() {
+    for html in ["<h2>A<br><br>B</h2>", "<h2>A <br>B</h2>", "<h2>A<br> B</h2>"] {
+        let heading = nodes(html)
+            .into_iter()
+            .find(|content| matches!(content, NodeContent::Heading { .. }))
+            .expect("a heading should be recorded");
+        assert_eq!(
+            heading,
+            NodeContent::Heading {
+                level: 2,
+                text: "A B".to_string()
+            },
+            "input: {html}"
+        );
+    }
+}
+
+#[test]
+fn heading_breaks_keep_annotation_byte_offsets_after_collapsing_whitespace() {
+    for (html, text, start, end) in [
+        ("<h2>A<br><b>B</b></h2>", "A B", 2, 3),
+        ("<h2>A <br><br><b>B</b></h2>", "A B", 2, 3),
+        ("<h2>é<br><br><b>β</b></h2>", "é β", 3, 5),
+        ("<h2>A<br><b> B</b></h2>", "A B", 2, 3),
+        ("<h2>é<br><b> β</b></h2>", "é β", 3, 5),
+    ] {
+        let document = convert(
+            html,
+            Some(ConversionOptions {
+                include_document_structure: true,
+                ..ConversionOptions::default()
+            }),
+        )
+        .expect("conversion should succeed")
+        .document
+        .expect("document structure should be populated");
+        let heading = document
+            .nodes
+            .iter()
+            .find(|node| matches!(node.content, NodeContent::Heading { .. }))
+            .expect("a heading should be recorded");
+        assert_eq!(
+            heading.content,
+            NodeContent::Heading {
+                level: 2,
+                text: text.to_string()
+            },
+            "input: {html}"
+        );
+        assert_eq!(
+            heading.annotations,
+            [TextAnnotation {
+                start,
+                end,
+                kind: AnnotationKind::Bold
+            }],
+            "input: {html}"
+        );
+    }
+}
+
+#[test]
+fn inline_code_breaks_keep_unicode_annotation_byte_offsets() {
+    let document = convert(
+        "<p>é<code>β<br>γ</code>δ</p>",
+        Some(ConversionOptions {
+            include_document_structure: true,
+            ..ConversionOptions::default()
+        }),
+    )
+    .expect("conversion should succeed")
+    .document
+    .expect("document structure should be populated");
+    assert_eq!(
+        document.nodes[0].content,
+        NodeContent::Paragraph {
+            text: "éβ\nγδ".to_string()
+        }
+    );
+    assert_eq!(
+        document.nodes[0].annotations,
+        [TextAnnotation {
+            start: 2,
+            end: 7,
+            kind: AnnotationKind::Code
+        }]
+    );
+}
+
+#[cfg(feature = "visitor")]
+#[test]
+fn skipped_heading_wrappers_restore_pending_break_whitespace() {
+    use html_to_markdown_rs::{NodeContext, visitor::HtmlVisitor, visitor::VisitResult};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug)]
+    struct SkipSpan(bool);
+    impl HtmlVisitor for SkipSpan {
+        fn visit_element_end(&mut self, ctx: &NodeContext<'_>, _output: &str) -> VisitResult {
+            if ctx.tag_name == "span" && self.0 {
+                VisitResult::Custom(String::new())
+            } else if ctx.tag_name == "span" {
+                VisitResult::Skip
+            } else {
+                VisitResult::Continue
+            }
+        }
+    }
+
+    for (html, start, custom) in [
+        ("<h2>A<br><span>discard</span><b> B</b></h2>", 2, false),
+        ("<h2>A<span><br></span><b> B</b></h2>", 1, false),
+        ("<h2>A<br><span>discard</span><b> B</b></h2>", 2, true),
+        ("<h2>A<span><br></span><b> B</b></h2>", 1, true),
+    ] {
+        let document = convert(
+            html,
+            Some(ConversionOptions {
+                include_document_structure: true,
+                visitor: Some(Arc::new(Mutex::new(SkipSpan(custom)))),
+                ..ConversionOptions::default()
+            }),
+        )
+        .expect("conversion should succeed")
+        .document
+        .expect("document structure should be populated");
+        let heading = document
+            .nodes
+            .iter()
+            .find(|node| matches!(node.content, NodeContent::Heading { .. }))
+            .expect("a heading should be recorded");
+        assert_eq!(
+            heading.content,
+            NodeContent::Heading {
+                level: 2,
+                text: "A B".to_string()
+            },
+            "input: {html}"
+        );
+        assert_eq!(
+            heading.annotations,
+            [TextAnnotation {
+                start,
+                end: 3,
+                kind: AnnotationKind::Bold
+            }],
+            "input: {html}"
+        );
+    }
+}
+
+#[test]
+fn heading_breaks_preserve_spaces_inside_inline_code() {
+    for (html, start) in [
+        ("<h2>A<br><code> B</code></h2>", 2),
+        ("<h2><code>A<br> B</code></h2>", 0),
+        ("<h2><code>A <br>B</code></h2>", 0),
+        ("<h2><code>A<br><br>B</code></h2>", 0),
+    ] {
+        let document = convert(
+            html,
+            Some(ConversionOptions {
+                include_document_structure: true,
+                ..ConversionOptions::default()
+            }),
+        )
+        .expect("conversion should succeed")
+        .document
+        .expect("document structure should be populated");
+        let heading = document
+            .nodes
+            .iter()
+            .find(|node| matches!(node.content, NodeContent::Heading { .. }))
+            .expect("a heading should be recorded");
+        assert_eq!(
+            heading.content,
+            NodeContent::Heading {
+                level: 2,
+                text: "A  B".to_string()
+            },
+            "input: {html}"
+        );
+        assert_eq!(
+            heading.annotations,
+            [TextAnnotation {
+                start,
+                end: 4,
+                kind: AnnotationKind::Code
+            }],
+            "input: {html}"
+        );
+    }
 }
