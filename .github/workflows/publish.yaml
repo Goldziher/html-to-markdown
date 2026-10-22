@@ -3059,8 +3059,8 @@ jobs:
 
   update-swift-package-manifest:
     name: Update Swift Package.swift manifest with artifact URL and checksum
-    needs: [prepare, upload-swift-release]
-    if: ${{ (needs.prepare.outputs.is_tag == 'true' || needs.prepare.outputs.dry_run == 'true') && needs.upload-swift-release.result == 'success' }}
+    needs: [prepare, upload-swift-release, publish-zig]
+    if: ${{ !cancelled() && (needs.prepare.outputs.is_tag == 'true' || needs.prepare.outputs.dry_run == 'true') && needs.upload-swift-release.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v3
@@ -3082,7 +3082,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           path: .release-tooling
-          sparse-checkout: scripts/ci/swift/finalize_release_manifest.py
+          sparse-checkout: scripts/ci/swift
           persist-credentials: false
 
       - uses: actions/download-artifact@v8
@@ -3153,6 +3153,8 @@ jobs:
             sleep 5
           done
 
+      - uses: xberg-io/actions/install-task@2d3e217104ad1edf519be3e38703c14e3ed48aa4
+
       - name: Update release notes with artifact URL
         if: ${{ needs.prepare.outputs.dry_run != 'true' }}
         env:
@@ -3160,24 +3162,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           CHECKSUM=$(cat swift-checksums/*.checksum | tr -d '[:space:]')
-          ASSET_URL="https://github.com/xberg-io/html-to-markdown/releases/download/v${VERSION}/HtmlToMarkdown-rs.artifactbundle.zip"
-
-          cat > /tmp/swift-notes.md << EOF
-          ## Swift Package Manager
-
-          Add to your \`Package.swift\`:
-
-          \`\`\`swift
-          .package(url: "https://github.com/xberg-io/html-to-markdown", from: "${VERSION}")
-          \`\`\`
-
-          The Swift binding is distributed as a pre-built artifact bundle. No Rust toolchain required.
-
-          **Artifact**: [HtmlToMarkdown-rs.artifactbundle.zip](${ASSET_URL})
-          **Checksum**: \`${CHECKSUM}\`
-          EOF
-
-          gh release edit "v${VERSION}" --notes-file /tmp/swift-notes.md
+          task --taskfile .release-tooling/scripts/ci/swift/Taskfile.yaml notes -- "${CHECKSUM}" "${VERSION}"
 
   build-r-package:
     name: Build R source tarball

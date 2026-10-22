@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  notes:
+    desc: Preserve release notes while updating Swift artifact metadata
+    cmds:
+      - python3 '{{.TASKFILE_DIR}}/update_release_notes.py' {{.CLI_ARGS}}

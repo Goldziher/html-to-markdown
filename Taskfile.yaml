@@ -126,6 +126,13 @@ tasks:
     cmds:
       - bats --recursive --print-output-on-failure scripts/tests/bats
 
+  test:release-scripts:
+    desc: "Run release workflow and helper regression tests"
+    env:
+      PYTHONPATH: "{{.ROOT_DIR}}/scripts"
+    cmds:
+      - uv run --no-sync python -m pytest -q {{.CLI_ARGS | default "scripts/tests"}}
+
   test:scripts:lib:sync:
     desc: "Refresh the vendored Bats helper library from xberg-io/actions"
     cmds:
