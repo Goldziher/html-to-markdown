@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
-//! Issue #851: a link with `href="#"` whose content is white space or a comment is written as
-//! the same link with no content is.
+//! ~keep Hash-only links keep empty labels (#851), with source whitespace outside the link (#929).
 
 use html_to_markdown_rs::{ConversionOptions, HighlightStyle, TierStrategy, convert};
 
@@ -32,15 +31,21 @@ fn converters() -> Vec<ConversionOptions> {
 }
 
 #[test]
-fn should_write_a_hash_link_with_white_space_or_a_comment_as_the_link_with_no_content() {
+fn should_keep_hash_link_labels_empty_and_preserve_source_whitespace() {
     for options in converters() {
-        for content in ["", " ", "<!--x-->", "<span></span>"] {
+        for (content, expected) in [
+            ("", "a[](#)b\n"),
+            (" ", "a [](#)b\n"),
+            ("<!--x-->", "a[](#)b\n"),
+            ("<span></span>", "a[](#)b\n"),
+            ("<i> </i>", "a [](#)b\n"),
+        ] {
             let html = format!("<p>a<a href=\"#\">{content}</a>b</p>");
             let output = convert(&html, Some(options.clone()))
                 .expect("conversion succeeds")
                 .content
                 .unwrap_or_default();
-            assert_eq!(output, "a[](#)b\n", "{:?}: {html}", options.tier_strategy);
+            assert_eq!(output, expected, "{:?}: {html}", options.tier_strategy);
         }
     }
 }

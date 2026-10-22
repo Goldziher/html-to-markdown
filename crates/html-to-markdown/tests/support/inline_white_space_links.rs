@@ -201,15 +201,10 @@ fn a_link_with_no_address_is_written_as_a_span_is() {
     ]);
 }
 
-/// A label of white space only has no ends, so no space goes outside the link. The full
-/// converter writes the address as the label, the fast converter an empty label. A link that
-/// holds only an element with no text keeps an empty label on the full converter (issue #771),
-/// and the fast converter gives that link to the full one.
-///
-/// ~keep These rows pin the output of the base, not the output of a browser: a browser shows
-/// ~keep the white space of such a link as a space between the two words.
+// ~keep Direct whitespace labels retain the address fallback on the full converter. Empty wrappers
+// ~keep retain an empty label (#771) and move their separating space outside the link (#929).
 #[test]
-fn a_link_label_of_white_space_only_puts_no_space_outside_the_link() {
+fn whitespace_only_wrappers_preserve_space_outside_the_empty_link() {
     assert_on_each_converter(&[
         (
             "<p>Press<a href=\"/p\"> </a>now</p>",
@@ -229,12 +224,12 @@ fn a_link_label_of_white_space_only_puts_no_space_outside_the_link() {
         (
             // ~keep Issue #771 decides: before the sync this row had the address as the label.
             "<p>Press<a href=\"/p\"><span> </span></a>now</p>",
-            "Press[](/p)now\n",
+            "Press [](/p)now\n",
             None,
         ),
         (
             "<p>Press<a href=\"/p\"><span>&nbsp;</span></a>now</p>",
-            "Press[](/p)now\n",
+            "Press [](/p)now\n",
             None,
         ),
     ]);

@@ -751,6 +751,14 @@ fn write_link_with_edges(
     edges: &LabelEdges<'_>,
     handler: &mut HandlerContext<'_>,
 ) {
+    // ~keep Formatting can erase a whitespace-only label; its source space still separates words (#929).
+    if label.is_empty()
+        && data.empty_span_content
+        && !keeps_source_white_space(handler.options, handler.context)
+        && !is_fresh_block_start(handler.context, handler.context.at_fresh_block_start.get())
+    {
+        push_inline_prefix(handler.output, data.text_edges.0, handler.options, handler.context);
+    }
     write_with_edges(edges, handler, |handler| {
         write_link(handler.output, tag, data, label, handler.options, handler.context);
     });
