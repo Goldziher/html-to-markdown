@@ -148,7 +148,7 @@ conversion_options(
 
 \item{infer_dimensions}{Infer image dimensions from data}
 
-\item{max_depth}{Maximum DOM traversal depth}
+\item{max_depth}{Maximum conversion traversal depth (default: 1024)}
 
 \item{exclude_selectors}{CSS selectors for elements to exclude entirely (element + all content)}
 

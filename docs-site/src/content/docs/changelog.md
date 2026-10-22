@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.6] - 2026-10-22
+
+### Fixed
+
+- Preserve whitespace inside formatted link labels so adjacent words remain separated
+  ([#929](https://github.com/xberg-io/html-to-markdown/issues/929)).
+- Synchronize the Go E2E dependency pin with the workspace release version.
+
+### Security
+
+- Update `rustls-webpki` to 0.103.16 and `webpki-root-certs` to 1.0.10 to address
+  [RUSTSEC-2026-0382](https://rustsec.org/advisories/RUSTSEC-2026-0382) and
+  [RUSTSEC-2026-0383](https://rustsec.org/advisories/RUSTSEC-2026-0383).
+
+## [3.18.5] - 2026-10-20
+
+### Fixed
+
+- Ignore source-layout whitespace between MathML elements so inline formulas stay within their paragraph (#925).
+- Escape literal asterisks inside bold table text to preserve the intended formatting (#926).
+- Omit presentation tables whose cells contain only line breaks (#927).
+- Preserve link destinations inside preformatted blocks (#928).
+
+## [3.18.4] - 2026-10-19
+
+### Changed
+
+- Raise the default conversion depth limit from 64 to 1024 so deeply nested pages retain
+  their text. Explicit lower limits remain supported, and skipped content still produces
+  a depth-limit warning (#924).
+
+### Fixed
+
+- Avoid stack overflows when searching deeply nested link children for tables (#923).
+- Use smaller GitHub API pages when collecting release-job results to avoid failed summaries
+  on large release workflows.
+
+## [3.18.3] - 2026-10-19
+
+### Fixed
+
+- Keep SVG labels and image alt text separate from neighboring words when rendered as text,
+  including inside links, headings and code (#918).
+- Preserve fallback text, nested images and captions inside picture elements (#919).
+- Preserve spaces before inline elements after blank lines in list items and after links (#920).
+- Preserve stray table text, explicit breaks in otherwise empty code elements, text following
+  an unclosed noscript inside noframes, and block boundaries inside subscript and superscript
+  elements. Retain the existing tested policies for metadata-only heads and malformed markup
+  (#921, #922).
+
+## [3.18.2] - 2026-10-19
+
+### Changed
+
+- Upgrade Rust and language-package dependencies, including PyO3 0.30.1, ext-php-rs 0.16.3,
+  Jackson 2.22.4 and Vitest 5.0.5, and regenerate bindings and documentation with Alef 0.111.0.
+- Upgrade the documentation site to Astro 7.4.0 and remove vulnerable transitive dependencies
+  from its Markdown discovery and CSS selector tooling.
+
+### Fixed
+
+- Preserve Markdown image syntax for images with alt text and no source, restoring the behavior
+  from 3.17.2 (#917).
+
 ## [3.18.1] - 2026-10-15
 
 ### Fixed

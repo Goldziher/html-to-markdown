@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.18.6] - 2026-10-22
+
+### Fixed
+
+- Preserve whitespace inside formatted link labels so adjacent words remain separated
+  ([#929](https://github.com/xberg-io/html-to-markdown/issues/929)).
+- Synchronize the Go E2E dependency pin with the workspace release version.
+
+### Security
+
+- Update `rustls-webpki` to 0.103.16 and `webpki-root-certs` to 1.0.10 to address
+  [RUSTSEC-2026-0382](https://rustsec.org/advisories/RUSTSEC-2026-0382) and
+  [RUSTSEC-2026-0383](https://rustsec.org/advisories/RUSTSEC-2026-0383).
+
 ## [3.18.5] - 2026-10-20
 
 ### Fixed

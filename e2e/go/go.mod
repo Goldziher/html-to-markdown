@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/stretchr/testify v1.12.1
-	github.com/xberg-io/html-to-markdown/packages/go/v3 v3.18.1
+	github.com/xberg-io/html-to-markdown/packages/go/v3 v3.18.6
 )
 
 require go.yaml.in/yaml/v3 v3.0.5 // indirect

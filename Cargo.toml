@@ -26,7 +26,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "3.18.5"
+version = "3.18.6"
 edition = "2024"
 authors = ["Na'aman Hirschfeld <naaman@xberg.io>", "Tobias Perlstein <tobias@xberg.io>"]
 description = "High-performance HTML to Markdown converter"
@@ -47,7 +47,7 @@ clap_complete = "4.6"
 clap_mangen = "0.3"
 encoding_rs = "0.8"
 ext-php-rs = "0.16.3"
-html-to-markdown-rs = { version = "3.18.5", path = "crates/html-to-markdown" }
+html-to-markdown-rs = { version = "3.18.6", path = "crates/html-to-markdown" }
 html5ever = "0.40.1"
 mimalloc = { version = "0.1", default-features = false }
 once_cell = "1.21"
@@ -103,4 +103,4 @@ strip = true
 debug = 1
 
 [patch.crates-io]
-html-to-markdown-rs = { path = "crates/html-to-markdown", version = "3.18.5" }
+html-to-markdown-rs = { path = "crates/html-to-markdown", version = "3.18.6" }

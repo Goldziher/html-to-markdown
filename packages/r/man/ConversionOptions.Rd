@@ -106,7 +106,7 @@ Use \code{\link[ConversionOptions:builder]{ConversionOptions::builder()}} to con
 
 \item{\code{infer_dimensions}}{Infer image dimensions from data.}
 
-\item{\code{max_depth}}{Maximum DOM traversal depth.}
+\item{\code{max_depth}}{Maximum conversion traversal depth (default: 1024).}
 
 \item{\code{exclude_selectors}}{CSS selectors for elements to exclude entirely (element + all content).}
 
