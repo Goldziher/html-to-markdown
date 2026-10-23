@@ -13,7 +13,12 @@ pub(super) struct ElementTextCapture {
 
 pub(super) fn append_text(ctx: &Context, text: &str) {
     if let Some(collector) = ctx.structure_collector.as_ref() {
-        collector.borrow_mut().append_text(text);
+        let mut collector = collector.borrow_mut();
+        if ctx.in_heading && !ctx.in_code {
+            collector.append_heading_text(text);
+        } else {
+            collector.append_text(text);
+        }
     }
 }
 

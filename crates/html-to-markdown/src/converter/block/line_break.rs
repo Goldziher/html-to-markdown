@@ -48,10 +48,29 @@ pub fn handle(node_handle: &NodeHandle, parser: &Parser, output: &mut String, ha
         rule_like_text.advance();
     }
 
+    record_structure_break(ctx);
     if write_special_break(output, ctx) {
         return;
     }
     write_flow_break(output, options, ctx);
+}
+
+// ~keep Inline code belongs to its enclosing capture; blocks and cells collect their own text.
+fn record_structure_break(ctx: &Context) {
+    if ctx.in_code_block || ctx.in_table_cell || ctx.in_layout_cell {
+        return;
+    }
+    let Some(collector) = ctx.structure_collector.as_ref() else {
+        return;
+    };
+    let mut collector = collector.borrow_mut();
+    if ctx.in_heading && ctx.in_code {
+        collector.append_text(" ");
+    } else if ctx.in_heading {
+        collector.append_heading_break();
+    } else {
+        collector.append_text("\n");
+    }
 }
 
 fn write_special_break(output: &mut String, ctx: &Context) -> bool {

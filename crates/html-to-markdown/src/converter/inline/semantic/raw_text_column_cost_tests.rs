@@ -412,9 +412,9 @@ fn expected_document(id: &str) -> &'static str {
             ": Some(\"html\") })",
         ),
         "policy/hardbreak/Markdown" | "policy/hardbreak/Plain" | "policy/hardbreak/Djot" => concat!(
-            "Some(DocumentStructure { nodes: [DocumentNode { id: \"paragraph-89516efad3eca675\", cont",
-            "ent: Paragraph { text: \"x1. z\" }, parent: None, children: [], annotations: [TextAnnota",
-            "tion { start: 1, end: 4, kind: Highlight }], attributes: None }], source_format: Some(",
+            "Some(DocumentStructure { nodes: [DocumentNode { id: \"paragraph-c0b45f8016f28814\", cont",
+            "ent: Paragraph { text: \"x\\n1. z\" }, parent: None, children: [], annotations: [TextAnnota",
+            "tion { start: 2, end: 5, kind: Highlight }], attributes: None }], source_format: Some(",
             "\"html\") })",
         ),
         "policy/unicode/Markdown" | "policy/unicode/Plain" | "policy/unicode/Djot" => concat!(

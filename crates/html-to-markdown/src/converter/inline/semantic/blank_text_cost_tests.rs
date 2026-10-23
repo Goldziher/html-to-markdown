@@ -230,11 +230,11 @@ fn blank_marks_should_keep_line_break_code_and_fallback_policies() {
             }]
         } else if html.starts_with("<div>x<br>") {
             vec![paragraph(
-                "paragraph-4e5b75bcca16bec6",
-                "x\n z",
+                "paragraph-4fed1c9f442a0a5e",
+                "x\n\n z",
                 vec![TextAnnotation {
-                    start: 1,
-                    end: 3,
+                    start: 2,
+                    end: 4,
                     kind: AnnotationKind::Highlight,
                 }],
             )]
