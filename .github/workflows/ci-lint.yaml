@@ -147,10 +147,9 @@ jobs:
         with:
           python-version: "3.13"
           install-command: "uv sync --no-install-project --no-install-workspace"
+      - uses: xberg-io/actions/install-task@2d3e217104ad1edf519be3e38703c14e3ed48aa4
       - name: Test release helpers
-        env:
-          PYTHONPATH: scripts
-        run: uv run --no-sync python -m pytest scripts/tests -q
+        run: task test:release-scripts
 
   quality-warnings:
     name: Reject quality warning regressions

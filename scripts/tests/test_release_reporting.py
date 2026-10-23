@@ -24,6 +24,20 @@ class ReleaseReportingTests(unittest.TestCase):
         assert setup["uses"] == "xberg-io/actions/setup-python-env@v1"
         assert setup["with"]["python-version"] == "3.13"
 
+    def test_release_helper_job_installs_task_before_running_workflow_regressions(self) -> None:
+        """Workflow execution tests need the same Task executable as release jobs."""
+        workflow = yaml.safe_load((ROOT / ".github/workflows/ci-lint.yaml").read_text())
+        steps = workflow["jobs"]["release-scripts"]["steps"]
+        tests = next(index for index, step in enumerate(steps) if step.get("name") == "Test release helpers")
+        installers = [
+            index
+            for index, step in enumerate(steps)
+            if step.get("uses") == "xberg-io/actions/install-task@2d3e217104ad1edf519be3e38703c14e3ed48aa4"
+        ]
+        assert len(installers) == 1
+        assert installers[0] < tests
+        assert steps[tests]["run"] == "task test:release-scripts"
+
     def test_both_queries_address_the_repository_outside_a_checkout(self) -> None:
         """Reject implicit repository lookup while retaining draft-state results."""
         workflow = yaml.safe_load((ROOT / ".github/workflows/publish.yaml").read_text())
